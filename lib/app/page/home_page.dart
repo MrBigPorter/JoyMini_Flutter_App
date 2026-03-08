@@ -86,12 +86,12 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
         onRefresh: _onManualRefresh,
         child: CustomScrollView(
           physics: platformScrollPhysics(),
-          cacheExtent: 1000,
+          cacheExtent: 1500,
           slivers: [
             // 1. Banner Section
             banners.when(
               skipLoadingOnRefresh: true,
-              skipLoadingOnReload: true, // 🚀 修复 3：补上重载免死金牌，彻底告别骨架屏闪烁！
+              skipLoadingOnReload: true, //  修复 3：补上重载免死金牌，彻底告别骨架屏闪烁！
               data: (list) => SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.all(16.w),
@@ -105,7 +105,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
             // 2. Hot Group Buy Section
             hotGroups.when(
               skipLoadingOnRefresh: true,
-              skipLoadingOnReload: true, // 🚀 修复 3
+              skipLoadingOnReload: true, //  修复 3
               data: (data) {
                 if (data.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
                 return SliverToBoxAdapter(
@@ -122,7 +122,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
             // 3. Treasures Waterfall
             treasures.when(
               skipLoadingOnRefresh: true,
-              skipLoadingOnReload: true, // 🚀 修复 3
+              skipLoadingOnReload: true, //  修复 3
               data: (data) {
                 if (data.isNotEmpty) {
                   return HomeTreasures(treasures: data);

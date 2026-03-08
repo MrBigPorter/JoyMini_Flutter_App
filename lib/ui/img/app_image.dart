@@ -98,44 +98,36 @@ class AppCachedImage extends StatelessWidget {
   }
 
   Widget _buildNetworkImage(BuildContext context, String path) {
-    // 1. 确保逻辑宽度归一化 (和你 Preloader 逻辑一致)
+    // 1. 确保逻辑宽度归一化
     final double fixedWidth = width?.toInt().toDouble() ?? 240.0;
     final url = UrlResolver.resolveImage(context, path, logicalWidth: fixedWidth, fit: fit);
 
     if (url.isEmpty) return _buildFallback();
 
-    // 3.  Stack 方案：物理防闪烁 + 完美兜底
-    return Stack(
-      fit: StackFit.passthrough,
-      children: [
-        // 底层：永远垫着 previewBytes
-        // 这样 Nginx 挂了，这里就一直显示这张图，用户根本感觉不到网络崩了
-        if (previewBytes != null && previewBytes!.isNotEmpty)
-          Image.memory(
-              previewBytes!,
-              width: width,
-              height: height,
-              fit: fit,
-              gaplessPlayback: true
-          )
-        else
-          Container(color: placeholderColor, width: width, height: height),
+    final bool hasPreview = previewBytes != null && previewBytes!.isNotEmpty;
+    //  核心保留：300ms 的柔和淡入动画决不能丢
+    final Duration fadeDuration = hasPreview
+        ? Duration.zero
+        : (fadeInDuration ?? const Duration(milliseconds: 300));
 
-        // 顶层：尝试加载高清图
-        CachedNetworkImage(
-          imageUrl: url,
-          cacheKey: url,
-          width: width,
-          height: height,
-          fit: fit,
-          // 彻底关掉动画，防止和底图叠加时闪烁
-          fadeInDuration: Duration.zero,
-          fadeOutDuration: Duration.zero,
-          // 占位和错误都设为透明，直接透出底层的 previewBytes
-          placeholder: (context, url) => const SizedBox.shrink(),
-          errorWidget: (context, url, err) => const SizedBox.shrink(),
-        ),
-      ],
+    //  提取兜底的骨架屏 (把 product_item.dart 传进来的 Skeleton 拿出来)
+    final Widget fallbackWidget = placeholder ?? Container(color: placeholderColor, width: width, height: height);
+
+    if (hasPreview) {
+      return Image.memory(previewBytes!, width: width, height: height, fit: fit, gaplessPlayback: true);
+    }
+
+    // 极简架构：不再请求第二张 blur 图，直接 骨架屏 -> 300ms 淡入 -> 高清图
+    return CachedNetworkImage(
+      imageUrl: url,
+      cacheKey: url,
+      width: width,
+      height: height,
+      fit: fit,
+      fadeInDuration: fadeDuration,
+      fadeOutDuration: fadeDuration,
+      placeholder: (context, url) => fallbackWidget,
+      errorWidget: (context, url, err) => error ?? fallbackWidget,
     );
   }
 

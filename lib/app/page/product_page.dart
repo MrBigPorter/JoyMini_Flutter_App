@@ -284,6 +284,10 @@ class _ProductLoadingSkeleton extends StatelessWidget {
       },
       body: CustomScrollView(
         physics: const NeverScrollableScrollPhysics(),
+        // 核心：增加视窗外的预渲染区域！
+        // 1500 大概是两到三屏的高度。
+        // 意思是：用户还没滑到下面，底层其实已经偷偷把图片下载并准备好渲染了！
+        //cacheExtent: 1500,
         slivers: [
           SliverPadding(
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
