@@ -111,7 +111,7 @@ class AppCachedImage extends StatelessWidget {
         : (fadeInDuration ?? const Duration(milliseconds: 300));
 
     //  提取兜底的骨架屏 (把 product_item.dart 传进来的 Skeleton 拿出来)
-    final Widget fallbackWidget = placeholder ?? Container(color: placeholderColor, width: width, height: height);
+    final Widget fallbackWidget = placeholder ?? _buildFallback(isPlaceholder: true);
 
     if (hasPreview) {
       return Image.memory(previewBytes!, width: width, height: height, fit: fit, gaplessPlayback: true);

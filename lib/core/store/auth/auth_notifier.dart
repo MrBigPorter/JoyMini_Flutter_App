@@ -46,17 +46,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
       isAuthenticated: true,
     );
 
-    // Critical Path: Fetch user profile synchronously to ensure UserID is available.
-    await ref.read(userProvider.notifier).fetchProfile();
+    Future.microtask(() => appRouter.go('/home'));
 
-    // Background Tasks: Fetch non-critical data without blocking navigation.
-    Future.wait<void>([
-      ref.read(walletProvider.notifier).fetchBalance(),
-    ]).then((_) {
-      debugPrint('[Auth] Login: Background data loaded');
-    }).catchError((e) {
-      debugPrint('[Auth] Login: Background data error: $e');
-    });
+
+   Future.wait<void>([
+     // Critical Path: Fetch user profile synchronously to ensure UserID is available.
+    ref.read(userProvider.notifier).fetchProfile(),
+    ref.read(walletProvider.notifier).fetchBalance(),
+   ]).then((_) {
+     debugPrint('[Auth] Login: User profile and wallet balance fetched successfully');
+   }).catchError((e) {
+     debugPrint('[Auth] Login: Error fetching user profile or wallet balance - $e');
+   });
   }
 
   /// Updates current access and refresh tokens.

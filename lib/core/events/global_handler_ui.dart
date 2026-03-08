@@ -69,6 +69,10 @@ extension GlobalHandlerUIExtension on _GlobalHandlerState {
   /// 处理 EventBus 传来的全局系统事件
   void _handleGlobalEvent(GlobalEvent event) {
     if (!mounted) return;
+    final isAuthenticated =  ref.watch(authProvider.select((s) => s.isAuthenticated));
+    if(!isAuthenticated){
+      return;
+    }
     if (event.type == GlobalEventType.deviceBanned) _showLockDialog();
   }
 
@@ -112,11 +116,12 @@ extension GlobalHandlerUIExtension on _GlobalHandlerState {
                 SizedBox(height: 24.h),
                 Button(
                   onPressed: (){
+                    close();
                     if (kIsWeb) {
                       //  Web 端：网页没有“退出”概念，最佳实践是清空路由并踢回登录页
                       ref.read(authProvider.notifier).logout();
                     } else {
-                      // 📱 移动原生端：安全调用 Platform
+                      //  移动原生端：安全调用 Platform
                       if (Platform.isAndroid) {
                         SystemNavigator.pop();
                       } else {

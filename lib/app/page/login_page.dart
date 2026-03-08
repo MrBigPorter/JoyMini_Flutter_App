@@ -108,8 +108,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         result.tokens.refreshToken,
       );
 
-      //  Navigate to Main Page
-      appRouter.go('/home');
+
     }
   }
 
