@@ -10,10 +10,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_app/core/providers/me_provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../../../theme/design_tokens.g.dart';
+import 'package:flutter_app/core/store/auth/auth_provider.dart';
+import 'package:flutter_app/theme/design_tokens.g.dart';
+
+//  替换为智能缓存池：死死绑定登录状态，退出自动清空！
+final orderListCacheProvider = Provider<Map<String, PageResult<OrderItem>>>((ref) {
+  //  神级代码：盯住登录状态。一旦从已登录变成未登录（或切账号），
+  // Riverpod 会直接炸毁这个 Provider，然后给你分配一个全新的、干净的 {} 空 Map！
+  ref.watch(authProvider.select((s) => s.isAuthenticated));
+  return {};
+});
 
 
-final _orderListCache = <String, PageResult<OrderItem>>{};
 final orderListDirtyProvider = StateProvider.family<bool, String>((ref, status) => false);
 
 class OrderList extends ConsumerStatefulWidget {
@@ -40,16 +48,19 @@ class _OrderListState extends ConsumerState<OrderList> with AutomaticKeepAliveCl
         final cacheKey = 'order_list_${widget.status}';
         final fetchApi = ref.read(orderListProvider((status: widget.status, treasureId: null)));
 
+        //  核心改造 1：从 Provider 中拿取当前账号【专属】的缓存池
+        final cachePool = ref.read(orderListCacheProvider);
+
         if (page == 1) {
           final isDirty = ref.read(orderListDirtyProvider(widget.status));
 
           //  2. 真·SWR 拦截：有缓存且客户端没标记脏
-          if (!isDirty && _orderListCache.containsKey(cacheKey)) {
+          if (!isDirty && cachePool.containsKey(cacheKey)) {
 
             // ① 派小弟去后台拉取最新数据（对齐服务器端的发货/取消状态）
             fetchApi(pageSize: pageSize, page: 1).then((freshData) {
               if (mounted && _ctl.value.currentPage <= 1) {
-                _orderListCache[cacheKey] = freshData;
+                cachePool[cacheKey] = freshData;
                 // ② 数据回来后，【绕过 Controller，直接修改底层 ValueNotifier】！
                 // 这会让 UI 瞬间热更新，已经发货的商品会无缝消失，完全不闪屏！
                 _ctl.value = _ctl.value.copyWith(
@@ -61,12 +72,12 @@ class _OrderListState extends ConsumerState<OrderList> with AutomaticKeepAliveCl
             }).catchError((_) {});
 
             // ③ 0 毫秒瞬间返回内存里的缓存，消灭一切骨架屏！
-            return _orderListCache[cacheKey]!;
+            return cachePool[cacheKey]!;
           }
 
           // ============ 正常走网络请求（冷启动或被客户端标记脏了） ============
           final res = await fetchApi(pageSize: pageSize, page: 1);
-          _orderListCache[cacheKey] = res;
+          cachePool[cacheKey] = res;
           if (isDirty) ref.read(orderListDirtyProvider(widget.status).notifier).state = false;
           return res;
         }

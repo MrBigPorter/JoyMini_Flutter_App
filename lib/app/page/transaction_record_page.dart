@@ -11,6 +11,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../components/list.dart';
 import '../../core/models/balance.dart';
 import '../../core/models/page_request.dart';
+import '../../core/store/auth/auth_provider.dart';
 
 // 1. 定义一个函数类型别名 (这样报错会很清晰)
 typedef TransactionRequestFunc = Future<PageResult<TransactionUiModel>> Function({
@@ -21,49 +22,26 @@ required int pageSize
 // 定义入参
 typedef TransactionListParams = ({UiTransactionType type});
 
-// 1. 全局内存缓存：保住第一页的命，消灭骨架屏！
-final _transactionCache = <String, PageResult<TransactionUiModel>>{};
-
+// 2. 智能缓存池：绑定登录状态，自动清空
+final transactionCacheProvider = Provider<Map<String, PageResult<TransactionUiModel>>>((ref) {
+  ref.watch(authProvider.select((s) => s.isAuthenticated));
+  return {};
+});
 // 2. 脏标记 (Dirty Flag)：记录某个类型的交易是否需要强刷
 final transactionDirtyProvider = StateProvider.family<bool, UiTransactionType>((ref, type) => false);
 
-// 2. Provider 定义 (明确返回 TransactionRequestFunc)
-final transactionListProvider = Provider.family<TransactionRequestFunc, TransactionListParams>((ref, params) {
+//  3. 纯粹的数据源 Provider (把之前的缓存逻辑全剥离出去，只负责发请求)
+final transactionApiProvider = Provider.family<TransactionRequestFunc, TransactionListParams>((ref, params) {
   return ({required int page, required int pageSize}) async {
-    final cacheKey = 'transaction_list_${params.type.name}';
-
-    //  看看有没有人贴了“脏标记”
-    final isDirty = ref.read(transactionDirtyProvider(params.type));
-
-    // 核心逻辑：如果是第一页、且数据没脏、且有缓存 -> 瞬间秒开！
-    if (page == 1 && !isDirty && _transactionCache.containsKey(cacheKey)) {
-      // (可选) 可以在这里静默拉取新数据更新缓存，或者干脆啥都不做，完全依赖脏标记
-      return _transactionCache[cacheKey]!;
-    }
-
-    // ============ 走真实的真实网络请求 ============
-    PageResult<TransactionUiModel> result;
     if (params.type == UiTransactionType.deposit) {
       final res = await Api.walletRechargeHistoryApi(WalletRechargeHistoryDto(page: page, pageSize: pageSize));
-      result = PageResult(list: res.list.map((e) => e.toUiModel()).toList(), total: res.total, count: res.count, page: res.page, pageSize: res.pageSize);
+      return PageResult(list: res.list.map((e) => e.toUiModel()).toList(), total: res.total, count: res.count, page: res.page, pageSize: res.pageSize);
     } else {
       final res = await Api.walletWithdrawHistory(WalletWithdrawHistoryDto(page: page, pageSize: pageSize));
-      result = PageResult(list: res.list.map((e) => e.toUiModel()).toList(), total: res.total, count: res.count, page: res.page, pageSize: res.pageSize);
+      return PageResult(list: res.list.map((e) => e.toUiModel()).toList(), total: res.total, count: res.count, page: res.page, pageSize: res.pageSize);
     }
-
-    // 更新缓存并销毁标记
-    if (page == 1) {
-      _transactionCache[cacheKey] = result; // 存入缓存
-      if (isDirty) {
-        // 数据已经最新了，把脏标记洗白，下次进来继续秒开！
-        ref.read(transactionDirtyProvider(params.type).notifier).state = false;
-      }
-    }
-
-    return result;
   };
 });
-
 
 
 // 页面主体
@@ -198,16 +176,45 @@ class _TransactionListViewState extends ConsumerState<TransactionListView>
 
     _ctl = PageListController<TransactionUiModel>(
       requestKey: widget.type,
-      request: ({required int pageSize, required int page}) {
+      request: ({required int pageSize, required int page}) async {
+        final cacheKey = 'transaction_list_${widget.type.name}';
 
-        final TransactionRequestFunc requestFunc = ref.read(
-            transactionListProvider((type: widget.type))
-        );
+        final fetchApi = ref.read(transactionApiProvider((type: widget.type)));
+        final cachePool = ref.read(transactionCacheProvider);
 
-        return requestFunc(
-          pageSize: pageSize,
-          page: page,
-        );
+        if (page == 1) {
+          final isDirty = ref.read(transactionDirtyProvider(widget.type));
+
+          if (!isDirty && cachePool.containsKey(cacheKey)) {
+
+            // ① 偷偷派小弟去后台拉取最新数据（完美解决“多次进来不发请求”的问题！）
+            fetchApi(pageSize: pageSize, page: 1).then((freshData) {
+              if (mounted && _ctl.value.currentPage <= 1) {
+                cachePool[cacheKey] = freshData; // 更新缓存
+                // ② 拿到新数据后，绕过加载圈，直接静默替换 UI 面板的内容！
+                _ctl.value = _ctl.value.copyWith(
+                  items: freshData.list,
+                  hasMore: freshData.list.length < freshData.total,
+                  status: freshData.list.isEmpty ? PageStatus.empty : PageStatus.success,
+                );
+              }
+            }).catchError((_) {});
+
+            // ③ 0毫秒瞬间返回旧缓存，消灭骨架屏
+            return cachePool[cacheKey]!;
+          }
+
+          // ============ 正常走网络请求（冷启动或被充值/提现操作标记为脏了） ============
+          final res = await fetchApi(pageSize: pageSize, page: 1);
+
+          cachePool[cacheKey] = res; // 存入专属池子
+
+          if (isDirty) ref.read(transactionDirtyProvider(widget.type).notifier).state = false;
+          return res;
+        }
+
+        // 第 2 页之后正常加载更多
+        return await fetchApi(pageSize: pageSize, page: page);
       },
     );
   }

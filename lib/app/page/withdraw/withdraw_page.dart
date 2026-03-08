@@ -25,7 +25,7 @@ import 'package:flutter_app/core/providers/wallet_provider.dart';
 // --- Forms & Validation ---
 import 'package:flutter_app/utils/form/validators.dart';
 import 'package:flutter_app/utils/form/withdraw_froms/withdraw_form.dart';
-import '../../utils/form/validation/k_withdraw_validation_messages.dart';
+import '../../../utils/form/validation/k_withdraw_validation_messages.dart';
 
 // --- Modals ---
 import 'package:flutter_app/app/page/withdraw/withdraw_success_modal.dart';

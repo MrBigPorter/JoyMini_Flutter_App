@@ -36,6 +36,7 @@ import '../providers/socket_provider.dart';
 import '../services/customer_service/customer_service_helper.dart';
 import '../services/socket/session_manager.dart';
 import '../services/socket/socket_service.dart';
+import '../store/auth/auth_provider.dart';
 import '../store/user_store.dart';
 
 part 'global_handler_socket.dart';

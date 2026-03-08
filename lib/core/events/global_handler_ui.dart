@@ -111,20 +111,10 @@ extension GlobalHandlerUIExtension on _GlobalHandlerState {
                 ),
                 SizedBox(height: 24.h),
                 Button(
-                  onPressed: () {
-                    CustomerServiceHelper.startChat();
-                  },
-                  child: Text('security.btn_contact_support'.tr()),
-                ),
-                SizedBox(height: 12.h),
-
-                // 🚀 核心优化：多端适配的退出逻辑
-                GestureDetector(
-                  onTap: () {
+                  onPressed: (){
                     if (kIsWeb) {
-                      // 🌐 Web 端：网页没有“退出”概念，最佳实践是清空路由并踢回登录页
-                      // 请将 '/login' 替换为你项目中实际的登录路由或错误提示页
-                      appRouter.go('/login');
+                      //  Web 端：网页没有“退出”概念，最佳实践是清空路由并踢回登录页
+                      ref.read(authProvider.notifier).logout();
                     } else {
                       // 📱 移动原生端：安全调用 Platform
                       if (Platform.isAndroid) {
@@ -134,13 +124,8 @@ extension GlobalHandlerUIExtension on _GlobalHandlerState {
                       }
                     }
                   },
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8.h),
-                    child: Text(
-                      'security.btn_exit_app'.tr(),
-                      style: TextStyle(color: context.textSecondary700),
-                    ),
-                  ),
+                  width: 120,
+                  child: Text('security.btn_exit_app'.tr(),),
                 ),
               ],
             ),

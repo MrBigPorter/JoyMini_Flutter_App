@@ -40,7 +40,7 @@ import 'package:flutter_app/app/page/transaction_record_page.dart';
 import 'package:flutter_app/app/page/me_components/me_page.dart';
 import 'package:flutter_app/app/page/login_page.dart';
 import 'package:flutter_app/app/page/product_detail_page.dart';
-import 'package:flutter_app/app/page/withdraw_page.dart';
+import 'package:flutter_app/app/page/withdraw/withdraw_page.dart';
 import 'package:flutter_app/ui/chat/group/group_request_list/group_request_list_page.dart';
 import 'package:flutter_app/ui/chat/group/group_profile/group_profile_page.dart';
 import '../../ui/chat/group/group_search/group_search_page.dart';
