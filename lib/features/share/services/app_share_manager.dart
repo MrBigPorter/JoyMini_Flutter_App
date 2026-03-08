@@ -15,9 +15,12 @@ class ShareManager {
       if (content.groupId != null) 'gid': content.groupId,
     });
 
+    //  核心：清洗文字里的 HTML 标签，并在结尾加两个换行符 \n\n
+    final cleanDesc = content.desc.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+
     final data = ShareData(
       title: content.title,
-      text: content.desc,      // Use dynamic copy passed from the business layer
+      text: "$cleanDesc\n\n", // 必须有 \n\n
       url: uri.toString(),     // Generated H5 intermediate link
       imageUrl: content.imageUrl,
     );

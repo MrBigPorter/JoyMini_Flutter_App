@@ -111,7 +111,7 @@ class ShareService {
 
   /// WhatsApp: Requires parameter encoding
   static Future<void> shareWhatsApp(ShareData d) async {
-    final text = Uri.encodeComponent(d.combined);
+    final text = Uri.encodeComponent("${d.text}\n\n${d.url}");
     await _launchSocialIntent(
       urlScheme: 'whatsapp://send?text=$text',
       fallbackData: d,
