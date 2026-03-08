@@ -25,6 +25,7 @@ import 'package:flutter_app/app/page/transaction/transaction_ui_model.dart';
 import 'package:flutter_app/app/page/transaction_record_page.dart';
 import 'package:flutter_app/app/page/withdraw/withdraw_success_modal.dart';
 
+// Declare parts
 part 'withdraw_page_logic.dart';
 part 'withdraw_page_ui.dart';
 part 'withdraw_page_skeleton.dart';
@@ -36,17 +37,17 @@ class WithdrawPage extends ConsumerStatefulWidget {
   ConsumerState<WithdrawPage> createState() => _WithdrawPageState();
 }
 
-// 使用 with 混入我们抽离的逻辑 (WithdrawPageLogic)
+// Mixin logic via WithdrawPageLogic
 class _WithdrawPageState extends ConsumerState<WithdrawPage> with WithdrawPageLogic {
 
   @override
   Widget build(BuildContext context) {
-    // 监听数据流
+    // Watch data streams
     final wallet = ref.watch(walletProvider.select((s) => s));
     final withdrawable = wallet.realBalance;
     final channelsAsync = ref.watch(clientPaymentChannelsWithdrawProvider);
 
-    // 绑定监听器 (逻辑部分)
+    // Bind listeners (Logic part)
     setupListeners(withdrawable);
 
     final isPageLoading = channelsAsync.isLoading && !channelsAsync.hasValue;
@@ -70,7 +71,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> with WithdrawPageLo
                   SizedBox(height: 20.h),
 
                   if (isPageLoading)
-                    const WithdrawSkeletonLoader() // 独立的优雅骨架屏
+                    const WithdrawSkeletonLoader() // Elegant standalone skeleton
                   else if (channelsAsync.hasError)
                     buildErrorState()
                   else ...[

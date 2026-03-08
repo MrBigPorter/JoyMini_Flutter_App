@@ -8,7 +8,7 @@ class WithdrawSkeletonLoader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        //  1. 优化后的金额输入区域骨架屏 (告别大灰砖)
+        // 1. Optimized Amount Input Area Skeleton
         Container(
           padding: EdgeInsets.all(20.w),
           decoration: BoxDecoration(
@@ -19,7 +19,7 @@ class WithdrawSkeletonLoader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 顶部 Amount 和 Withdraw All 占位
+              // Top Amount and Withdraw All placeholders
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -28,7 +28,7 @@ class WithdrawSkeletonLoader extends StatelessWidget {
                 ],
               ),
               SizedBox(height: 24.h),
-              // 中间的大额度输入 ₱ 0.00
+              // Middle currency input ₱ 0.00
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -40,7 +40,7 @@ class WithdrawSkeletonLoader extends StatelessWidget {
               SizedBox(height: 20.h),
               Divider(height: 1, color: Colors.grey.withOpacity(0.1)),
               SizedBox(height: 16.h),
-              // 底部的 Fee / Actual Received 明细
+              // Bottom Fee / Actual Received details
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -61,11 +61,11 @@ class WithdrawSkeletonLoader extends StatelessWidget {
         ),
         SizedBox(height: 24.h),
 
-        // 2. 模拟渠道标题
+        // 2. Mock Channel Title
         Skeleton.react(width: 120.w, height: 16.h, borderRadius: BorderRadius.circular(4.r)),
         SizedBox(height: 12.h),
 
-        // 3. 模拟渠道列表 (3个 item)
+        // 3. Mock Channel List (3 items)
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),

@@ -1,6 +1,6 @@
 part of 'withdraw_page.dart';
 
-/// 扩展：专门负责渲染各种 UI 组件，告别主文件代码膨胀
+/// Extension: Handles rendering of UI components to prevent main file bloat
 extension WithdrawPageUI on _WithdrawPageState {
 
   TextStyle get headerStyle => TextStyle(
@@ -53,7 +53,7 @@ extension WithdrawPageUI on _WithdrawPageState {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('withdraw.amount_label'.tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text('withdraw.amount_label'.tr(), style:  TextStyle(fontWeight: FontWeight.bold, color: context.textPrimary900),),
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
@@ -85,9 +85,18 @@ extension WithdrawPageUI on _WithdrawPageState {
                 color: context.textPrimary900,
                 fontWeight: FontWeight.bold,
               ),
+              hintStyle: TextStyle(
+                fontSize: 36.sp,
+                fontWeight: FontWeight.bold,
+                color: context.utilityGray300,
+              ),
               hintText: '0.00',
               border: InputBorder.none,
             ),
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(7),
+            ],
           ),
           const Divider(),
           SizedBox(height: 8.h),

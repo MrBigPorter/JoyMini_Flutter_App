@@ -1,7 +1,7 @@
 
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_app/app/page/deposit_page.dart';
+import 'package:flutter_app/app/page/deposit/deposit_page.dart';
 import 'package:flutter_app/app/page/group_member_page.dart';
 import 'package:flutter_app/app/page/group_room_page.dart';
 import 'package:flutter_app/app/page/kyc_verify/kyc_verify_page.dart';

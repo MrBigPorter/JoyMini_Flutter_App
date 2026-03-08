@@ -16,12 +16,12 @@ import 'package:flutter_app/ui/button/button.dart';
 import 'package:flutter_app/ui/index.dart';
 import 'package:flutter_app/utils/form/deposit_form/deposit_form.dart';
 import 'package:flutter_app/utils/format_helper.dart';
-import '../../core/models/balance.dart';
-import '../../core/store/wallet_store.dart';
-import '../../utils/form/validation/k_deposit_validation_messages.dart';
-import '../../utils/form/validators.dart';
-import '../../utils/jump_helper.dart';
-import 'deposit/payment_webview_page.dart';
+import '../../../core/models/balance.dart';
+import '../../../core/store/wallet_store.dart';
+import '../../../utils/form/validation/k_deposit_validation_messages.dart';
+import '../../../utils/form/validators.dart';
+import '../../../utils/jump_helper.dart';
+import 'payment_webview_page.dart';
 
 class DepositPage extends ConsumerStatefulWidget {
   const DepositPage({super.key});

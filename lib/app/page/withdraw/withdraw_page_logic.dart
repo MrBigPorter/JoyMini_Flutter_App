@@ -1,6 +1,6 @@
 part of 'withdraw_page.dart';
 
-/// 混入：专门处理提现页面的核心业务逻辑
+/// Mixin: Handles core business logic for the withdrawal page
 mixin WithdrawPageLogic on ConsumerState<WithdrawPage> {
   PaymentChannelConfigItem? selectedChannel;
 
@@ -23,9 +23,9 @@ mixin WithdrawPageLogic on ConsumerState<WithdrawPage> {
     });
   }
 
-  /// 设置 Riverpod 的页面级监听
+  /// Setup Riverpod page-level listeners
   void setupListeners(double withdrawable) {
-    // 监听渠道加载完成
+    // Listen for channel loading completion
     ref.listen<AsyncValue<List<PaymentChannelConfigItem>>>(
       clientPaymentChannelsWithdrawProvider,
           (prev, next) {
@@ -40,7 +40,7 @@ mixin WithdrawPageLogic on ConsumerState<WithdrawPage> {
       },
     );
 
-    // 监听余额变化，重新校验
+    // Listen for balance changes to re-validate
     ref.listen(walletProvider.select((s) => s.realBalance), (prev, next) {
       if (prev != next) updateValidators(next);
     });
