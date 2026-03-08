@@ -78,7 +78,7 @@ class ShareService {
 
   static Future<ShareResult> shareNative(BuildContext ctx, ShareData d) async {
     final origin = _getShareOrigin(ctx);
-    final thumbnail = await _ensurePreviewThumbnail(d);
+    //final thumbnail = await _ensurePreviewThumbnail(d);
 
     return SharePlus.instance.share(
       ShareParams(
@@ -86,7 +86,7 @@ class ShareService {
         subject: d.title,
         sharePositionOrigin: origin,
         downloadFallbackEnabled: true,
-        previewThumbnail: thumbnail,
+        //previewThumbnail: thumbnail,
       ),
     );
   }
@@ -162,13 +162,13 @@ class ShareService {
     }
 
     try {
-      final thumbnail = await _ensurePreviewThumbnail(d);
+     // final thumbnail = await _ensurePreviewThumbnail(d);
 
       await SharePlus.instance.share(
         ShareParams(
           text: d.combined,
           subject: d.title,
-          previewThumbnail: thumbnail,
+          // previewThumbnail: null, //  留空！让社交软件自己去解析 H5 里的图片
           downloadFallbackEnabled: true,
         ),
       );
