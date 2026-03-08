@@ -423,13 +423,6 @@ class AppRouter {
         final String path = state.matchedLocation;
         final isAuthenticated = ref.read(authProvider.select((auth) => auth.isAuthenticated));
 
-        // Handle deep link redirection for product sharing.
-        if (state.uri.toString().startsWith('luckyapp://product/')) {
-          final newPath = state.uri.toString().replaceFirst('luckyapp://product/', '/product/');
-          debugPrint("[Router] Redirecting deep link: $newPath");
-          return newPath;
-        }
-
         // Check if the target route requires authentication.
         final bool needLogin = RouteAuthConfig.needLoginForPath(path);
 

@@ -15,9 +15,10 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../core/cache/api_cache_manager.dart';
-import '../core/store/auth/auth_provider.dart';
-import '../ui/chat/core/call_manager/call_dispatcher.dart';
+import 'package:flutter_app/core/cache/api_cache_manager.dart';
+import 'package:flutter_app/core/store/auth/auth_provider.dart';
+import 'package:flutter_app/features/share/services/deep_link_service.dart';
+import 'package:flutter_app/ui/chat/core/call_manager/call_dispatcher.dart';
 
 
 @pragma('vm:entry-point')
@@ -57,6 +58,7 @@ class AppBootstrap {
     await _setupFirebase();
     // 改用 Future.microtask 把它扔到后台队列，让 App 瞬间把 UI 跑起来！
    // Future.microtask(() => _setupFirebase());
+    DeepLinkService().init();
   }
 
   /// 2. 数据级初始化 (Data Level)

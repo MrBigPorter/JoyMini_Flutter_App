@@ -5,29 +5,30 @@ import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// 假设你的 ShareData 在这里引入
+// Assuming your ShareData is imported here
 import 'package:flutter_app/features/share/models/share_data.dart';
 
 class ShareService {
 
   // ==========================================
-  // 1. 内部辅助方法 (Private Helpers)
+  // 1. Private Helpers
   // ==========================================
 
-  /// 下载图片作为预览图，增加 3秒 超时，防止分享卡死
+  /// Downloads the image as a preview thumbnail with a 3-second timeout to prevent freezing.
   static Future<XFile?> _ensurePreviewThumbnail(ShareData d) async {
     if (d.previewThumbnail != null) return d.previewThumbnail;
     if (d.imageUrl == null || d.imageUrl!.isEmpty) return null;
 
     try {
-      //  优化：增加 timeout，如果 3秒 下不来就算了，直接弹出分享框，不要让用户等
+      // Optimization: Added timeout. If download exceeds 3 seconds, proceed without it
+      // to ensure the share dialog pops up immediately for the user.
       final resp = await http.get(Uri.parse(d.imageUrl!))
           .timeout(const Duration(seconds: 3));
 
       if (resp.statusCode == 200) {
         return XFile.fromData(
           resp.bodyBytes,
-          name: 'preview_thumbnail.jpg', // 建议给个后缀
+          name: 'preview_thumbnail.jpg',
           mimeType: resp.headers['content-type'] ?? 'image/jpeg',
         );
       }
@@ -37,8 +38,8 @@ class ShareService {
     return null;
   }
 
-  /// 获取 iPad 分享弹出的锚点位置
-  ///  优化：增加空安全检查，防止崩溃
+  /// Gets the anchor position for sharing on iPad.
+  /// Optimization: Added null-safety check to prevent crashes.
   static Rect? _getShareOrigin(BuildContext ctx) {
     try {
       final box = ctx.findRenderObject() as RenderBox?;
@@ -48,21 +49,21 @@ class ShareService {
     } catch (e) {
       debugPrint('ShareService: Cannot find render object for share origin: $e');
     }
-    return null; // 如果获取失败，SharePlus 会尝试居中显示或使用默认位置
+    return null; // If failed, SharePlus will attempt to center or use a default position.
   }
 
-  ///  优化：提取公共的社交软件跳转逻辑
+  /// Optimization: Extracted common social app intent logic.
   static Future<void> _launchSocialIntent({
     required String urlScheme,
     required ShareData fallbackData,
   }) async {
     final uri = Uri.parse(urlScheme);
 
-    // 尝试打开 App (WhatsApp, TG 等)
+    // Attempt to open the specific app (WhatsApp, Telegram, etc.)
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
-      // 失败则降级为系统原生分享
+      // Fallback to system native share if app launch fails
       await SharePlus.instance.share(
         ShareParams(
             text: fallbackData.combined,
@@ -73,20 +74,18 @@ class ShareService {
   }
 
   // ==========================================
-  // 2. 公开方法 (Public APIs)
+  // 2. Public APIs
   // ==========================================
 
   static Future<ShareResult> shareNative(BuildContext ctx, ShareData d) async {
     final origin = _getShareOrigin(ctx);
-    //final thumbnail = await _ensurePreviewThumbnail(d);
 
     return SharePlus.instance.share(
       ShareParams(
-        text: d.combined, // 确保这里是 "文案 + 空格 + 链接"
+        text: d.combined, // Ensure this is "Text + Space + Link"
         subject: d.title,
         sharePositionOrigin: origin,
         downloadFallbackEnabled: true,
-        //previewThumbnail: thumbnail,
       ),
     );
   }
@@ -110,9 +109,8 @@ class ShareService {
     );
   }
 
-  /// WhatsApp: 需要对参数进行编码
+  /// WhatsApp: Requires parameter encoding
   static Future<void> shareWhatsApp(ShareData d) async {
-    // WhatsApp 同时支持文本和链接拼接
     final text = Uri.encodeComponent(d.combined);
     await _launchSocialIntent(
       urlScheme: 'whatsapp://send?text=$text',
@@ -120,7 +118,7 @@ class ShareService {
     );
   }
 
-  /// Telegram: 支持 url 和 text 参数
+  /// Telegram: Supports url and text parameters
   static Future<void> shareTelegram(ShareData d) async {
     final url = Uri.encodeComponent(d.url);
     final text = Uri.encodeComponent(d.text ?? '');
@@ -130,7 +128,7 @@ class ShareService {
     );
   }
 
-  /// Twitter/X: 推荐使用 intent URL
+  /// Twitter/X: Recommends using intent URL
   static Future<void> shareTwitter(ShareData d) async {
     final text = Uri.encodeComponent(d.text ?? '');
     final url = Uri.encodeComponent(d.url);
@@ -140,35 +138,33 @@ class ShareService {
     );
   }
 
-  /// Facebook: 极其特殊，基本只认 u 参数
+  /// Facebook: Primarily uses the 'u' parameter
   static Future<void> shareFacebook(ShareData d) async {
     final url = Uri.encodeComponent(d.url);
-    // FB 很多时候忽略 text，只抓取 url 的 OpenGraph 信息
+    // FB often ignores text and crawls the OpenGraph info from the URL instead
     await _launchSocialIntent(
       urlScheme: 'https://www.facebook.com/sharer/sharer.php?u=$url',
       fallbackData: d,
     );
   }
 
-  /// 智能分享入口：尝试原生分享，失败则调用自定义 Sheet
+  /// Smart Share Entry: Attempts native share, falls back to custom sheet if it fails
   static Future<void> openSystemOrSheet(
       ShareData d,
       Future<void> Function()? openSheet,
       ) async {
-    // 1. Web 平台直接弹自定义 Sheet (原生分享在 Web 上体验不一致)
+    // 1. Direct to custom sheet on Web (Native share experience is inconsistent)
     if (kIsWeb && openSheet != null) {
       await openSheet();
       return;
     }
 
     try {
-     // final thumbnail = await _ensurePreviewThumbnail(d);
-
       await SharePlus.instance.share(
         ShareParams(
           text: d.combined,
           subject: d.title,
-          // previewThumbnail: null, //  留空！让社交软件自己去解析 H5 里的图片
+          // Leave previewThumbnail null! Let social apps crawl images from the H5 meta tags.
           downloadFallbackEnabled: true,
         ),
       );

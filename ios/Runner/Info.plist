@@ -31,7 +31,7 @@
 			<string>com.porter.joyminis</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>luckyapp</string>
+				<string>joymini</string>
 			</array>
 		</dict>
 	</array>
