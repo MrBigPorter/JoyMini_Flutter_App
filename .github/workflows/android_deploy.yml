@@ -40,6 +40,10 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
+      - name: 优化云端编译内存 (防止 143 报错)
+        run: |
+          echo "org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> android/gradle.properties
+
       - name: Build Release APK
         run: |
           flutter pub get
