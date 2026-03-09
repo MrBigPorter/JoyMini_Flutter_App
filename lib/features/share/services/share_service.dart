@@ -82,7 +82,7 @@ class ShareService {
 
     return SharePlus.instance.share(
       ShareParams(
-        text: d.combined, // Ensure this is "Text + Space + Link"
+        //text: d.combined, // Ensure this is "Text + Space + Link"
         subject: d.title,
         sharePositionOrigin: origin,
         downloadFallbackEnabled: true,
@@ -160,14 +160,7 @@ class ShareService {
     }
 
     try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: d.combined,
-          subject: d.title,
-          // Leave previewThumbnail null! Let social apps crawl images from the H5 meta tags.
-          downloadFallbackEnabled: true,
-        ),
-      );
+      await Share.shareUri(Uri.parse(d.url));
     } catch (e) {
       debugPrint('ShareService: Native share failed ($e), falling back to custom sheet.');
       if (openSheet != null) {

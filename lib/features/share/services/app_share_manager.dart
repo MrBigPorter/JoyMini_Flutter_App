@@ -20,7 +20,7 @@ class ShareManager {
 
     final data = ShareData(
       title: content.title,
-      text: "$cleanDesc\n\n", // 必须有 \n\n
+      text: "$content.desc\n\n", // 必须有 \n\n
       url: uri.toString(),     // Generated H5 intermediate link
       imageUrl: content.imageUrl,
     );
