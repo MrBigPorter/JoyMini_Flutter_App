@@ -11,7 +11,7 @@ permissions:
   deployments: write
 
 jobs:
-  #  深度优化：把 H5 和 Android 合并到一个任务里，只拉一次代码，极致提速！
+  # 🚀 深度优化：把 H5 和 Android 合并到一个任务里，只拉一次代码，极致提速！
   build-all:
     runs-on: self-hosted
     steps:
@@ -77,14 +77,28 @@ jobs:
             --non-interactive \
             --release-notes "大哥，这是 MacBook Air 全自动流水线极速产出的版本！" || true
 
-      # ================= 阶段 3: 终极战报 =================
-      - name: 📱 发送通知到 Telegram
-        if: always() # 关键：这一步必须跟在最外层的步骤里，保证必发
+      # ================= 阶段 2.5: 备用降落伞 =================
+      - name: 💾 备份 APK 到 GitHub 网页端
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7 # 存7天自动清理，不占用额外空间
+
+      # ================= 阶段 3: 终极扫码战报 =================
+      - name: 📱 发送带二维码的战报到 Telegram
+        if: always()
         run: |
-          # 修复了多余的 text 参数
-          MESSAGE="🐺 *JoyMini 独狼战报* 🚀%0A%0A✅ *Android*: 成功空降 Firebase！%0A✅ *H5*: 成功部署 Cloudflare！%0A%0A大哥，快去手机端查收！"
+          # 1. 组装文案内容 (注意这里用的是 caption，因为发的是图片)
+          MESSAGE="🐺 *JoyMini 极速战报* 🚀%0A%0A✅ *Android*: 成功空降 Firebase%0A✅ *H5*: 成功部署 Cloudflare%0A%0A👇 *大哥，请直接扫码安装最新版*："
           
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+          # 2. 利用开源 API，把你的 Firebase 链接动态生成一张二维码图片
+          # 记得确保 secrets.FIREBASE_INVITE_LINK 已经配置好！
+          QR_URL="https://quickchart.io/qr?text=${{ secrets.FIREBASE_INVITE_LINK }}&size=400"
+          
+          # 3. 呼叫 Telegram 的 sendPhoto 接口直接发图！
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendPhoto" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d "parse_mode=Markdown" \
-            -d "text=$MESSAGE"
+            -d "photo=$QR_URL" \
+            -d "caption=$MESSAGE" \
+            -d "parse_mode=Markdown"
