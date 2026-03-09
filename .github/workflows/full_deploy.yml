@@ -78,6 +78,7 @@ jobs:
           firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
             --app "${{ secrets.FIREBASE_APP_ID }}" \
             --token "${{ secrets.FIREBASE_TOKEN }}" \
+            --groups "admin" \
             --release-notes "大哥，这是由 MacBook Air 自动呈上的最新版本！"
 
       - name: 提取 APK
