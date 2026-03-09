@@ -70,12 +70,15 @@ jobs:
           flutter pub get
           flutter build apk --release --dart-define-from-file=lib/core/config/env/prod.json
 
-      - name: 🚀 自动分发到 Firebase (海外神速版)
-        uses: w9jds/firebase-action@v13.4.0
-        with:
-          args: appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk --app ${{ secrets.FIREBASE_APP_ID }}
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      - name: 🚀 自动分发到 Firebase (Mac 原生版)
+        run: |
+          # 1. 确保安装了 Firebase 工具 (如果没有的话)
+          # curl -sL https://firebase.tools | upgrade=true bash
+          # 2. 直接调用本地命令上传
+          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
+            --app "${{ secrets.FIREBASE_APP_ID }}" \
+            --token "${{ secrets.FIREBASE_TOKEN }}" \
+            --release-notes "大哥，这是由 MacBook Air 自动呈上的最新版本！"
 
       - name: 提取 APK
         uses: actions/upload-artifact@v4
