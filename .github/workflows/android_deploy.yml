@@ -1,0 +1,53 @@
+name: JoyMini Android Auto Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # 允许你在 GitHub 网页上手动点个按钮触发打包
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17' # Flutter 较新版本推荐 Java 17
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: 还原签名文件 (Keystore) 与密码本
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          # 1. 还原 .jks 文件
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          
+          # 2. 动态生成 key.properties 密码本
+          cat << EOF > android/key.properties
+          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Build Release APK
+        run: |
+          flutter pub get
+          flutter build apk --release --dart-define-from-file=lib/core/config/env/prod.json
+
+      - name: 提取 APK 产物供下载
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7 # 安装包在 GitHub 上保留 7 天

@@ -1,13 +1,36 @@
 
+
 ---
 
-# 📜 Lucky IM Project Grand Master Log (v4.0 - v6.4.0)
+# 📜 Lucky IM Project Grand Master Log (v4.0 - v6.5.0)
 
-## 🛡️ 第九章：VoIP 极限防御与全端互通 (The VoIP Defense Era) **[v6.2.0 - CURRENT]**
+## 🚀 第十章：DevOps 自动化与云端分发 (The DevOps & Cloud Distribution Era) **[v6.5.0 NEW]**
+
+*本章标志着 Lucky IM 彻底终结了“手动编译、人工上传”的原始农耕时代。我们通过 GitHub Actions 与 Cloudflare Pages 的深度集成，在保留“后端网关 Nginx”绝对控制权的前提下，建立了一套分钟级的 H5 自动化交付流水线。*
+
+* **[Automation] GitHub Actions 全自动交付 (CI/CD Pipeline)**:
+* **流水线合龙**: 实现了从 `git push` 到 Cloudflare Pages 自动发布的完整闭环。采用 `subosito/flutter-action` 容器化环境，规避了本地开发环境差异导致的打包偏移。
+* **环境初始化自愈**: 攻克了 CI 环境下 `exit code 64` 的用法报错。通过显式执行 `flutter config --enable-web` 强制唤醒虚拟机的 Web 构建能力，解决了原生参数解析引擎的“冷启动”绝症。
+
+
+* **[Distribution] 后端网关接力架构 (Nginx Gateway Relay)**:
+* **职责解耦**: 确立了“前端托管、后端路由”的混合架构。Flutter 静态产物托管于 Cloudflare 全球 CDN，而流量入口始终锁定在后端目录下的 `nginx.conf`。
+* **动态页保护**: 确保了 `/share.html` 等动态桥接页依然精准命中 NestJS 后端，同时将根路径 `/` 优雅反向代理至 Cloudflare 节点，实现了“静态加速”与“动态控制”的完美平衡。
+
+
+* **[Security] 权限提权与 Secret 隔离 (Permission & Secret Management)**:
+* **403 权限破壁**: 修复了 `Resource not accessible by integration` 的 GitHub 权限死锁。通过在 Workflow 中显式声明 `permissions: deployments: write`，授予了临时 `GITHUB_TOKEN` 写入部署记录的权限。
+* **生产配置注入**: 实现了 `--dart-define-from-file=lib/core/config/env/prod.json` 的自动化注入，确保云端构建产物与生产环境域名配置字符级对齐，杜绝了硬编码导致的 API 访问漂移。
+
+
+
+---
+
+## 🛡️ 第九章：VoIP 极限防御与全端互通 (The VoIP Defense Era) **[v6.2.0 - v6.4.0]**
 
 *本章标志着 Lucky IM 彻底打穿了移动端碎片化的物理壁垒。我们在极端恶劣的系统环境（锁屏死锁、硬件残废、信令风暴、IPC 截断、网络真空穿透、系统音频抢占与外设热插拔）下，成功建立了一套坚不可摧的工业级音视频抗打盾牌。*
 
-* **[Audio] 焦点抢占防御与硬件无缝路由 (Audio Focus & Hardware Routing) [v6.4.0 NEW]**:
+* **[Audio] 焦点抢占防御与硬件无缝路由 (Audio Focus & Hardware Routing)**:
 * **10086 系统打断防御 (Interruption Daemon)**: 彻底解决了视频通话中途遭遇原生系统电话（如 10086 / 闹钟）打断后，导致的“被动永久哑巴”绝症。通过监听 `AudioSession.instance.interruptionEventStream`，在 `event.begin == false`（原生电话挂断瞬间）执行核武级复苏：`await session.setActive(true)`，强行夺回麦克风底层物理控制权，实现通话自愈。
 * **AirPods 热插拔自适应 (Routing Daemon)**: 攻克了外设（蓝牙/有线耳机）插拔时的通道错乱与 UI 脱节问题。通过监听 `devicesChangedEventStream`，一旦侦测到外部设备接入 (`hasExternalAudio`)，底层通道自动转移，并通过 `onSpeakerStateChanged` 即时反向通知状态机，强行熄灭 UI 层扬声器图标，实现底层硬件与 UI 的绝对同步。
 * **音频会话极简配置 (AudioSession Minimalism)**: 避免了重度配置与 WebRTC 底层 C++ 音频引擎发生焦点争夺。移除了导致“失声”的冗余安卓属性和 iOS 路由策略，采用最精简稳健的 `avAudioSessionMode: AVAudioSessionMode.voiceChat`。
@@ -70,7 +93,7 @@
 * **[Database] 事务一致性守卫**: 在 `handleJoinRequest` 实施“先清理、后更新”策略（`deleteMany` + `upsert`），彻底消灭退群重申导致的 Prisma 主键冲突与数据库死锁。
 * **[RBAC] 轻量级权限矩阵**: 基于 `OWNER/ADMIN/MEMBER` 体系，在后端设 `_checkPermission`，前端注 `canManage` 动态驱动 UI。
 * **[Interact] 消息流转体系**: 封装通用选人组件，实现消息转发时 `meta` 属性（如媒体比例、原作者）的无损分发。并采用 `extraCodec` 彻底解决 Web 刷新路由参数丢失。
-* **[Notice] 交互式全局通知 (Interactive Notification) [NEW]**: 废弃原生生硬弹窗，基于 `BotToast` 构建应用内跨页面卡片 (`global_handler_ui`)。实现带有头像的好友申请提醒，并支持“一键直达”申请列表，极大缩短交互路径。
+* **[Notice] 交互式全局通知 (Interactive Notification)**: 废弃原生生硬弹窗，基于 `BotToast` 构建应用内跨页面卡片 (`global_handler_ui`)。实现带有头像的好友申请提醒，并支持“一键直达”申请列表，极大缩短交互路径。
 * **[Defense] 极端竞态防御**: 拦截系统通知类消息（type 99）触发的已读上报，攻克用户被踢瞬间丢失权限导致的 403 崩溃。
 
 ---
@@ -96,8 +119,8 @@
 * **[Streaming] 全链路流式缓冲**: 客户端 Range 头 + Nginx 代理配置，实现大视频点击即播。
 * **[Cache] 三级播放策略**: 内存 -> 本地 Asset -> 网络 URL。
 * **[Web] 物理隔离**: Web 端使用 Canvas 截帧、Blob URL 文件处理、右键菜单屏蔽，并自动清理死链 Blob。
-* **[Audio] 物理级语音交互 (Voice Recording UX) [NEW]**: 重构了录音链路。在 `RecordingOverlay` 中引入 `IgnorePointer` 穿透修复手势冲突；并在 `VoiceRecordButton` 实施双端隔离（Web 端点击发送，移动端长按录制+上滑 50px 阈值取消）。
-* **[Video] 全局播放互斥锁 (Global Playback Lock) [NEW]**: 引入 `ValueNotifier<String?> _playingMsgId` 建立全局唯一播放锁。点开新视频时自动静音/暂停旧视频，杜绝信息流中的“大合唱”现象并防止 OOM 内存雪崩。
+* **[Audio] 物理级语音交互 (Voice Recording UX)**: 重构了录音链路。在 `RecordingOverlay` 中引入 `IgnorePointer` 穿透修复手势冲突；并在 `VoiceRecordButton` 实施双端隔离（Web 端点击发送，移动端长按录制+上滑 50px 阈值取消）。
+* **[Video] 全局播放互斥锁 (Global Playback Lock)**: 引入 `ValueNotifier<String?> _playingMsgId` 建立全局唯一播放锁。点开新视频时自动静音/暂停旧视频，杜绝信息流中的“大合唱”现象并防止 OOM 内存雪崩。
 
 ---
 
@@ -113,7 +136,7 @@
 
 * **[Zero-State] 自愈防线**: 列表页强制 `_fetchList`，房间页引入核弹级清零 `forceClearUnread`。
 * **[Read] 实时已读回执**: 500ms 防抖 (Debounce) 已读上报。
-* **[UX] 乐观 UI 预先插入 (Optimistic UI) [NEW]**: 在发起单聊 (`create_direct_chat_dialog`) 成功后，绕过 Socket 等待，强制在本地伪造 `Conversation` 对象压入列表并瞬间跳转，实现真正的“零延迟”视觉欺骗与交互体感。
+* **[UX] 乐观 UI 预先插入 (Optimistic UI)**: 在发起单聊 (`create_direct_chat_dialog`) 成功后，绕过 Socket 等待，强制在本地伪造 `Conversation` 对象压入列表并瞬间跳转，实现真正的“零延迟”视觉欺骗与交互体感。
 
 ---
 
@@ -125,7 +148,7 @@
 
 ---
 
-## ⚖️ 架构铁律 (The Iron Rules - v6.4.0)
+## ⚖️ 架构铁律 (The Iron Rules - v6.5.0)
 
 *这是项目的最高准则，任何代码提交不得违反。*
 
@@ -155,6 +178,9 @@
 24. **解码器物理唤醒 (Codec Defibrillator)**: 生命回复 `resumed` 时，严禁信任原生渲染管线。必须强制对 `srcObject` 实施“剥离再挂载”及轨道的瞬断重启。
 25. **DOM 就绪阻断 (DOM Readiness Blocking)**: Web 端渲染前必须通过 `await Future.wait` 强制等待双端画板底层物理节点构建完毕，防秒接黑屏。
 26. **底层 C++ 强校验约定**: 调用 Android 端 `createOffer` 强制重连时，必须回退使用老式字典约束 `optional: [{'IceRestart': true}]`。
-27. **[NEW] 音频焦点强制夺回原则 (Audio Focus Preemption)**: 遭遇系统级高优先级音频（如电话/闹钟）打断并结束后，严禁被动等待，必须通过 `session.setActive(true)` 强行向系统重新申请焦点，防止麦克风永久静音假死。
-28. **[NEW] 硬件路由自适应约束 (Adaptive Audio Routing)**: 严禁仅在初始化阶段绑定音频路由，必须部署全局守护进程实时监听 `devicesChangedEventStream`。一旦侦测到外设热插拔，必须立即触发通道切换并反向同步 UI。
-29. **[NEW] 全局媒体互斥锁 (Global Media Lock)**: 列表页中严禁多媒体文件并发播放。必须引入全局监听（如 `_playingMsgId`），触发新播放时强制中止旧任务，防止音频重叠与 OOM。
+27. **音频焦点强制夺回原则 (Audio Focus Preemption)**: 遭遇系统级高优先级音频（如电话/闹钟）打断并结束后，严禁被动等待，必须通过 `session.setActive(true)` 强行向系统重新申请焦点，防止麦克风永久静音假死。
+28. **硬件路由自适应约束 (Adaptive Audio Routing)**: 严禁仅在初始化阶段绑定音频路由，必须部署全局守护进程实时监听 `devicesChangedEventStream`。一旦侦测到外设热插拔，必须立即触发通道切换并反向同步 UI。
+29. **全局媒体互斥锁 (Global Media Lock)**: 列表页中严禁多媒体文件并发播放。必须引入全局监听（如 `_playingMsgId`），触发新播放时强制中止旧任务，防止音频重叠与 OOM。
+30. **[NEW] 外部部署权限显式声明原则 (Explicit Deployment Permissions)**: 自动化流水线严禁使用默认低权令牌。必须在 Workflow 级别显式声明 `deployments: write`，以打通 GitHub 与外部服务（如 Cloudflare）的通信闭环。
+31. **[NEW] CI 构建环境预热原则 (CI Build Priming)**: 在 CI 执行 Web 构建前，必须显式调用 `flutter config --enable-web`。严禁在未确认环境能力的条件下执行复杂的渲染参数指令，防止 Shell 级参数解析崩溃。
+32. **[NEW] 网关入口收口原则 (Gateway Entry Consolidation)**: 即使采用云端自动部署，流量入口必须始终锁定在后端 Nginx 手中。严禁绕过后端目录下的 `nginx.conf` 直接访问静态源，确保 SSL 卸载、动态拦截（`/share.html`）与静态分发的物理链路绝对一致。

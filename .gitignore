@@ -92,3 +92,8 @@ server/node_modules/
 
 # 自己工具的 build
 tool/build/
+
+# Android Keystore and Properties
+# should not push to git
+android/key.properties
+android/app/upload-keystore.jks
