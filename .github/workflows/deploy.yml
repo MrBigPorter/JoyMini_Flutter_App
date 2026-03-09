@@ -3,7 +3,7 @@ name: JoyMini H5 Auto Deploy
 on:
   push:
     branches:
-      - main  # 确认你本地分支名是 main，如果是 master 请改为 master
+      - main
 
 jobs:
   build-and-deploy:
@@ -13,25 +13,31 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. 准备 Flutter 环境（注意：不是单纯的 Dart 环境）
+      # 2. 准备 Flutter 环境
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: 'stable' # 使用稳定版
           cache: true
 
       # 3. 编译 Web 静态产物
       - name: Build Web
         run: |
+          # 第一步：必须显式启用 web 支持，否则 build 命令会报参数错误
+          flutter config --enable-web
+          
+          # 第二步：获取依赖
           flutter pub get
-          flutter build web --release --web-renderer canvaskit
+          
+          # 第三步：使用你本地完全一致的打包命令
+          flutter build web --release --dart-define-from-file=lib/core/config/env/prod.json
 
-      # 4. 一键投递到 Cloudflare Pages
+      # 4. 投递到 Cloudflare Pages
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: joymini-web # 必须匹配项目名
+          projectName: joymini-web
           directory: build/web
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
