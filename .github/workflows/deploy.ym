@@ -1,0 +1,23 @@
+name: Auto Deploy H5
+on:
+  push:
+    branches: [main] # 只要你一推代码，就开始自动部署
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+
+      # 第一步：在云端编译 Flutter
+      - name: Build
+        run: flutter build web --release
+
+      # 第二步：自动推送到 Cloudflare Pages (告别手动上传)
+      - name: Deploy to CF
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          projectName: joymini-web
+          directory: build/web
