@@ -37,12 +37,12 @@ class JumHelper {
 
         // jumpCate = 5 其它映射，暂时也指向 product
         if (jump == 5) {
-          appRouter.go('/product/${item.relatedTitleId}');
+          appRouter.go('/product-detail/${item.relatedTitleId}');
           return;
         }
 
         // 兜底：只要有 relatedTitleId 默认进产品页
-        appRouter.go('/product/${item.relatedTitleId}');
+        appRouter.go('/product-detail/${item.relatedTitleId}');
         return;
       }
 

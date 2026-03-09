@@ -161,7 +161,7 @@ class GroupLobbyCard extends StatelessWidget {
     return Column(
       children: [
         GestureDetector(
-          onTap: () => appRouter.push('/product/${treasure.treasureId}'),
+          onTap: () => appRouter.push('/product-detail/${treasure.treasureId}'),
           child: Row(
             children: [
               ClipRRect(

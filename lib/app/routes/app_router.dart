@@ -57,6 +57,8 @@ import 'package:flutter_app/ui/chat/selector/contact_selection_page.dart';
 final _shellKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 // 全局路由器实例  Global router instance
 late GoRouter appRouter;
+bool isAppRouterReady = false; // 新增这一行：专门用来给 DeepLink 做状态指示灯
+
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 /// application router
@@ -213,7 +215,7 @@ class AppRouter {
         // 这样 /product/123 会先被这里匹配，而不会被误认为是 ShellRoute 里的 /product
         GoRoute(
             name: 'productDetail',
-            path: '/product/:id',
+            path: '/product-detail/:id',
             parentNavigatorKey: NavHub.key,
             pageBuilder: (ctx, state) {
               final id = state.pathParameters['id']!;
@@ -420,8 +422,20 @@ class AppRouter {
         ),
       ],
       redirect: (context, state) {
+        final uri = state.uri;
+        // 拦截原生协议
+        if (uri.scheme == 'joymini' && uri.host == 'product') {
+          final pid = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+          if (pid != null) {
+            final gid = uri.queryParameters['groupId'] ?? uri.queryParameters['gid'];
+            // 这里重定向后，GoRouter 会直接去目的地，DeepLinkService 就会被上面的时间锁拦住
+            return gid != null ? '/product-detail/$pid?groupId=$gid' : '/product-detail/$pid';
+          }
+        }
+
         final String path = state.matchedLocation;
         final isAuthenticated = ref.read(authProvider.select((auth) => auth.isAuthenticated));
+
 
         // Check if the target route requires authentication.
         final bool needLogin = RouteAuthConfig.needLoginForPath(path);
@@ -439,6 +453,7 @@ class AppRouter {
         return null;
       },
       errorPageBuilder: (context, state) {
+        print('Route error: ${state.error}');
         // 重置全局进度条
         Future.microtask(() {
           ref.read(overlayProgressProvider.notifier).state = 0.0;
@@ -454,6 +469,7 @@ class AppRouter {
 
     // assign to the global instance, so that other parts of the app can access it
     appRouter = router;
+    isAppRouterReady = true; // 新增这一行：初始化完成后，绿灯亮起！
     return router;
   }
 }

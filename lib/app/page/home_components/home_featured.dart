@@ -83,7 +83,7 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => appRouter.push('/product/${item.treasureId}'),
+      onTap: () => appRouter.push('/product-detail/${item.treasureId}'),
       child: Container(
         decoration: BoxDecoration(
           color: context.bgSecondary,

@@ -57,7 +57,7 @@ class DemoPage extends StatelessWidget {
               onPressed: () {
                 Navigator.pushNamed(
                   context,
-                  '/product/:id',
+                  '/product-detail/:id',
                   arguments: {'id': '123'},
                 );
               },

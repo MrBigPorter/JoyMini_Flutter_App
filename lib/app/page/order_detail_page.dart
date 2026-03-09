@@ -188,7 +188,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
         height: 44.w,
         onPressed: () {
           if (orderDetail.group?.groupId != null) {
-            appRouter.push('/product/${orderDetail.group!.groupId}/group');
+            appRouter.push('/product-detail/${orderDetail.group!.groupId}/group');
           }
         },
         trailing: Icon(Icons.group_outlined, size: 18.w, color: Colors.white),

@@ -334,7 +334,7 @@ class _GroupRoomPageState extends ConsumerState<GroupRoomPage> {
     return Button(
       width: double.infinity,
       onPressed: () {
-        appRouter.push('/product/$treasureId');
+        appRouter.push('/product-detail/$treasureId');
       },
       child: Text("Try Again", style: TextStyle(color: Colors.white)),
     );

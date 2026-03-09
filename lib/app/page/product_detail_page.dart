@@ -63,6 +63,8 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage>
 
   @override
   Widget build(BuildContext context) {
+
+
     final detailAsync = ref.watch(productDetailProvider(widget.productId));
     final statusAsync = ref.watch(productRealtimeStatusProvider(widget.productId));
     final webBaseUrl = ref.watch(configProvider.select((s) => s.webBaseUrl));

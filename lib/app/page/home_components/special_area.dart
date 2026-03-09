@@ -72,7 +72,7 @@ class SpecialArea extends StatelessWidget {
 
       items.add(
         GestureDetector(
-          onTap: () => appRouter.push('/product/${item.treasureId}'),
+          onTap: () => appRouter.push('/product-detail/${item.treasureId}'),
           behavior: HitTestBehavior.opaque,
           child: Container(
             padding: EdgeInsets.only(left: 12.w, right: 12.w, top: 12.h),

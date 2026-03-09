@@ -85,7 +85,7 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => appRouter.push('/product/${item.treasureId}'),
+      onTap: () => appRouter.push('/product-detail/${item.treasureId}'),
       // ProductItem internally handles its own countdown via ValueNotifier
       // avoiding entire grid re-renders
       child: ProductItem(

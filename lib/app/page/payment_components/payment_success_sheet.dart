@@ -84,7 +84,7 @@ class PaymentSuccessSheet extends ConsumerWidget {
                   data: ShareData(
                     title: title,
                     url:
-                        '$baseUrl/product/${purchaseResponse.treasureId}?groupId=${purchaseResponse.groupId}',
+                        '$baseUrl/product-detail/${purchaseResponse.treasureId}?groupId=${purchaseResponse.groupId}',
                   ),
                 ),
               )

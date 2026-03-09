@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
-
 import 'package:flutter_app/app/routes/app_router.dart';
 
 class DeepLinkService {
-  // Singleton pattern
   static final DeepLinkService _instance = DeepLinkService._internal();
   factory DeepLinkService() => _instance;
   DeepLinkService._internal();
@@ -13,13 +11,13 @@ class DeepLinkService {
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
 
+  // Track the last processed link and time to prevent duplicate jumps within a short window
+  static String? _lastProcessedLink;
+  static DateTime? _lastProcessTime;
+
   void init() {
     _appLinks = AppLinks();
-
-    // 1. Handle [Cold Start] (App is closed when link is clicked)
     _handleInitialUri();
-
-    // 2. Handle [Hot Start / Background] (App is running in background)
     _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
       debugPrint('Deep Link detected (Hot Start): $uri');
       _handleDeepLinkTarget(uri);
@@ -32,39 +30,78 @@ class DeepLinkService {
     try {
       final uri = await _appLinks.getInitialLink();
       if (uri != null) {
-        debugPrint('Deep Link detected (Cold Start): $uri');
-        // Delay slightly to ensure Router is ready before navigating
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _handleDeepLinkTarget(uri);
-        });
+        debugPrint('JoyMini [DeepLink] Cold Start detected: $uri');
+        // IMPORTANT: _handleDeepLinkTarget is NO LONGER called here.
+        // GoRouter's redirect logic in app_router.dart handles native links on cold starts.
+        // We only record the link to prevent the Hot Start listener from triggering again.
+        _lastProcessedLink = uri.toString();
+        _lastProcessTime = DateTime.now();
       }
     } catch (e) {
       debugPrint('Failed to get Initial Link: $e');
     }
   }
 
-  static void _handleDeepLinkTarget(Uri uri) {
-    // 1. Security check: scheme must match our updated 'joymini'
-    if (uri.scheme != 'joymini') return;
+  static void _handleDeepLinkTarget(Uri uri, {bool isColdStart = false}) {
+    // If the scheme is joymini://, exit immediately.
+    // GoRouter's redirect logic has already handled this protocol.
+    if (uri.scheme == 'joymini') {
+      debugPrint('JoyMini [DeepLink] Scheme handled by GoRouter Redirect, Service exiting');
+      return;
+    }
 
-    // 2. Match joymini://product/xxx
-    if (uri.host == 'product') {
-      final pid = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
-      final gid = uri.queryParameters['groupId'];
+    // Handle HTTPS (Web sharing pages) logic here
+    final currentLink = uri.toString();
+    final now = DateTime.now();
+    if (_lastProcessedLink == currentLink &&
+        _lastProcessTime != null &&
+        now.difference(_lastProcessTime!).inMilliseconds < 1500) {
+      return;
+    }
+    _lastProcessedLink = currentLink;
+    _lastProcessTime = now;
 
-      if (pid != null && pid.isNotEmpty) {
-        // Use global appRouter for navigation
-        if (gid != null) {
-          appRouter.push('/product/$pid?groupId=$gid');
-        } else {
-          appRouter.push('/product/$pid');
-        }
+    String? pid;
+    String? gid;
+
+    if (uri.queryParameters.containsKey('pid')) {
+      pid = uri.queryParameters['pid'];
+      gid = uri.queryParameters['groupId'] ?? uri.queryParameters['gid'];
+    }
+
+    if (pid != null && pid.isNotEmpty) {
+      _safeJump(pid, gid, isColdStart);
+    }
+  }
+
+  static void _safeJump(String pid, String? gid, bool isColdStart) {
+    if (!isAppRouterReady) {
+      debugPrint('JoyMini [DeepLink] Waiting for router initialization...');
+      Future.delayed(const Duration(milliseconds: 500), () => _safeJump(pid, gid, isColdStart));
+      return;
+    }
+
+    // Anti-redirection check: Verify the current path displayed by GoRouter.
+    final String currentLocation = appRouter.routerDelegate.currentConfiguration.uri.toString();
+
+    // If the current path already contains the product ID, redirect has already reached the destination.
+    if (currentLocation.contains(pid)) {
+      debugPrint('JoyMini [DeepLink] Already on target page $pid, intercepting secondary jump');
+      return;
+    }
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      debugPrint('JoyMini [DeepLink] Executing jump: $pid');
+      try {
+        appRouter.pushNamed(
+          'productDetail',
+          pathParameters: {'id': pid},
+          queryParameters: gid != null ? {'groupId': gid} : {},
+        );
+      } catch (e) {
+        debugPrint('JoyMini [DeepLink] Jump exception: $e');
       }
-    }
-    // 3. Match joymini://home (Fallback or specific home link)
-    else if (uri.host == 'home') {
-      appRouter.go('/home');
-    }
+    });
   }
 
   void dispose() {

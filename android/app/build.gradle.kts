@@ -61,7 +61,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release") [cite: 4]
+            signingConfig = signingConfigs.getByName("release")
 
             isMinifyEnabled = false
             isShrinkResources = false
