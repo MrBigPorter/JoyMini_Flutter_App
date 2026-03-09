@@ -83,6 +83,10 @@ flutter build ipa --release --dart-define-from-file=lib/core/config/env/prod.jso
 
 
 ---
+cd /Volumes/MySSD/github-runner/
+./run.sh
+
+
 
 ###  教程核心总结：你只需要记住这三行
 
