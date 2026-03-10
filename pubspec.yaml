@@ -209,6 +209,7 @@ flutter:
     - assets/locales/en.json
     - assets/locales/tl.json
     - assets/fonts/
+    - shorebird.yaml
   fonts:
     - family: Inter
       fonts:

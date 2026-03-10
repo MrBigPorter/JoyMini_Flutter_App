@@ -45,15 +45,10 @@ jobs:
       - name: 📊 3. Extract Build Metadata
         id: meta
         run: |
-          # Automatically extract version from pubspec.yaml (e.g., 1.0.0+1)
           APP_VERSION=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2)
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          
-          # Get short Git commit hash
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
-          
-          # Get the latest commit subject/message safely
           COMMIT_MSG=$(git log -1 --pretty=%s)
           echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
 
@@ -68,7 +63,7 @@ jobs:
         run: flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }}
 
       - name: ☁️ Deploy to Cloudflare Pages
-        id: cf_deploy  # Added ID to capture the URL output
+        id: cf_deploy
         uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
@@ -84,7 +79,7 @@ jobs:
           sed -i '' "s/com.porter.joyminis/com.porter.joyminis.test/g" ios/Runner.xcodeproj/project.pbxproj
           echo "✅ iOS Bundle ID dynamically changed to .test"
 
-      # ================= Phase 7: Android Build & Sign =================
+      # ================= Phase 7: Android Build with Shorebird =================
       - name: 🔐 Restore Android Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -97,11 +92,19 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
-      - name: 🚀 Build Android (APK & AAB)
+      - name: 🐦 7a. Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+
+      - name: 🚀 7b. Build Android via Shorebird (APK & AAB)
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          flutter build apk --release --dart-define-from-file=${{ env.ENV_FILE }}
+          # [核心改动] 使用 shorebird release 替代 flutter build
+          # -- 后面的参数会透传给 Flutter，确保 .json 配置生效
+          shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
+          
           if [ "${{ env.IS_PROD }}" == "true" ]; then
-            flutter build appbundle --release --dart-define-from-file=${{ env.ENV_FILE }}
+            shorebird release android --artifact aab -- --dart-define-from-file=${{ env.ENV_FILE }}
           fi
 
       # ================= Phase 8: iOS Build =================
@@ -121,21 +124,12 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > $CREDENTIAL_FILE
           export GOOGLE_APPLICATION_CREDENTIALS=$CREDENTIAL_FILE
           
-          # Send Android
+          # 注意：Firebase 分发的是 Shorebird 生成的 APK
           firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
             --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
             --groups "admin" \
             --non-interactive \
-            --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }}"
-
-          # Send iOS (Uncomment when certificates are ready)
-          # if [ -f build/ios/ipa/*.ipa ]; then
-          #   firebase appdistribution:distribute build/ios/ipa/*.ipa \
-          #     --app "${{ env.FIREBASE_IOS_APP_ID }}" \
-          #     --groups "admin" \
-          #     --non-interactive \
-          #     --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }}"
-          # fi
+            --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }} (Shorebird Enabled)"
 
       # ================= Phase 10: Artifact Archiving =================
       - name: 💾 Archive Android APK
@@ -161,7 +155,6 @@ jobs:
       - name: 📱 Send Detailed Telegram Report
         if: always()
         run: |
-          # Constructing multiline message securely
           MESSAGE="🐺 *JoyMini CI/CD Pipeline*
 
           📌 *Status*: ${{ job.status }}
@@ -172,11 +165,12 @@ jobs:
           👨‍💻 *Author*: ${{ github.actor }}
           🌐 *H5 Web*: [Click to Preview Web App](${{ steps.cf_deploy.outputs.url }})
 
+          🔥 *Hot Update*: Shorebird Engine Active 🐦
+
           👇 *Scan to install App (Cross-platform)*:"
           
           QR_URL="https://quickchart.io/qr?text=${{ secrets.FIREBASE_INVITE_LINK }}&size=400"
           
-          # Using -F (multipart) to prevent characters like '&' from breaking the curl command
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendPhoto" \
             -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
             -F "photo=$QR_URL" \
