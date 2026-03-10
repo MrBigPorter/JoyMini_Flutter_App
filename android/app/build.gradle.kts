@@ -1,21 +1,35 @@
 import java.util.Properties
 import java.io.FileInputStream
-
-// 1. 在 android 块的最上方，增加读取 key.properties 的逻辑
-val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-}
+import java.util.Base64
 
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
     id("org.jetbrains.kotlin.plugin.compose")
-    // 【新增】直接加在这里，不需要版本号（因为根目录已经定义了）
     id("com.google.gms.google-services")
     id("com.google.firebase.firebase-perf")
+}
+
+// 1. 获取并解码 Flutter 传入的 --dart-define-from-file 参数 (Kotlin DSL 版)
+val dartEnvironmentVariables = if (project.hasProperty("dart-defines")) {
+    project.property("dart-defines").toString().split(",").associate {
+        val pair = String(Base64.getDecoder().decode(it)).split("=")
+        pair[0] to (if (pair.size > 1) pair[1] else "")
+    }
+} else {
+    emptyMap()
+}
+
+// 2. 提取我们在 JSON 里定义的变量
+val appIdSuffix = dartEnvironmentVariables["APP_ID_SUFFIX"] ?: ""
+val appNameSuffix = dartEnvironmentVariables["APP_NAME_SUFFIX"] ?: ""
+
+// 3. 读取 key.properties 的逻辑
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -34,7 +48,12 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.porter.joyminis"
+        // 动态拼接包名
+        applicationId = "com.porter.joyminis$appIdSuffix"
+
+        // 动态修改 App 显示名称 (这里定义了 app_name，所以 strings.xml 中不应再定义)
+        resValue("string", "app_name", "JoyMini$appNameSuffix")
+
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -45,39 +64,31 @@ android {
         compose = true
     }
 
-    // 2. 新增签名配置块
-        signingConfigs {
-            // 创建一个名为 "release" 的签名配置
-            create("release") {
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-                storePassword = keystoreProperties.getProperty("storePassword")
-                val stFile = keystoreProperties.getProperty("storeFile")
-                if (stFile != null) {
-                    storeFile = project.file(stFile)
-                }
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+            storePassword = keystoreProperties.getProperty("storePassword")
+            val stFile = keystoreProperties.getProperty("storeFile")
+            if (stFile != null) {
+                storeFile = project.file(stFile)
             }
         }
+    }
 
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
-
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            //signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
-//  这是一个自动脚本
-// 它的作用：遍历所有依赖，只要看到有人敢要 1.9.0 或 1.17.0，
-// 直接强行替换成 1.8.0 和 1.13.1。
-// 这就是你要的“一次性识别并搞定”。
 configurations.all {
     resolutionStrategy {
         force("androidx.browser:browser:1.8.0")
@@ -90,34 +101,29 @@ configurations.all {
 }
 
 dependencies {
-    // (Amplify 部分)
-    // 使用 BOM 锁定核心版本为 2.19.1 (配合 Liveness 1.3.0 )
+    // Amplify
     implementation(platform("com.amplifyframework:core:2.19.1"))
     implementation(platform("com.amplifyframework:aws-auth-cognito:2.19.1"))
-
-    // 实际引入库 (不需要写版本号了，BOM 会自动管)
     implementation("com.amplifyframework:aws-auth-cognito")
-    implementation("com.amplifyframework:core") // 显式加上 core 比较保险
-
-    // Liveness 独立引入
+    implementation("com.amplifyframework:core")
     implementation("com.amplifyframework.ui:liveness:1.3.0")
 
+    // Compose
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.appcompat:appcompat:1.6.1")
+
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
+    // ML Kit
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
     implementation("com.google.mlkit:text-recognition-chinese:16.0.0")
     implementation("com.google.android.gms:play-services-mlkit-face-detection:17.1.0")
 
-    //  【精华】引入 Firebase BOM (Bill of Materials)
-    // 它的好处是：以后添加具体的 Firebase 库（如 Analytics, Messaging）不需要写版本号了！
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0")) // 版本号可以用最新的
-
-    //  添加具体功能，不用写版本号，BOM 会自动配对
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-messaging") // 如果你要做推送，就把这个加上
-
+    implementation("com.google.firebase:firebase-messaging")
 }

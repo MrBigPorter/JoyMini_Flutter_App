@@ -1,9 +1,10 @@
-name: JoyMini Full Auto Pipeline
+name: JoyMini Professional CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
+      - test
   workflow_dispatch:
 
 permissions:
@@ -11,37 +12,65 @@ permissions:
   deployments: write
 
 jobs:
-  # 🚀 深度优化：把 H5 和 Android 合并到一个任务里，只拉一次代码，极致提速！
-  build-all:
-    runs-on: self-hosted
+  build-and-deploy:
+    runs-on: self-hosted  # 你的 MacBook Air Runner
     steps:
-      - name: Checkout Code
+      - name: 1. Checkout Code
         uses: actions/checkout@v4
 
-      - name: 全局环境准备
+      # ================= 阶段 A: 智能环境识别 =================
+      - name: 2. 确定部署环境
+        id: set_env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "ENV_TAG=[PROD 生产版]" >> $GITHUB_ENV
+            echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
+            echo "CF_PROJECT=joymini-web" >> $GITHUB_ENV
+            # 正式版 ID
+            echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_PROD }}" >> $GITHUB_ENV
+            echo "FIREBASE_IOS_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_PROD }}" >> $GITHUB_ENV
+            echo "IS_PROD=true" >> $GITHUB_ENV
+            echo "APP_ID_SUFFIX=" >> $GITHUB_ENV
+          else
+            echo "ENV_TAG=[TEST 测试版]" >> $GITHUB_ENV
+            echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
+            echo "CF_PROJECT=joymini-web-test" >> $GITHUB_ENV
+            # 测试版 ID (对应 com.porter.joyminis.test)
+            echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}" >> $GITHUB_ENV
+            echo "FIREBASE_IOS_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_TEST }}" >> $GITHUB_ENV
+            echo "IS_PROD=false" >> $GITHUB_ENV
+            echo "APP_ID_SUFFIX=.test" >> $GITHUB_ENV
+          fi
+
+      - name: 3. 全局 Flutter 环境准备
         run: |
           flutter config --no-analytics
-          flutter config --enable-web
-          echo "🚀 获取所有依赖包..."
           flutter pub get
 
-      # ================= 阶段 1: H5 阵地 =================
-      - name: 🚀 编译 H5
+      # ================= 阶段 B: Web 阵地 =================
+      - name: 🚀 编译 H5 Web 端
         run: |
-          echo "🚀 开始编译 H5 Web 端..."
-          flutter build web --release --dart-define-from-file=lib/core/config/env/prod.json
+          flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }}
 
-      - name: ☁️ 部署 H5 到 Cloudflare
+      - name: ☁️ 部署到 Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: joymini-web
+          projectName: ${{ env.CF_PROJECT }}
           directory: build/web
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= 阶段 2: Android 阵地 =================
-      - name: 🔐 还原签名文件
+      # ================= 阶段 C: iOS 动态变身 =================
+      - name: 🍏 修改 iOS 项目配置 (仅限测试分支)
+        if: env.IS_PROD == 'false'
+        run: |
+          # 动态修改 Bundle Identifier 为 .test 后缀
+          sed -i '' "s/com.porter.joyminis/com.porter.joyminis.test/g" ios/Runner.xcodeproj/project.pbxproj
+          echo "✅ iOS Bundle ID 已变更为 com.porter.joyminis.test"
+
+      # ================= 阶段 D: Android 阵地 =================
+      - name: 🔐 还原 Android 签名文件
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -53,50 +82,58 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
-      - name: ⚙️ 优化 Gradle 内存 (保留守护进程提速)
+      - name: 🚀 编译 Android (APK + AAB)
         run: |
-          # 删掉了 daemon=false，利用 Mac 内存缓存加速后续编译
-          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+          # 无论什么分支都打 APK 方便分发
+          flutter build apk --release --dart-define-from-file=${{ env.ENV_FILE }}
+          
+          # 生产环境额外打上架包 AAB
+          if [ "${{ env.IS_PROD }}" = "true" ]; then
+            flutter build appbundle --release --dart-define-from-file=${{ env.ENV_FILE }}
+          fi
 
-      - name: 🚀 编译 Android APK
+      # ================= 阶段 E: iOS 编译 =================
+      - name: 🚀 编译 iOS (IPA)
         run: |
-          echo "🚀 开始编译 Android APK..."
-          flutter build apk --release --dart-define-from-file=lib/core/config/env/prod.json
+          # 使用 --no-codesign 绕过 Runner 的本地签名校验，由 Flutter 构建系统处理
+          flutter build ipa --release --no-codesign --dart-define-from-file=${{ env.ENV_FILE }}
 
-      - name: 🦅 自动分发到 Firebase
+      # ================= 阶段 F: 统一分发到 Firebase =================
+      - name: 🦅 分发到 Firebase App Distribution
         run: |
-          # 优化：加个判断，如果你的 Mac 已经装了 firebase，就不再重复下载了，提速！
           if ! command -v firebase &> /dev/null; then
               curl -sL https://firebase.tools | upgrade=true bash
           fi
           
+          # 1. 发送 Android APK
           firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
-            --app "${{ secrets.FIREBASE_APP_ID }}" \
+            --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
             --token "${{ secrets.FIREBASE_TOKEN }}" \
             --groups "admin" \
             --non-interactive \
-            --release-notes "大哥，这是 MacBook Air 全自动流水线极速产出的版本！" || true
+            --release-notes "${{ env.ENV_TAG }} Android 极速部署完成。"
 
-      # ================= 阶段 2.5: 备用降落伞 =================
-      - name: 💾 备份 APK 到 GitHub 网页端
+          # 2. 发送 iOS IPA (如果需要的话，注意 iOS 必须有正确的 Ad-hoc 签名才能安装)
+          # firebase appdistribution:distribute build/ios/ipa/Runner.ipa \
+          #   --app "${{ env.FIREBASE_IOS_APP_ID }}" \
+          #   --token "${{ secrets.FIREBASE_TOKEN }}" \
+          #   --groups "admin" \
+          #   --non-interactive
+
+      # ================= 阶段 G: 存档与战报 =================
+      - name: 💾 归档 AAB (仅限 main)
+        if: env.IS_PROD == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 7 # 存7天自动清理，不占用额外空间
+          name: production-aab-bundle
+          path: build/app/outputs/bundle/release/app-release.aab
 
-      # ================= 阶段 3: 终极扫码战报 =================
-      - name: 📱 发送带二维码的战报到 Telegram
+      - name: 📱 发送 Telegram 战报
         if: always()
         run: |
-          # 1. 组装文案内容 (注意这里用的是 caption，因为发的是图片)
-          MESSAGE="🐺 *JoyMini 极速战报* 🚀%0A%0A✅ *Android*: 成功空降 Firebase%0A✅ *H5*: 成功部署 Cloudflare%0A%0A👇 *大哥，请直接扫码安装最新版*："
-          
-          # 2. 利用开源 API，把你的 Firebase 链接动态生成一张二维码图片
-          # 记得确保 secrets.FIREBASE_INVITE_LINK 已经配置好！
+          MESSAGE="🐺 *JoyMini 自动流水线*%0A%0A📌 状态: ${{ job.status }}%0A🏷️ 环境: ${{ env.ENV_TAG }}%0A🌿 分支: \`${{ github.ref_name }}\`%0A%0A👇 *扫码安装最新版本*："
           QR_URL="https://quickchart.io/qr?text=${{ secrets.FIREBASE_INVITE_LINK }}&size=400"
           
-          # 3. 呼叫 Telegram 的 sendPhoto 接口直接发图！
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendPhoto" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d "photo=$QR_URL" \

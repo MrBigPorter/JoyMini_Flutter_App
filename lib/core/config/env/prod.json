@@ -2,5 +2,7 @@
   "FLAVOR": "prod",
   "API_BASE_URL": "https://admin.joyminis.com",
   "IMG_BASE_URL": "https://img.joyminis.com",
-  "LOG_HTTP": false
+  "LOG_HTTP": false,
+  "APP_ID_SUFFIX": "",
+  "APP_NAME_SUFFIX": ""
 }
