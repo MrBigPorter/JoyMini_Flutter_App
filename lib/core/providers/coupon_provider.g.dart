@@ -6,7 +6,7 @@ part of 'coupon_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$myCouponsByStatusHash() => r'dd766fa25a839f866eb2e48b65e87b498a01cab6';
+String _$myCouponsByStatusHash() => r'149249298361348f19cae694396c69d2e617c23f';
 
 /// Copied from Dart SDK
 class _SystemHash {
