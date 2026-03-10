@@ -1,0 +1,79 @@
+name: "🚑 JoyMini Hot Update (Patch)"
+
+# Trigger: Manual trigger only to prevent accidental deployments
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '🎯 Select Target Environment'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - prod
+
+jobs:
+  shorebird-patch:
+    runs-on: self-hosted # Utilizing your local MacBook Air Runner
+    steps:
+      # ================= Step 1: Initialization =================
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+        with:
+          clean: true
+
+      # ================= Step 2: Configuration =================
+      - name: 2. Set Environment Variables
+        id: set_env
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "prod" ]]; then
+            echo "ENV_TAG=[PROD]" >> $GITHUB_ENV
+            echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
+          else
+            echo "ENV_TAG=[TEST]" >> $GITHUB_ENV
+            echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
+          fi
+
+      - name: 3. Prepare Flutter Environment
+        run: |
+          flutter config --no-analytics
+          flutter pub get
+
+      - name: 4. Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+
+      # ================= Step 5: Core Deployment =================
+      - name: 🚀 5. Build and Publish Patch
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+        run: |
+          # Note: The --force flag is required for CI/CD to bypass 
+          # interactive confirmation prompts during the patch process.
+          shorebird patch android --force -- --dart-define-from-file=${{ env.ENV_FILE }}
+
+      # ================= Step 6: Reporting =================
+      - name: 📱 6. Send Telegram Notification
+        if: always()
+        run: |
+          MESSAGE="🚑 *JoyMini Hotfix Patch Deployed* 🚀
+
+          📌 *Status*: ${{ job.status }}
+          🏷️ *Target Env*: ${{ env.ENV_TAG }}
+          🌿 *Branch*: \`${{ github.ref_name }}\`
+          👨‍💻 *Triggered By*: ${{ github.actor }}
+
+          ✅ *Patch successfully pushed to Shorebird Cloud!*
+          The update will be silently downloaded by active apps. Users only need to restart the application to apply changes."
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=$MESSAGE" \
+            -d "parse_mode=Markdown"
+
+      # ================= Step 7: Cleanup =================
+      - name: 🧹 7. Secure Workspace Cleanup
+        if: always()
+        run: |
+          # Restore any local changes made during build to keep the runner clean
+          git checkout -- .

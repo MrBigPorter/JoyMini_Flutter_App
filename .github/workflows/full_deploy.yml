@@ -2,9 +2,13 @@ name: JoyMini Enterprise CI/CD Pipeline
 
 on:
   push:
+    # 逻辑 1：推送到 test 分支时，自动触发测试环境打包
     branches:
-      - main
       - test
+    # 逻辑 2：只有推送 v 开头的标签时，才触发正式环境打包
+    tags:
+      - 'v*'
+  # 逻辑 3：保留手动点击按钮触发，以防万一
   workflow_dispatch:
 
 permissions:
@@ -13,7 +17,7 @@ permissions:
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted  # Your MacBook Air Runner
+    runs-on: self-hosted
     steps:
       # ================= Phase 1: Secure Checkout =================
       - name: 1. Checkout Code (Force Clean)
@@ -21,11 +25,20 @@ jobs:
         with:
           clean: true
 
+      # ================= Phase 1.5: Auto Versioning =================
+      - name: 🤖 1.5. Auto Bump Build Number
+        run: |
+          VERSION_NAME=$(grep '^version: ' pubspec.yaml | sed 's/version: //g' | cut -d '+' -f 1)
+          NEW_VERSION="$VERSION_NAME+${{ github.run_number }}"
+          perl -pi -e "s/^version: .*/version: $NEW_VERSION/g" pubspec.yaml
+          echo "✅ Cloud build version set to: $NEW_VERSION"
+
       # ================= Phase 2: Environment Determination =================
       - name: 2. Determine Deployment Environment
         id: set_env
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          # 只要是 main 分支或者 v 开头的标签，就走 PROD 环境；否则（如 test 分支）走 TEST
+          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "ENV_TAG=[PROD]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
             echo "CF_PROJECT=joymini-web" >> $GITHUB_ENV
@@ -77,7 +90,7 @@ jobs:
         if: env.IS_PROD == 'false'
         run: |
           sed -i '' "s/com.porter.joyminis/com.porter.joyminis.test/g" ios/Runner.xcodeproj/project.pbxproj
-          echo "✅ iOS Bundle ID dynamically changed to .test"
+          echo "✅ iOS Bundle ID changed to .test"
 
       # ================= Phase 7: Android Build with Shorebird =================
       - name: 🔐 Restore Android Keystore
@@ -99,8 +112,6 @@ jobs:
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          # [核心改动] 使用 shorebird release 替代 flutter build
-          # -- 后面的参数会透传给 Flutter，确保 .json 配置生效
           shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
           
           if [ "${{ env.IS_PROD }}" == "true" ]; then
@@ -124,7 +135,6 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > $CREDENTIAL_FILE
           export GOOGLE_APPLICATION_CREDENTIALS=$CREDENTIAL_FILE
           
-          # 注意：Firebase 分发的是 Shorebird 生成的 APK
           firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
             --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
             --groups "admin" \
@@ -135,21 +145,14 @@ jobs:
       - name: 💾 Archive Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.ref_name }}-android-apk
+          name: android-apk-${{ env.APP_VERSION }}
           path: build/app/outputs/flutter-apk/app-release.apk
 
       - name: 💾 Archive iOS IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.ref_name }}-ios-ipa
+          name: ios-ipa-${{ env.APP_VERSION }}
           path: build/ios/ipa/*.ipa
-
-      - name: 💾 Archive Production AAB (Main Only)
-        if: env.IS_PROD == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: production-aab-bundle
-          path: build/app/outputs/bundle/release/app-release.aab
 
       # ================= Phase 11: Telegram Notification =================
       - name: 📱 Send Detailed Telegram Report
@@ -160,14 +163,12 @@ jobs:
           📌 *Status*: ${{ job.status }}
           🏷️ *Environment*: ${{ env.ENV_TAG }}
           📦 *App Version*: \`${{ env.APP_VERSION }}\`
-          🌿 *Branch*: \`${{ github.ref_name }}\`
+          🌿 *Ref*: \`${{ github.ref_name }}\`
           📝 *Commit*: \`${{ env.SHORT_SHA }}\` - ${{ env.COMMIT_MSG }}
           👨‍💻 *Author*: ${{ github.actor }}
-          🌐 *H5 Web*: [Click to Preview Web App](${{ steps.cf_deploy.outputs.url }})
+          🌐 *H5 Web*: [Preview Web App](${{ steps.cf_deploy.outputs.url }})
 
-          🔥 *Hot Update*: Shorebird Engine Active 🐦
-
-          👇 *Scan to install App (Cross-platform)*:"
+          🔥 *Hot Update*: Shorebird Engine Active 🐦"
           
           QR_URL="https://quickchart.io/qr?text=${{ secrets.FIREBASE_INVITE_LINK }}&size=400"
           
@@ -181,9 +182,10 @@ jobs:
       - name: 🧹 Secure Workspace Cleanup
         if: always()
         run: |
-          echo "Starting cleanup of sensitive credentials and restoring codebase..."
+          echo "Cleaning credentials and restoring codebase..."
           rm -f android/app/upload-keystore.jks
           rm -f android/key.properties
           rm -f ${{ github.workspace }}/firebase-key.json
           git checkout -- ios/Runner.xcodeproj/project.pbxproj
-          echo "✅ Cleanup complete. Runner restored to a clean state."
+          git checkout -- pubspec.yaml
+          echo "✅ Cleanup complete."
