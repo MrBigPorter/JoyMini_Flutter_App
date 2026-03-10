@@ -1,4 +1,4 @@
-name: JoyMini Professional CI/CD Pipeline
+name: JoyMini Enterprise CI/CD Pipeline
 
 on:
   push:
@@ -13,46 +13,62 @@ permissions:
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted  # 你的 MacBook Air Runner
+    runs-on: self-hosted  # Your MacBook Air Runner
     steps:
-      - name: 1. Checkout Code
+      # ================= Phase 1: Secure Checkout =================
+      - name: 1. Checkout Code (Force Clean)
         uses: actions/checkout@v4
+        with:
+          clean: true
 
-      # ================= 阶段 A: 智能环境识别 =================
-      - name: 2. 确定部署环境
+      # ================= Phase 2: Environment Determination =================
+      - name: 2. Determine Deployment Environment
         id: set_env
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "ENV_TAG=[PROD 生产版]" >> $GITHUB_ENV
+            echo "ENV_TAG=[PROD]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
             echo "CF_PROJECT=joymini-web" >> $GITHUB_ENV
-            # 正式版 ID
             echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_PROD }}" >> $GITHUB_ENV
             echo "FIREBASE_IOS_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_PROD }}" >> $GITHUB_ENV
             echo "IS_PROD=true" >> $GITHUB_ENV
-            echo "APP_ID_SUFFIX=" >> $GITHUB_ENV
           else
-            echo "ENV_TAG=[TEST 测试版]" >> $GITHUB_ENV
+            echo "ENV_TAG=[TEST]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
             echo "CF_PROJECT=joymini-web-test" >> $GITHUB_ENV
-            # 测试版 ID (对应 com.porter.joyminis.test)
             echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}" >> $GITHUB_ENV
             echo "FIREBASE_IOS_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_TEST }}" >> $GITHUB_ENV
             echo "IS_PROD=false" >> $GITHUB_ENV
-            echo "APP_ID_SUFFIX=.test" >> $GITHUB_ENV
           fi
 
-      - name: 3. 全局 Flutter 环境准备
+      # ================= Phase 3: Extract Metadata =================
+      - name: 📊 3. Extract Build Metadata
+        id: meta
+        run: |
+          # Automatically extract version from pubspec.yaml (e.g., 1.0.0+1)
+          APP_VERSION=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2)
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          
+          # Get short Git commit hash
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+          
+          # Get the latest commit subject/message safely
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
+
+      # ================= Phase 4: Environment Setup =================
+      - name: 4. Prepare Global Flutter Environment
         run: |
           flutter config --no-analytics
           flutter pub get
 
-      # ================= 阶段 B: Web 阵地 =================
-      - name: 🚀 编译 H5 Web 端
-        run: |
-          flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }}
+      # ================= Phase 5: Web Deployment =================
+      - name: 🚀 Build Web (H5)
+        run: flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }}
 
-      - name: ☁️ 部署到 Cloudflare Pages
+      - name: ☁️ Deploy to Cloudflare Pages
+        id: cf_deploy  # Added ID to capture the URL output
         uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
@@ -61,16 +77,15 @@ jobs:
           directory: build/web
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= 阶段 C: iOS 动态变身 =================
-      - name: 🍏 修改 iOS 项目配置 (仅限测试分支)
+      # ================= Phase 6: iOS Dynamic Config =================
+      - name: 🍏 Dynamically Adjust iOS Project Files (Test Only)
         if: env.IS_PROD == 'false'
         run: |
-          # 动态修改 Bundle Identifier 为 .test 后缀
           sed -i '' "s/com.porter.joyminis/com.porter.joyminis.test/g" ios/Runner.xcodeproj/project.pbxproj
-          echo "✅ iOS Bundle ID 已变更为 com.porter.joyminis.test"
+          echo "✅ iOS Bundle ID dynamically changed to .test"
 
-      # ================= 阶段 D: Android 阵地 =================
-      - name: 🔐 还原 Android 签名文件
+      # ================= Phase 7: Android Build & Sign =================
+      - name: 🔐 Restore Android Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -82,60 +97,99 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
-      - name: 🚀 编译 Android (APK + AAB)
+      - name: 🚀 Build Android (APK & AAB)
         run: |
-          # 无论什么分支都打 APK 方便分发
           flutter build apk --release --dart-define-from-file=${{ env.ENV_FILE }}
-          
-          # 生产环境额外打上架包 AAB
-          if [ "${{ env.IS_PROD }}" = "true" ]; then
+          if [ "${{ env.IS_PROD }}" == "true" ]; then
             flutter build appbundle --release --dart-define-from-file=${{ env.ENV_FILE }}
           fi
 
-      # ================= 阶段 E: iOS 编译 =================
-      - name: 🚀 编译 iOS (IPA)
+      # ================= Phase 8: iOS Build =================
+      - name: 🚀 Build iOS (IPA)
         run: |
-          # 使用 --no-codesign 绕过 Runner 的本地签名校验，由 Flutter 构建系统处理
           flutter build ipa --release --no-codesign --dart-define-from-file=${{ env.ENV_FILE }}
 
-      # ================= 阶段 F: 统一分发到 Firebase =================
-      - name: 🦅 分发到 Firebase App Distribution
+      # ================= Phase 9: Firebase Distribution =================
+      - name: 🦅 Distribute to Firebase App Distribution
+        env:
+          CREDENTIAL_FILE: ${{ github.workspace }}/firebase-key.json
         run: |
           if ! command -v firebase &> /dev/null; then
               curl -sL https://firebase.tools | upgrade=true bash
           fi
           
-          # 1. 发送 Android APK
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > $CREDENTIAL_FILE
+          export GOOGLE_APPLICATION_CREDENTIALS=$CREDENTIAL_FILE
+          
+          # Send Android
           firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
             --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
-            --token "${{ secrets.FIREBASE_TOKEN }}" \
             --groups "admin" \
             --non-interactive \
-            --release-notes "${{ env.ENV_TAG }} Android 极速部署完成。"
+            --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }}"
 
-          # 2. 发送 iOS IPA (如果需要的话，注意 iOS 必须有正确的 Ad-hoc 签名才能安装)
-          # firebase appdistribution:distribute build/ios/ipa/Runner.ipa \
-          #   --app "${{ env.FIREBASE_IOS_APP_ID }}" \
-          #   --token "${{ secrets.FIREBASE_TOKEN }}" \
-          #   --groups "admin" \
-          #   --non-interactive
+          # Send iOS (Uncomment when certificates are ready)
+          # if [ -f build/ios/ipa/*.ipa ]; then
+          #   firebase appdistribution:distribute build/ios/ipa/*.ipa \
+          #     --app "${{ env.FIREBASE_IOS_APP_ID }}" \
+          #     --groups "admin" \
+          #     --non-interactive \
+          #     --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }}"
+          # fi
 
-      # ================= 阶段 G: 存档与战报 =================
-      - name: 💾 归档 AAB (仅限 main)
+      # ================= Phase 10: Artifact Archiving =================
+      - name: 💾 Archive Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.ref_name }}-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: 💾 Archive iOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.ref_name }}-ios-ipa
+          path: build/ios/ipa/*.ipa
+
+      - name: 💾 Archive Production AAB (Main Only)
         if: env.IS_PROD == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: production-aab-bundle
           path: build/app/outputs/bundle/release/app-release.aab
 
-      - name: 📱 发送 Telegram 战报
+      # ================= Phase 11: Telegram Notification =================
+      - name: 📱 Send Detailed Telegram Report
         if: always()
         run: |
-          MESSAGE="🐺 *JoyMini 自动流水线*%0A%0A📌 状态: ${{ job.status }}%0A🏷️ 环境: ${{ env.ENV_TAG }}%0A🌿 分支: \`${{ github.ref_name }}\`%0A%0A👇 *扫码安装最新版本*："
+          # Constructing multiline message securely
+          MESSAGE="🐺 *JoyMini CI/CD Pipeline*
+
+          📌 *Status*: ${{ job.status }}
+          🏷️ *Environment*: ${{ env.ENV_TAG }}
+          📦 *App Version*: \`${{ env.APP_VERSION }}\`
+          🌿 *Branch*: \`${{ github.ref_name }}\`
+          📝 *Commit*: \`${{ env.SHORT_SHA }}\` - ${{ env.COMMIT_MSG }}
+          👨‍💻 *Author*: ${{ github.actor }}
+          🌐 *H5 Web*: [Click to Preview Web App](${{ steps.cf_deploy.outputs.url }})
+
+          👇 *Scan to install App (Cross-platform)*:"
+          
           QR_URL="https://quickchart.io/qr?text=${{ secrets.FIREBASE_INVITE_LINK }}&size=400"
           
+          # Using -F (multipart) to prevent characters like '&' from breaking the curl command
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendPhoto" \
-            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d "photo=$QR_URL" \
-            -d "caption=$MESSAGE" \
-            -d "parse_mode=Markdown"
+            -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -F "photo=$QR_URL" \
+            -F "caption=$MESSAGE" \
+            -F "parse_mode=Markdown"
+
+      # ================= Phase 12: Secure Cleanup =================
+      - name: 🧹 Secure Workspace Cleanup
+        if: always()
+        run: |
+          echo "Starting cleanup of sensitive credentials and restoring codebase..."
+          rm -f android/app/upload-keystore.jks
+          rm -f android/key.properties
+          rm -f ${{ github.workspace }}/firebase-key.json
+          git checkout -- ios/Runner.xcodeproj/project.pbxproj
+          echo "✅ Cleanup complete. Runner restored to a clean state."
