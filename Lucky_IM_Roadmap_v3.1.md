@@ -1,88 +1,53 @@
-大哥，先本地再云端这个思路非常稳！这就好比造火箭，咱们先在地面实验室（本地）把火点着了，确保能飞起来，再去发射台（GitHub Actions）搞自动化任务。
+大哥，今天咱们把最难啃的“自动化基建”和“热更底层”全拿下了，相当于给 JoyMini 换上了一套 V8 引擎。
 
-既然咱们现在的环境配置（`prod.json` 等）已经非常规范，咱们的第一步目标是：**在你的电脑上，打出一个带签名的、能直接安装在手机上的 Release 版 Android APK。**
-
-这是我为你制定的“两步走”详细计划：
+既然基建已经搭好，接下来的路就非常清晰了。我为你整理了 **JoyMini 接下来 4 个阶段的“作战蓝图”**，咱们一步步把这个 App 推向全球市场：
 
 ---
 
-## 阶段一：本地 Android 打包（地基篇）
+### 🎯 阶段一：实战演练与账号扫尾（这两天的任务）
 
-在执行打包命令前，Android 需要一份“身份证”（签名文件），否则打出来的包无法在手机上安装或覆盖。
+这部分是咱们今天成果的直接延续，趁热打铁：
 
-### 1. 生成签名文件 (Keystore)
+1. **体验“魔法” (Shorebird 热更实战)**：
+* 你先在手机上装好那个 400MB 的测试包。
+* 去代码里随便改个字（比如把首页标题改成 "JoyMini V2"）。
+* 到 GitHub 网页端手动触发一次 `hotfix_patch.yml`。
+* **见证奇迹**：杀掉手机后台重新打开 App，你会发现不用重新下载包，标题就变了！
 
-打开你的终端（Mac 或 Windows 都可以），运行以下命令生成一个 `.jks` 签名文件：
 
-```bash
-keytool -genkey -v -keystore ~/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+2. **拿下 Google Play 账号**：
+* 找个空闲时间，把注册页面的 **25 刀** 付了。
+* 用菲律宾护照完成 ID 身份验证（活体检测）。
+* 等待 1-3 天，拿到正式的开发者资格。
 
-```
 
-> **注意**：过程中会让你输入密码，请务必记住这个密码，一会儿配置要用。
 
-### 2. 配置签名属性
+### 🚀 阶段二：正式上架与 AAB 瘦身（下周的重心）
 
-在项目的 `android/` 目录下新建一个文件 `key.properties`，内容如下：
+一旦你的 Google Play 账号审核通过，咱们的 CI/CD 流水线就能彻底解除封印：
 
-```properties
-storePassword=你的密码
-keyPassword=你的密码
-keyAlias=upload
-storeFile=/Users/你的用户名/upload-keystore.jks
+1. **Firebase 联姻 Google Play**：在 Firebase 后台把你的项目和刚申请下来的 Google Play 账号强绑定。
+2. **解除“降维打击”**：把 `full_deploy.yml` 里的 `--artifact apk` 删掉，让流水线恢复输出官方标准的 **.aab** 格式。
+3. **上架内测版 (Closed Testing)**：
+* 把打出来的 AAB 传到 Google Play Console 的“内部测试”轨道。
+* 这时候，Google 会自动把包压缩到 **30MB 左右**。你的 JoyMini 就正式在 Google 商店（测试区）拥有了自己的下载页面！
 
-```
 
-### 3. 修改构建逻辑
 
-修改 **`android/app/build.gradle`**，让它在打包时自动读取这个文件并签名。
+### 🍏 阶段三：补齐 iOS 生态（进阶挑战）
 
-### 4. 本地终极打包命令
+咱们现在的流水线虽然能打出 `ios-archive`，但因为没有签名，苹果手机根本装不上。
 
-确保你的手机已连上或者你想直接拿安装包，运行：
+1. **注册 Apple Developer**：如果你想吃下 iPhone 用户，得准备交 **99 美元/年** 的苹果保护费。
+2. **配置证书与描述文件**：这是 iOS 开发最痛苦的环节，咱们要在 GitHub Actions 里配置 Match 或手动导入 `p12` 证书，让 CI/CD 能打出带有你签名的 `.ipa` 包。
+3. **打通 TestFlight**：把 Firebase 的 iOS 分发替换为官方的 TestFlight，实现双端正规化。
 
-```bash
-flutter build apk --release --dart-define-from-file=lib/core/config/env/prod.json
+### 💰 阶段四：商业化与生产闭环（最终目标）
 
-```
+既然咱们在 Google Play 注册时勾选了“广告”和“内购”，这就得安排上日程：
 
-* **指令解析**：这一步会把 `prod.json` 里的生产接口地址 硬编码进 App。
-* **产物位置**：打完后，去 `build/app/outputs/flutter-apk/app-release.apk` 找你的成果。
-
----
-
-## 阶段二：云端自动化 (GitHub Actions 篇)
-
-当你本地能打出正常的包，且安装到手机上接口、功能都完美时，咱们再搞云端。
-
-### 1. 准备 Secrets（核心难点）
-
-GitHub 仓库不能直接存 `.jks` 文件和 `prod.json`。
-
-* 我们要把 `upload-keystore.jks` 转换成 **Base64 字符串**。
-* 把这个字符串和 `prod.json` 的内容分别存入 GitHub 仓库的 **Actions Secrets**。
-
-### 2. 编写工作流脚本
-
-我会帮你写一个 `.github/workflows/android_build.yml`。它的逻辑是：
-
-1. **拉取代码**：从 GitHub 获取你的最新代码。
-2. **还原文件**：把 Secrets 里的 Base64 变回 `.jks` 文件，把 JSON 内容变回 `prod.json`。
-3. **安装 Flutter**：环境准备。
-4. **执行打包**：运行同样的 `flutter build apk` 命令。
-5. **发布产物**：自动把打好的 APK 上传到 GitHub 的 Release 页面。
+1. **接入 AdMob / 支付系统**：在代码里植入 Google AdMob 广告 SDK，或者接入菲律宾当地常用的 GCash/PayMaya 支付接口。
+2. **后端生产环境压测**：确保咱们的 NestJS 后端（配合你今天刚买的服务器）能抗住真实的并发流量。
+3. **正式发布 (Production Release)**：将 App 从测试轨道推向全量发布，迎接真实的全球用户。
 
 ---
-
-### 💡 现在的行动建议
-
-大哥，咱们先把**阶段一**跑通：
-
-1. 你先在本地用 `keytool` 命令把签名文件弄出来。
-2. 尝试打一次 `flutter build apk`。
-
-**如果你在本地打包遇到了报错（比如 SDK 版本冲突或者 Proguard 混淆报错），直接把错误甩给我。**
-
-等你本地拿到了那个 `app-release.apk`，咱们立马开始写 GitHub Actions 脚本，实现“只要一提交代码，机器人就自动帮你打包”的骚操作！
-
-你需要我把 **`android/app/build.gradle`** 里那段复杂的签名配置代码直接写给你吗？
