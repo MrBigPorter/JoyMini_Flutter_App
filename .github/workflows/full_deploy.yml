@@ -18,6 +18,9 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: self-hosted
+    # 加入这个全局环境变量，强行使用 Node.js 24 新引擎，干掉黄牌警告！
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       # ================= Phase 1: Secure Checkout =================
       - name: 1. Checkout Code (Preserve Cache)
