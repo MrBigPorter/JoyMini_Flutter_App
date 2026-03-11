@@ -97,3 +97,8 @@ tool/build/
 # should not push to git
 android/key.properties
 android/app/upload-keystore.jks
+
+# FVM Version Cache
+.fvm/flutter_sdk
+.fvm/versions/
+.fvm/cache/
