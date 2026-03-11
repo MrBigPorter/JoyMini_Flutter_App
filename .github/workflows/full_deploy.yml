@@ -20,7 +20,7 @@ jobs:
     runs-on: self-hosted
     steps:
       # ================= Phase 1: Secure Checkout =================
-      - name: 1. Checkout Code (Force Clean)
+      - name: 1. Checkout Code (Preserve Cache)
         uses: actions/checkout@v4
         with:
           clean: false
@@ -109,10 +109,8 @@ jobs:
 
       - name: 🚀 7b. Build Android via Shorebird (APK & AAB)
         env:
-          # 有了这个 TOKEN，Shorebird 就会知道是 CI 环境，自动变为静默模式
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          # 移除了错误的 --force 参数，恢复正常的打包指令
           shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
           
           if [ "${{ env.IS_PROD }}" == "true" ]; then
@@ -136,13 +134,13 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > $CREDENTIAL_FILE
           export GOOGLE_APPLICATION_CREDENTIALS=$CREDENTIAL_FILE
           
-          # 【核心修复】：在结尾加上 || true
-          # 意思是：就算 Firebase 结尾抽风报错，流水线也当它成功了，继续往下走！
+          # [优化] 加上 --debug 强行激活控制台输出，防止 Node.js 死链接假死
           firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
             --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
             --groups "admin" \
             --non-interactive \
-            --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }} (Shorebird Enabled)" || true
+            --debug \
+            --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }} (Shorebird Enabled)"
 
       # ================= Phase 10: Artifact Archiving =================
       - name: 💾 Archive Android APK
@@ -156,6 +154,8 @@ jobs:
         with:
           name: ios-ipa-${{ env.APP_VERSION }}
           path: build/ios/ipa/*.ipa
+          # [优化] 如果没签名生成不了 IPA，静默跳过，不再报黄牌警告
+          if-no-files-found: ignore
 
       # ================= Phase 11: Telegram Notification =================
       - name: 📱 Send Detailed Telegram Report
@@ -170,6 +170,7 @@ jobs:
           📝 *Commit*: \`${{ env.SHORT_SHA }}\` - ${{ env.COMMIT_MSG }}
           👨‍💻 *Author*: ${{ github.actor }}
           🌐 *H5 Web*: [Preview Web App](${{ steps.cf_deploy.outputs.url }})
+          🔗 *Action Log*: [View on GitHub](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
           🔥 *Hot Update*: Shorebird Engine Active 🐦"
           
@@ -187,12 +188,11 @@ jobs:
         run: |
           echo "Cleaning credentials and heavy build artifacts..."
           
-          # 智能删除巨大的最终安装包，保留编译缓存以维持下次打包速度
           rm -rf build/app/outputs/
           rm -rf build/ios/ipa/
+          # [优化] 确保清理掉苹果庞大的归档缓存
           rm -rf build/ios/archive/
           
-          # 原有的安全清理
           rm -f android/app/upload-keystore.jks
           rm -f android/key.properties
           rm -f ${{ github.workspace }}/firebase-key.json
