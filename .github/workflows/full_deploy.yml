@@ -106,49 +106,45 @@ jobs:
       - name: 🐦 7a. Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
 
-      - name: 🚀 7b. Build Android via Shorebird (APK & AAB)
+      # 【本次核心修改 1】：强制产出 APK
+      - name: 🚀 7b. Build Android via Shorebird (Force APK)
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          shorebird release android -- --dart-define-from-file=${{ env.ENV_FILE }}
+          shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
 
       # ================= Phase 8: iOS Build =================
       - name: 🚀 Build iOS (IPA)
         run: |
           fvm flutter build ipa --release --no-codesign --dart-define-from-file=${{ env.ENV_FILE }}
 
-      # ================= Phase 9: Firebase Distribution (暴力加固版) =================
+      # ================= Phase 9: Firebase Distribution =================
+      # 【本次核心修改 2】：只认 APK，失败即报错！
       - name: 🦅 9. Distribute to Firebase App Distribution
         run: |
-          # 1. 确保 Firebase CLI 安装
           if ! command -v firebase &> /dev/null; then
               curl -sL https://firebase.tools | upgrade=true bash
           fi
           
-          # 2. 【核心修复】使用局部变量定义路径，杜绝 ambiguous redirect 报错
           FB_KEY_PATH="${{ github.workspace }}/firebase-key.json"
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > "$FB_KEY_PATH"
           export GOOGLE_APPLICATION_CREDENTIALS="$FB_KEY_PATH"
           
-          # 3. 【核心修复】地毯式搜索产物，优先 APK，次选 AAB
           TARGET_FILE=$(find build -name "*release.apk" | head -n 1)
-          if [ -z "$TARGET_FILE" ]; then
-            TARGET_FILE=$(find build -name "*release.aab" | head -n 1)
-          fi
           
           if [ -n "$TARGET_FILE" ] && [ -f "$TARGET_FILE" ]; then
-            echo "🚀 Found file to upload: $TARGET_FILE"
-            # 即使分发失败也继续执行，保证 Telegram 通知发送
+            echo "🚀 Found APK to upload: $TARGET_FILE"
+            # 删除了 || echo，失败直接抛出红灯！
             firebase appdistribution:distribute "$TARGET_FILE" \
               --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
               --groups "admin" \
               --non-interactive \
-              --release-notes "Version: ${{ env.APP_VERSION }} (Shorebird Release)" || echo "⚠️ Firebase upload failed, skipping..."
+              --release-notes "Version: ${{ env.APP_VERSION }} (Shorebird Release)"
           else
-            echo "⚠️ No APK or AAB found to upload, skipping Firebase step."
+            echo "❌ 致命错误: 没有找到 APK 文件！请检查 7b 步骤。"
+            exit 1
           fi
           
-          # 4. 清理临时密钥
           rm -f "$FB_KEY_PATH"
 
       # ================= Phase 10: Artifact Archiving =================
@@ -158,7 +154,6 @@ jobs:
           name: android-release-${{ env.APP_VERSION }}
           path: |
             build/app/outputs/flutter-apk/*.apk
-            build/app/outputs/bundle/release/*.aab
           if-no-files-found: warn
 
       - name: 💾 Archive iOS Archive
@@ -194,7 +189,6 @@ jobs:
           echo "Cleaning credentials..."
           rm -f android/app/upload-keystore.jks
           rm -f android/key.properties
-          # 确保这一步不会因为文件不存在而报错
           rm -f "${{ github.workspace }}/firebase-key.json"
           git checkout -- ios/Runner.xcodeproj/project.pbxproj
           git checkout -- pubspec.yaml
