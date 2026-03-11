@@ -60,8 +60,8 @@ jobs:
       - name: 📊 3. Extract Build Metadata
         id: meta
         run: |
-          # [优化] 更健壮的版本号提取逻辑，防止空格干扰
-          APP_VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //g' | cut -d '+' -f 1)
+          # [核心修复 1] 更健壮的版本号提取逻辑，保留带 + 号的完整版本号（如 1.0.0+29）
+          APP_VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //g')
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
@@ -119,20 +119,12 @@ jobs:
       - name: 🐦 7a. Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
 
-      - name: 🚀 7b. Build Android via Shorebird (Dynamic Artifact)
+      - name: 🚀 7b. Build Android via Shorebird (APK & AAB)
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          # [核心修复] 根据环境动态选择打包产物，防止 Shorebird 同一版本号冲突
-          if [ "${{ env.IS_PROD }}" == "true" ]; then
-            echo "📦 PROD Mode: Building AAB for Play Store..."
-            shorebird release android --artifact aab -- --dart-define-from-file=${{ env.ENV_FILE }}
-            echo "ANDROID_ARTIFACT=build/app/outputs/bundle/release/app-release.aab" >> $GITHUB_ENV
-          else
-            echo "🧪 TEST Mode: Building APK for Firebase..."
-            shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
-            echo "ANDROID_ARTIFACT=build/app/outputs/flutter-apk/app-release.apk" >> $GITHUB_ENV
-          fi
+          # [核心修复 2] 不加 --artifact，让 Shorebird 一口气打出双包，规避同版本坑位冲突
+          shorebird release android -- --dart-define-from-file=${{ env.ENV_FILE }}
 
       # ================= Phase 8: iOS Build =================
       - name: 🚀 Build iOS (IPA)
@@ -151,8 +143,8 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > $CREDENTIAL_FILE
           export GOOGLE_APPLICATION_CREDENTIALS=$CREDENTIAL_FILE
           
-          # [核心修复] 使用动态环境变量，无论是 APK 还是 AAB 都能准确找到并上传
-          firebase appdistribution:distribute ${{ env.ANDROID_ARTIFACT }} \
+          # [核心修复 3] 永远只把 APK 传给 Firebase，测试人员下包最稳，绝不用 AAB 惹它发脾气
+          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
             --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
             --groups "admin" \
             --non-interactive \
@@ -164,8 +156,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-release-${{ env.APP_VERSION }}
-          # [核心修复] 归档时也使用动态路径
-          path: ${{ env.ANDROID_ARTIFACT }}
+          # [核心修复 4] 把 APK 和 AAB 全部抓取归档，以后要上架 Play Store 直接来这里下 AAB！
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
 
       - name: 💾 Archive iOS Archive (No Codesign)
         uses: actions/upload-artifact@v4
