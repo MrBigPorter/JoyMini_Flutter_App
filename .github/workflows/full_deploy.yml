@@ -43,16 +43,12 @@ jobs:
           if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "ENV_TAG=[PROD]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
-            echo "CF_PROJECT=joymini-web" >> $GITHUB_ENV
             echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_PROD }}" >> $GITHUB_ENV
-            echo "FIREBASE_IOS_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_PROD }}" >> $GITHUB_ENV
             echo "IS_PROD=true" >> $GITHUB_ENV
           else
             echo "ENV_TAG=[TEST]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
-            echo "CF_PROJECT=joymini-web-test" >> $GITHUB_ENV
             echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}" >> $GITHUB_ENV
-            echo "FIREBASE_IOS_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_TEST }}" >> $GITHUB_ENV
             echo "IS_PROD=false" >> $GITHUB_ENV
           fi
 
@@ -63,10 +59,7 @@ jobs:
           # [核心修复] 保留带 + 号的完整版本号
           APP_VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //g')
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
+          echo "SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
 
       # ================= Phase 4: Environment Setup =================
       - name: 🐦 4a. Expose Local FVM to Runner
@@ -90,7 +83,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: ${{ env.CF_PROJECT }}
+          projectName: ${{ env.CF_PROJECT || 'joymini-web' }}
           directory: build/web
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
@@ -103,16 +96,12 @@ jobs:
 
       # ================= Phase 7: Android Build with Shorebird =================
       - name: 🔐 Restore Android Keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-          cat << EOF > android/key.properties
-          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
           keyAlias=upload
-          storeFile=upload-keystore.jks
-          EOF
+          storeFile=upload-keystore.jks" > android/key.properties
 
       - name: 🐦 7a. Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
@@ -121,7 +110,6 @@ jobs:
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          # 自动触发 Release 并生成双包
           shorebird release android -- --dart-define-from-file=${{ env.ENV_FILE }}
 
       # ================= Phase 8: iOS Build =================
@@ -129,33 +117,39 @@ jobs:
         run: |
           fvm flutter build ipa --release --no-codesign --dart-define-from-file=${{ env.ENV_FILE }}
 
-      # ================= Phase 9: Firebase Distribution =================
-      - name: 🦅 Distribute to Firebase App Distribution
+      # ================= Phase 9: Firebase Distribution (暴力加固版) =================
+      - name: 🦅 9. Distribute to Firebase App Distribution
         run: |
+          # 1. 确保 Firebase CLI 安装
           if ! command -v firebase &> /dev/null; then
               curl -sL https://firebase.tools | upgrade=true bash
           fi
           
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > $CREDENTIAL_FILE
-          export GOOGLE_APPLICATION_CREDENTIALS=$CREDENTIAL_FILE
+          # 2. 【核心修复】使用局部变量定义路径，杜绝 ambiguous redirect 报错
+          FB_KEY_PATH="${{ github.workspace }}/firebase-key.json"
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > "$FB_KEY_PATH"
+          export GOOGLE_APPLICATION_CREDENTIALS="$FB_KEY_PATH"
           
-          # [智能搜索] 优先找 APK，找不到再看有没有 AAB
+          # 3. 【核心修复】地毯式搜索产物，优先 APK，次选 AAB
           TARGET_FILE=$(find build -name "*release.apk" | head -n 1)
           if [ -z "$TARGET_FILE" ]; then
             TARGET_FILE=$(find build -name "*release.aab" | head -n 1)
           fi
           
-          if [ -n "$TARGET_FILE" ]; then
+          if [ -n "$TARGET_FILE" ] && [ -f "$TARGET_FILE" ]; then
             echo "🚀 Found file to upload: $TARGET_FILE"
-            # 即使上传失败（比如 Firebase 不吃 AAB），也不准让整个流程挂掉
+            # 即使分发失败也继续执行，保证 Telegram 通知发送
             firebase appdistribution:distribute "$TARGET_FILE" \
               --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
               --groups "admin" \
               --non-interactive \
-              --release-notes "Version: ${{ env.APP_VERSION }} (Shorebird v31)" || echo "⚠️ Firebase upload failed, but skipping error..."
+              --release-notes "Version: ${{ env.APP_VERSION }} (Shorebird Release)" || echo "⚠️ Firebase upload failed, skipping..."
           else
-            echo "⚠️ No APK or AAB found in build directory, skipping Firebase step."
+            echo "⚠️ No APK or AAB found to upload, skipping Firebase step."
           fi
+          
+          # 4. 清理临时密钥
+          rm -f "$FB_KEY_PATH"
 
       # ================= Phase 10: Artifact Archiving =================
       - name: 💾 Archive Android Artifact
@@ -163,8 +157,8 @@ jobs:
         with:
           name: android-release-${{ env.APP_VERSION }}
           path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/bundle/release/*.aab
           if-no-files-found: warn
 
       - name: 💾 Archive iOS Archive
@@ -183,7 +177,6 @@ jobs:
           🏷️ *Environment*: ${{ env.ENV_TAG }}
           📦 *App Version*: \`${{ env.APP_VERSION }}\`
           📝 *Commit*: \`${{ env.SHORT_SHA }}\`
-          🌐 *H5 Web*: [Preview Web App](${{ steps.cf_deploy.outputs.url }})
           🔥 *Hot Update*: Shorebird Engine Active 🐦"
           
           QR_URL="https://quickchart.io/qr?text=${{ secrets.FIREBASE_INVITE_LINK }}&size=400"
@@ -198,11 +191,11 @@ jobs:
       - name: 🧹 12. Smart Cleanup
         if: always()
         run: |
-          echo "Cleaning credentials only..."
-          # [核心修复] 停止删除 build 目录，防止 Firebase 捡不到包且加速下次编译
+          echo "Cleaning credentials..."
           rm -f android/app/upload-keystore.jks
           rm -f android/key.properties
-          rm -f ${{ github.workspace }}/firebase-key.json
+          # 确保这一步不会因为文件不存在而报错
+          rm -f "${{ github.workspace }}/firebase-key.json"
           git checkout -- ios/Runner.xcodeproj/project.pbxproj
           git checkout -- pubspec.yaml
           echo "✅ Cleanup complete."
