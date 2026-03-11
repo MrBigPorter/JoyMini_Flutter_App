@@ -71,9 +71,17 @@ jobs:
             -d "text=$MESSAGE" \
             -d "parse_mode=Markdown"
 
-      # ================= Step 7: Cleanup =================
-      - name: 🧹 7. Secure Workspace Cleanup
+      # ================= Step 7: Smart Cleanup =================
+      - name: 🧹 7. Smart Workspace Cleanup
         if: always()
         run: |
+          echo "Cleaning heavy build artifacts..."
+          
+          # [优化点]: 删除巨大的最终产物目录，保住你 Mac 的硬盘空间
+          rm -rf build/app/outputs/
+          rm -rf build/ios/ipa/
+          rm -rf build/ios/archive/
+          
           # Restore any local changes made during build to keep the runner clean
           git checkout -- .
+          echo "✅ Cleanup complete. Freed GBs without losing build cache."

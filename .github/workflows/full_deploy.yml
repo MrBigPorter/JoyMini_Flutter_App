@@ -37,7 +37,6 @@ jobs:
       - name: 2. Determine Deployment Environment
         id: set_env
         run: |
-          # 只要是 main 分支或者 v 开头的标签，就走 PROD 环境；否则（如 test 分支）走 TEST
           if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "ENV_TAG=[PROD]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
@@ -112,10 +111,12 @@ jobs:
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
+          # [核心改进]: 增加 --force 强行跳过确认，防止流水线卡死
+          shorebird release android --force --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
           
           if [ "${{ env.IS_PROD }}" == "true" ]; then
-            shorebird release android --artifact aab -- --dart-define-from-file=${{ env.ENV_FILE }}
+            # 正式版同样增加 --force
+            shorebird release android --force --artifact aab -- --dart-define-from-file=${{ env.ENV_FILE }}
           fi
 
       # ================= Phase 8: iOS Build =================
@@ -178,14 +179,23 @@ jobs:
             -F "caption=$MESSAGE" \
             -F "parse_mode=Markdown"
 
-      # ================= Phase 12: Secure Cleanup =================
-      - name: 🧹 Secure Workspace Cleanup
+      # ================= Phase 12: Smart & Secure Cleanup =================
+      - name: 🧹 12. Smart Cleanup
         if: always()
         run: |
-          echo "Cleaning credentials and restoring codebase..."
+          echo "Cleaning credentials and heavy build artifacts..."
+          
+          # [核心改进]: 智能删除巨大的最终安装包，保留编译缓存以维持下次打包速度
+          rm -rf build/app/outputs/
+          rm -rf build/ios/ipa/
+          rm -rf build/ios/archive/
+          
+          # 原有的安全清理
           rm -f android/app/upload-keystore.jks
           rm -f android/key.properties
           rm -f ${{ github.workspace }}/firebase-key.json
+          
           git checkout -- ios/Runner.xcodeproj/project.pbxproj
           git checkout -- pubspec.yaml
-          echo "✅ Cleanup complete."
+          
+          echo "✅ Cleanup complete. Freed GBs without losing build cache."
