@@ -109,14 +109,14 @@ jobs:
 
       - name: 🚀 7b. Build Android via Shorebird (APK & AAB)
         env:
+          # 有了这个 TOKEN，Shorebird 就会知道是 CI 环境，自动变为静默模式
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          # [核心改进]: 增加 --force 强行跳过确认，防止流水线卡死
-          shorebird release android --force --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
+          # 移除了错误的 --force 参数，恢复正常的打包指令
+          shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
           
           if [ "${{ env.IS_PROD }}" == "true" ]; then
-            # 正式版同样增加 --force
-            shorebird release android --force --artifact aab -- --dart-define-from-file=${{ env.ENV_FILE }}
+            shorebird release android --artifact aab -- --dart-define-from-file=${{ env.ENV_FILE }}
           fi
 
       # ================= Phase 8: iOS Build =================
@@ -185,7 +185,7 @@ jobs:
         run: |
           echo "Cleaning credentials and heavy build artifacts..."
           
-          # [核心改进]: 智能删除巨大的最终安装包，保留编译缓存以维持下次打包速度
+          # 智能删除巨大的最终安装包，保留编译缓存以维持下次打包速度
           rm -rf build/app/outputs/
           rm -rf build/ios/ipa/
           rm -rf build/ios/archive/
