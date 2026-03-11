@@ -18,7 +18,7 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: self-hosted
-    # [优化] 加入全局环境变量，强行使用 Node.js 24 新引擎，彻底干掉过时的黄牌警告！
+    # [优化] 加入全局环境变量，强行使用 Node.js 24 新引擎
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -60,7 +60,7 @@ jobs:
       - name: 📊 3. Extract Build Metadata
         id: meta
         run: |
-          # [核心修复 1] 更健壮的版本号提取逻辑，保留带 + 号的完整版本号（如 1.0.0+29）
+          # [核心修复] 保留带 + 号的完整版本号
           APP_VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //g')
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
@@ -68,16 +68,14 @@ jobs:
           COMMIT_MSG=$(git log -1 --pretty=%s)
           echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
 
-      # ================= Phase 4: Environment Setup (FVM 版) =================
+      # ================= Phase 4: Environment Setup =================
       - name: 🐦 4a. Expose Local FVM to Runner
         run: |
-          # 把 Homebrew 的默认路径暴露给 GitHub Actions，让它能找到 fvm 命令
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
       - name: 🛠️ 4b. Prepare Flutter Environment via FVM
         run: |
-          # FVM 会自动读取项目根目录的 .fvmrc 文件，下载并使用对应的 3.41.4
           fvm install
           fvm flutter config --no-analytics
           fvm flutter pub get
@@ -123,7 +121,7 @@ jobs:
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          # [核心修复 2] 不加 --artifact，让 Shorebird 一口气打出双包，规避同版本坑位冲突
+          # 自动触发 Release 并生成双包
           shorebird release android -- --dart-define-from-file=${{ env.ENV_FILE }}
 
       # ================= Phase 8: iOS Build =================
@@ -143,30 +141,36 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > $CREDENTIAL_FILE
           export GOOGLE_APPLICATION_CREDENTIALS=$CREDENTIAL_FILE
           
-          # [核心修复 3] 永远只把 APK 传给 Firebase，测试人员下包最稳，绝不用 AAB 惹它发脾气
-          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
-            --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
-            --groups "admin" \
-            --non-interactive \
-            --debug \
-            --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }} (Shorebird Enabled)" || echo "⚠️ Firebase CLI 在收尾时超时，但包已成功上架！强行绿灯通过..."
+          # [终极修复] 动态寻找 APK 路径，彻底解决找不到文件的问题
+          APK_PATH=$(find build -name "*release.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          
+          if [ -f "$APK_PATH" ]; then
+            firebase appdistribution:distribute "$APK_PATH" \
+              --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
+              --groups "admin" \
+              --non-interactive \
+              --release-notes "Version: ${{ env.APP_VERSION }} (Shorebird Enabled)"
+          else
+            echo "❌ Fatal: Could not find APK file!"
+            exit 1
+          fi
 
       # ================= Phase 10: Artifact Archiving =================
       - name: 💾 Archive Android Artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-release-${{ env.APP_VERSION }}
-          # [核心修复 4] 把 APK 和 AAB 全部抓取归档，以后要上架 Play Store 直接来这里下 AAB！
           path: |
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: warn
 
-      - name: 💾 Archive iOS Archive (No Codesign)
+      - name: 💾 Archive iOS Archive
         uses: actions/upload-artifact@v4
         with:
           name: ios-archive-${{ env.APP_VERSION }}
           path: build/ios/archive/
-          # 如果没签名生成不了 IPA，静默跳过，不再报黄牌警告
           if-no-files-found: ignore
 
       # ================= Phase 11: Telegram Notification =================
@@ -174,16 +178,11 @@ jobs:
         if: always()
         run: |
           MESSAGE="🐺 *JoyMini CI/CD Pipeline*
-
           📌 *Status*: ${{ job.status }}
           🏷️ *Environment*: ${{ env.ENV_TAG }}
           📦 *App Version*: \`${{ env.APP_VERSION }}\`
-          🌿 *Ref*: \`${{ github.ref_name }}\`
-          📝 *Commit*: \`${{ env.SHORT_SHA }}\` - ${{ env.COMMIT_MSG }}
-          👨‍💻 *Author*: ${{ github.actor }}
+          📝 *Commit*: \`${{ env.SHORT_SHA }}\`
           🌐 *H5 Web*: [Preview Web App](${{ steps.cf_deploy.outputs.url }})
-          🔗 *Action Log*: [View on GitHub](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
           🔥 *Hot Update*: Shorebird Engine Active 🐦"
           
           QR_URL="https://quickchart.io/qr?text=${{ secrets.FIREBASE_INVITE_LINK }}&size=400"
@@ -194,21 +193,15 @@ jobs:
             -F "caption=$MESSAGE" \
             -F "parse_mode=Markdown"
 
-      # ================= Phase 12: Smart & Secure Cleanup =================
+      # ================= Phase 12: Smart Cleanup =================
       - name: 🧹 12. Smart Cleanup
         if: always()
         run: |
-          echo "Cleaning credentials and heavy build artifacts..."
-          
-          rm -rf build/app/outputs/
-          rm -rf build/ios/ipa/
-          rm -rf build/ios/archive/
-          
+          echo "Cleaning credentials only..."
+          # [核心修复] 停止删除 build 目录，防止 Firebase 捡不到包且加速下次编译
           rm -f android/app/upload-keystore.jks
           rm -f android/key.properties
           rm -f ${{ github.workspace }}/firebase-key.json
-          
           git checkout -- ios/Runner.xcodeproj/project.pbxproj
           git checkout -- pubspec.yaml
-          
-          echo "✅ Cleanup complete. Freed GBs without losing build cache."
+          echo "✅ Cleanup complete."
