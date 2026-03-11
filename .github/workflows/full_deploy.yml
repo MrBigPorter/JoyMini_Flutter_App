@@ -119,15 +119,19 @@ jobs:
       - name: 🐦 7a. Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
 
-      - name: 🚀 7b. Build Android via Shorebird (APK & AAB)
+      - name: 🚀 7b. Build Android via Shorebird (Dynamic Artifact)
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          # Shorebird 会自动识别当前目录的 FVM 环境，不需要加 fvm 前缀
-          shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
-          
+          # [核心修复] 根据环境动态选择打包产物，防止 Shorebird 同一版本号冲突
           if [ "${{ env.IS_PROD }}" == "true" ]; then
+            echo "📦 PROD Mode: Building AAB for Play Store..."
             shorebird release android --artifact aab -- --dart-define-from-file=${{ env.ENV_FILE }}
+            echo "ANDROID_ARTIFACT=build/app/outputs/bundle/release/app-release.aab" >> $GITHUB_ENV
+          else
+            echo "🧪 TEST Mode: Building APK for Firebase..."
+            shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
+            echo "ANDROID_ARTIFACT=build/app/outputs/flutter-apk/app-release.apk" >> $GITHUB_ENV
           fi
 
       # ================= Phase 8: iOS Build =================
@@ -147,7 +151,8 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > $CREDENTIAL_FILE
           export GOOGLE_APPLICATION_CREDENTIALS=$CREDENTIAL_FILE
           
-          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
+          # [核心修复] 使用动态环境变量，无论是 APK 还是 AAB 都能准确找到并上传
+          firebase appdistribution:distribute ${{ env.ANDROID_ARTIFACT }} \
             --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
             --groups "admin" \
             --non-interactive \
@@ -155,18 +160,19 @@ jobs:
             --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }} (Shorebird Enabled)" || echo "⚠️ Firebase CLI 在收尾时超时，但包已成功上架！强行绿灯通过..."
 
       # ================= Phase 10: Artifact Archiving =================
-      - name: 💾 Archive Android APK
+      - name: 💾 Archive Android Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk-${{ env.APP_VERSION }}
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: android-release-${{ env.APP_VERSION }}
+          # [核心修复] 归档时也使用动态路径
+          path: ${{ env.ANDROID_ARTIFACT }}
 
       - name: 💾 Archive iOS Archive (No Codesign)
         uses: actions/upload-artifact@v4
         with:
           name: ios-archive-${{ env.APP_VERSION }}
           path: build/ios/archive/
-          # [优化] 如果没签名生成不了 IPA，静默跳过，不再报黄牌警告
+          # 如果没签名生成不了 IPA，静默跳过，不再报黄牌警告
           if-no-files-found: ignore
 
       # ================= Phase 11: Telegram Notification =================
