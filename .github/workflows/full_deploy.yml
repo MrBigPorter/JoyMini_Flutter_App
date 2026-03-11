@@ -69,8 +69,11 @@ jobs:
           echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
 
       # ================= Phase 4: Environment Setup (FVM 版) =================
-      - name: 🐦 4a. Setup FVM
-        uses: leoafarias/setup-fvm@v1
+      - name: 🐦 4a. Expose Local FVM to Runner
+        run: |
+          # 把 Homebrew 的默认路径暴露给 GitHub Actions，让它能找到 fvm 命令
+          echo "/opt/homebrew/bin" >> $GITHUB_PATH
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
       - name: 🛠️ 4b. Prepare Flutter Environment via FVM
         run: |
