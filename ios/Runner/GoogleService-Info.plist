@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.porter.joyminis</string>
+	<string>com.porter.joyminis.test</string>
 	<key>PROJECT_ID</key>
 	<string>adroit-outlet-444914-m0</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1065683669109:ios:bc8f6a454fda378a7a283c</string>
+	<string>1:1065683669109:ios:f5efcbcfa8902b4a7a283c</string>
 </dict>
 </plist>

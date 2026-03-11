@@ -35,12 +35,17 @@ jobs:
             echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
           fi
 
-      - name: 3. Prepare Flutter Environment
-        run: |
-          flutter config --no-analytics
-          flutter pub get
+      # ================= Step 3: FVM & Flutter Setup =================
+      - name: 🐦 3a. Setup FVM
+        uses: leoafarias/setup-fvm@v1
 
-      - name: 4. Setup Shorebird
+      - name: 🛠️ 3b. Prepare Flutter Environment via FVM
+        run: |
+          fvm install
+          fvm flutter config --no-analytics
+          fvm flutter pub get
+
+      - name: 🐦 4. Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
 
       # ================= Step 5: Core Deployment =================
