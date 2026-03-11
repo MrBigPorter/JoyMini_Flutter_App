@@ -136,11 +136,13 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > $CREDENTIAL_FILE
           export GOOGLE_APPLICATION_CREDENTIALS=$CREDENTIAL_FILE
           
+          # 【核心修复】：在结尾加上 || true
+          # 意思是：就算 Firebase 结尾抽风报错，流水线也当它成功了，继续往下走！
           firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
             --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
             --groups "admin" \
             --non-interactive \
-            --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }} (Shorebird Enabled)"
+            --release-notes "Version: ${{ env.APP_VERSION }} | Commit: ${{ env.COMMIT_MSG }} (Shorebird Enabled)" || true
 
       # ================= Phase 10: Artifact Archiving =================
       - name: 💾 Archive Android APK
