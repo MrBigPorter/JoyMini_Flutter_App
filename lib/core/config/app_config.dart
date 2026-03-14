@@ -12,13 +12,13 @@ class AppConfig {
   );
 
   static const String _apiBaseRaw = String.fromEnvironment(
-      'API_BASE',
+      'API_BASE_URL',
       defaultValue: 'https://dev-api.joyminis.com'
     // 或者用本地调试: 'http://localhost:3000'
   );
 
   static const String _imgBaseRaw = String.fromEnvironment(
-      'IMG_BASE',
+      'IMG_BASE_URL',
       defaultValue: 'https://dev.joyminis.com'
     // 注意：Dev 环境默认指向网关代理，Prod环境才指向 img.joyminis.com
   );
@@ -46,6 +46,7 @@ class AppConfig {
   // 3. 工具方法：Android 模拟器 Localhost 修复
   // =========================================================
   static String _resolveLocalhost(String url) {
+    print('[AppConfig] 原始 URL: $url');
     // Web 端不需要处理，localhost 就是本机
     if (kIsWeb) return url;
 
