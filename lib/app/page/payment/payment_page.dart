@@ -25,6 +25,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'package:flutter_app/core/providers/coupon_provider.dart';
 import 'package:flutter_app/core/guards/kyc_guard.dart';
+import 'package:flutter_app/core/providers/flash_sale_provider.dart';
 
 
 // Logic is separated using 'part' to maintain clean UI code
@@ -214,6 +215,27 @@ class _BottomNavigationBarState extends ConsumerState<_BottomNavigationBar> with
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // Flash sale badge row
+                if (purchase.isFlashSale)
+                  Container(
+                    margin: EdgeInsets.only(bottom: 4.w),
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(4.r),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bolt, color: Colors.red, size: 11.w),
+                        Text(
+                          'Flash Sale Price',
+                          style: TextStyle(color: Colors.red, fontSize: 10.sp, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
                 RichText(
                   text: TextSpan(children: [
                     TextSpan(text: '${'common.total'.tr()}: ', style: TextStyle(color: context.textPrimary900, fontSize: context.textSm, fontWeight: FontWeight.w600)),

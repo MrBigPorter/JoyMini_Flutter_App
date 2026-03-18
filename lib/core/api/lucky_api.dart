@@ -561,6 +561,57 @@ class Api {
     return parseList<ClaimableCoupon>(res, (e) => ClaimableCoupon.fromJson(e));
   }
 
+  /// Get current user's lucky draw tickets
+  static Future<PageResult<LuckyDrawTicket>> luckyDrawMyTicketsApi(
+    LuckyDrawTicketQuery query,
+  ) async {
+    final res = await Http.get(
+      '/api/v1/lucky-draw/my-tickets',
+      query: query.toJson(),
+    );
+    return parsePageResponse(res, (e) => LuckyDrawTicket.fromJson(e));
+  }
+
+  /// Execute draw with a ticket
+  static Future<LuckyDrawActionResult> luckyDrawExecuteApi(String ticketId) async {
+    final res = await Http.post('/api/v1/lucky-draw/tickets/$ticketId/draw');
+    return LuckyDrawActionResult.fromJson(Map<String, dynamic>.from(res));
+  }
+
+  /// Get current user's lucky draw history results
+  static Future<PageResult<LuckyDrawResultItem>> luckyDrawMyResultsApi(
+    LuckyDrawTicketQuery query,
+  ) async {
+    final res = await Http.get(
+      '/api/v1/lucky-draw/my-results',
+      query: query.toJson(),
+    );
+    return parsePageResponse(res, (e) => LuckyDrawResultItem.fromJson(e));
+  }
+
+  /// Get currently active flash sale sessions
+  static Future<List<FlashSaleSession>> flashSaleActiveSessionsApi() async {
+    final res = await Http.get('/api/v1/flash-sale/sessions/active');
+    final list = (res as Map<String, dynamic>)['list'];
+    return parseList<FlashSaleSession>(list, (e) => FlashSaleSession.fromJson(e));
+  }
+
+  /// Get flash sale products under one active session
+  static Future<FlashSaleSessionProducts> flashSaleSessionProductsApi(
+    String sessionId,
+  ) async {
+    final res = await Http.get('/api/v1/flash-sale/sessions/$sessionId/products');
+    return FlashSaleSessionProducts.fromJson(Map<String, dynamic>.from(res));
+  }
+
+  /// Get one flash sale product detail by flashSaleProductId
+  static Future<FlashSaleProductDetail> flashSaleProductDetailApi(
+    String productId,
+  ) async {
+    final res = await Http.get('/api/v1/flash-sale/products/$productId');
+    return FlashSaleProductDetail.fromJson(Map<String, dynamic>.from(res));
+  }
+
   /// Get conversation list
   static Future<List<Conversation>> chatListApi({int page = 1}) async {
     final res = await Http.get('/api/v1/chat/list', query: {'page': page});

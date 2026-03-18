@@ -8,6 +8,7 @@ String? entries,
 String? treasureId,
 String? paymentMethod,
 String? groupId,
+String? flashSaleProductId,
 //  新增：用于区分 "单独购买" 还是 "拼团购买"
 // 因为 "发起拼团" 时 groupId 为空，必须靠这个字段区分
 String? isGroupBuy,
@@ -22,6 +23,7 @@ class OrdersCheckoutParams {
   final String? couponId;
   final int paymentMethod;
   final String? addressId;
+  final String? flashSaleProductId;
 
   //  新增：告诉后端是否为拼团订单 (影响价格计算)
   // true = 拼团 (开团或参团)
@@ -35,6 +37,7 @@ class OrdersCheckoutParams {
     this.couponId,
     required this.paymentMethod,
     this.addressId,
+    this.flashSaleProductId,
     this.isGroup, //  构造函数加入
   });
 
@@ -57,6 +60,8 @@ class OrderCheckoutResponse {
   final List<String> lotteryTickets;
   final int activityCoin;
   final String? treasureId;
+  final bool? alreadyInGroup;
+  final int? isGroupOwner;
 
   OrderCheckoutResponse({
     required this.orderId,
@@ -65,6 +70,8 @@ class OrderCheckoutResponse {
     required this.lotteryTickets,
     required this.activityCoin,
     required this.treasureId,
+    this.alreadyInGroup,
+    this.isGroupOwner,
   });
 
   factory OrderCheckoutResponse.fromJson(Map<String, dynamic> json) =>

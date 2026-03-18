@@ -7,14 +7,14 @@
 ## 🎯 当前任务（每次对话从这里开始）
 
 **阶段**: Phase F1 — Flutter 商业链路闭环  
-**上次停留**: Chat 规划文档与差距分析完成（2026-03-18）  
+**上次停留**: Flash Sale 前端闭环完成（2026-03-18）  
 **立即执行**:
-- [ ] 客服分流参数化：`CustomerServiceHelper.startChat()` 支持 `support/business` 场景与可配置 `businessId`
-- [ ] Lucky Draw API 接入：`my-tickets` / `draw` / `my-results`
-- [ ] Lucky Draw 页面与路由：券列表、抽奖执行、历史结果
-- [ ] Flash Sale 前端态补齐：秒杀价、倒计时、库存、结束态
-- [ ] 结算透传秒杀标识（如 `flashSaleProductId`，以后端 contract 为准）并统一支付/订单价格文案
-- [ ] 为以上改动补最小测试（Provider/Widget）与关键错误态
+- [x] 客服分流参数化：`CustomerServiceHelper.startChat()` 支持 `support/business` 场景与可配置 `businessId`
+- [x] Lucky Draw API 接入：`my-tickets` / `draw` / `my-results`
+- [x] Lucky Draw 页面与路由：券列表、抽奖执行、历史结果
+- [x] Flash Sale 前端态补齐：秒杀价、倒计时、库存、结束态
+- [x] 结算透传秒杀标识（如 `flashSaleProductId`，以后端 contract 为准）并统一支付/订单价格文案
+- [x] 为以上改动补最小测试（Provider/Widget）与关键错误态
 
 > 最后对齐时间：2026-03-18。完成一项就地打勾并更新时间。
 

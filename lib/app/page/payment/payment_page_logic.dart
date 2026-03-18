@@ -24,12 +24,33 @@ mixin PaymentPageLogic on ConsumerState<PaymentPage> {
           action.resetEntries(entries);
         }
 
+        // If this is a flash sale checkout, fetch flash price and override purchase state
+        final flashSaleProductId = widget.params.flashSaleProductId;
+        if (flashSaleProductId != null && flashSaleProductId.isNotEmpty) {
+          _initFlashSalePrice(treasureId, flashSaleProductId);
+        }
+
         //  Auto-select the best coupon on page enter
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted) _autoMatchBestCoupon(treasureId);
         });
       }
     });
+  }
+
+  void _initFlashSalePrice(String treasureId, String flashSaleProductId) async {
+    try {
+      final detail = await ref.read(
+        flashSaleProductDetailProvider(flashSaleProductId).future,
+      );
+      if (!mounted) return;
+      final flashPrice = double.tryParse(detail.flashPrice) ?? 0.0;
+      if (flashPrice > 0) {
+        ref.read(purchaseProvider(treasureId).notifier).overrideWithFlashPrice(flashPrice);
+      }
+    } catch (e) {
+      debugPrint('[Payment] Failed to load flash sale price: $e');
+    }
   }
 
   ///  Dynamic Validation: Automatically remove coupon if price falls below threshold
@@ -93,6 +114,7 @@ mixin BottomNavigationBarLogic on ConsumerState<_BottomNavigationBar> {
     final result = await action.submitOrder(
       groupId: widget.params.groupId,
       couponId: couponId,
+      flashSaleProductId: widget.params.flashSaleProductId,
     );
 
     if (!mounted) return;
