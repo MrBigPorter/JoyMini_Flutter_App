@@ -227,6 +227,8 @@ class ProductSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // 核心修复 2：监听动态价格，而不是写死的基础价
     final purchaseState = ref.watch(purchaseProvider(detail.treasureId ?? ''));
+    final isFlashSale = purchaseState.isFlashSale;
+    final originalAmount = detail.unitAmount ?? 0.0;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -287,14 +289,49 @@ class ProductSection extends ConsumerWidget {
                   ),
                 ),
                 SizedBox(width: 10.w),
-                Text(
-                  // 这里改为动态取价！如果是 Solo Buy，这里就会跟着变成 1000.00
-                  FormatHelper.formatCurrency(purchaseState.unitAmount),
-                  style: TextStyle(
-                    color: context.textPrimary900,
-                    fontSize: context.textXs,
-                    fontWeight: FontWeight.w800,
-                  ),
+                // Price display: flash sale shows flash price + strikethrough original
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isFlashSale)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.w),
+                        margin: EdgeInsets.only(bottom: 4.w),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bolt, color: Colors.white, size: 10.w),
+                            Text(
+                              'Flash',
+                              style: TextStyle(color: Colors.white, fontSize: 9.sp, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Text(
+                      FormatHelper.formatCurrency(purchaseState.unitAmount),
+                      style: TextStyle(
+                        color: isFlashSale ? Colors.red : context.textPrimary900,
+                        fontSize: context.textXs,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (isFlashSale && originalAmount > purchaseState.unitAmount)
+                      Text(
+                        FormatHelper.formatCurrency(originalAmount),
+                        style: TextStyle(
+                          color: context.textQuaternary500,
+                          fontSize: 10.sp,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: context.textQuaternary500,
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -443,6 +480,9 @@ class InfoSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final purchaseState = ref.watch(purchaseProvider(treasureId));
+    final isFlashSale = purchaseState.isFlashSale;
+    final originalAmount = detail.unitAmount ?? 0.0;
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
       child: Container(
@@ -456,10 +496,65 @@ class InfoSection extends ConsumerWidget {
           children: [
             InfoRow(label: 'common.price.detail'.tr(), value: ''),
             SizedBox(height: 12.w),
-            InfoRow(
-              label: 'common.ticket.price'.tr(),
-              value: FormatHelper.formatCurrency(purchaseState.unitAmount),
-            ),
+            // Flash sale: highlight flash price and show strikethrough original
+            if (isFlashSale) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.bolt, color: Colors.red, size: 14.w),
+                      Text(
+                        'Flash Price',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: context.textSm,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    FormatHelper.formatCurrency(purchaseState.unitAmount),
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: context.textSm,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              if (originalAmount > purchaseState.unitAmount) ...[
+                SizedBox(height: 6.w),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Original Price',
+                      style: TextStyle(
+                        color: context.textQuaternary500,
+                        fontSize: context.textXs,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      FormatHelper.formatCurrency(originalAmount),
+                      style: TextStyle(
+                        color: context.textQuaternary500,
+                        fontSize: context.textXs,
+                        decoration: TextDecoration.lineThrough,
+                        decorationColor: context.textQuaternary500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ] else
+              InfoRow(
+                label: 'common.ticket.price'.tr(),
+                value: FormatHelper.formatCurrency(purchaseState.unitAmount),
+              ),
             SizedBox(height: 12.w),
             InfoRow(
               label: 'common.tickets.number'.tr(),

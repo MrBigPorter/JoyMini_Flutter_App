@@ -37,6 +37,9 @@ class PurchaseState {
   final int? salesEndAt;
   final int productState;
 
+  /// True when this purchase is for a flash sale (price has been overridden)
+  final bool isFlashSale;
+
   PurchaseState({
     required this.entries,
     required this.baseGroupPrice,
@@ -51,6 +54,7 @@ class PurchaseState {
     this.salesStartAt,
     this.salesEndAt,
     this.productState = 1,
+    this.isFlashSale = false,
   });
 
   //  核心修复 1：将 unitAmount 变成动态计算的 Getter
@@ -94,6 +98,7 @@ class PurchaseState {
     int? maxPerBuyQuantity,
     int? minBuyQuantity,
     int? productState,
+    bool? isFlashSale,
   }) {
     return PurchaseState(
       entries: entries ?? this.entries,
@@ -109,6 +114,7 @@ class PurchaseState {
       salesStartAt: salesStartAt,
       salesEndAt: salesEndAt,
       productState: productState ?? this.productState,
+      isFlashSale: isFlashSale ?? this.isFlashSale,
     );
   }
 }
@@ -150,6 +156,18 @@ class PurchaseNotifier extends StateNotifier<PurchaseState> {
   void setGroupMode(bool isGroup) {
     state = state.copyWith(isGroupBuy: isGroup);
     _clampEntries(); // 切模式后检查数量是否合法
+  }
+
+  /// Override price for flash sale: sets both group/solo prices to flash price,
+  /// forces solo mode, and marks state as flash sale so UI can render accordingly.
+  void overrideWithFlashPrice(double flashPrice) {
+    state = state.copyWith(
+      baseGroupPrice: flashPrice,
+      baseSoloPrice: flashPrice,
+      isGroupBuy: false,
+      isFlashSale: true,
+    );
+    _clampEntries();
   }
 
   void _listenToProductUpdates() {
@@ -237,7 +255,11 @@ class PurchaseNotifier extends StateNotifier<PurchaseState> {
     return raw <= 0 ? 0.0 : raw;
   }
 
-  Future<PurchaseSubmitResult> submitOrder({String? groupId, String? couponId}) async {
+  Future<PurchaseSubmitResult> submitOrder({
+    String? groupId,
+    String? couponId,
+    String? flashSaleProductId,
+  }) async {
     if (!mounted) return PurchaseSubmitResult.error(PurchaseSubmitError.unknown);
     if (state.isSubmitting) return PurchaseSubmitResult.error(PurchaseSubmitError.unknown);
 
@@ -278,6 +300,7 @@ class PurchaseNotifier extends StateNotifier<PurchaseState> {
             entries: state.entries,
             paymentMethod: state.useDiscountCoins ? 2 : 1,
             groupId: groupId,
+            flashSaleProductId: flashSaleProductId,
             isGroup: state.isGroupBuy, // 这里取的值现在永远是对的！
             couponId: couponId,
           ),

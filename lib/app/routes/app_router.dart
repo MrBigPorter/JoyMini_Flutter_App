@@ -39,6 +39,7 @@ import 'package:flutter_app/app/page/transaction/transaction_ui_model.dart';
 import 'package:flutter_app/app/page/transaction_record_page.dart';
 import 'package:flutter_app/app/page/me_components/me_page.dart';
 import 'package:flutter_app/app/page/login_page.dart';
+import 'package:flutter_app/app/page/lucky_draw/lucky_draw_page.dart';
 import 'package:flutter_app/app/page/product_detail_page.dart';
 import 'package:flutter_app/app/page/withdraw/withdraw_page.dart';
 import 'package:flutter_app/ui/chat/group/group_request_list/group_request_list_page.dart';
@@ -48,6 +49,8 @@ import '../page/deposit/deposit_result_page.dart';
 import '../page/kyc_status_page.dart';
 import '../page/liveness_debug_page.dart';
 import '../page/my_vouchers_page.dart';
+import '../page/flash_sale/flash_sale_page.dart';
+import '../page/flash_sale/flash_sale_product_page.dart';
 import 'extra_codec.dart';
 import 'package:flutter_app/ui/chat/direct_chat_settings_page.dart';
 import 'package:flutter_app/ui/chat/local_contact_search_page.dart';
@@ -326,6 +329,7 @@ class AppRouter {
             entries: queryParams['entries'],
             treasureId: queryParams['treasureId'],
             paymentMethod: queryParams['paymentMethod'] ?? '1',
+            flashSaleProductId: queryParams['flashSaleProductId'],
 
             // groupId 如果是 null，代表"开团"；如果是字符串，代表"参团"
             groupId: queryParams['groupId'],
@@ -357,6 +361,32 @@ class AppRouter {
             name: 'setting',
             path: '/setting',
             builder: (context, state) => SettingPage()
+        ),
+        GoRoute(
+          name: 'luckyDraw',
+          path: '/lucky-draw',
+          builder: (context, state) => const LuckyDrawPage(),
+        ),
+        GoRoute(
+          name: 'flashSale',
+          path: '/flash-sale',
+          pageBuilder: (ctx, state) => fxPage(
+            key: state.pageKey,
+            child: const FlashSalePage(),
+            fx: RouteFx.slideUp,
+          ),
+        ),
+        GoRoute(
+          name: 'flashSaleProduct',
+          path: '/flash-sale/products/:id',
+          pageBuilder: (ctx, state) {
+            final id = state.pathParameters['id']!;
+            return fxPage(
+              key: state.pageKey,
+              child: FlashSaleProductPage(flashSaleProductId: id),
+              fx: RouteFx.zoomIn,
+            );
+          },
         ),
         GoRoute(
           name: 'kycStatus',

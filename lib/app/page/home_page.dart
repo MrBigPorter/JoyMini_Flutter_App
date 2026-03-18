@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_app/app/page/home_components/flash_sale_section.dart';
 import 'package:flutter_app/app/page/home_components/home_treasures.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/components/lucky_custom_material_indicator.dart';
@@ -102,7 +103,10 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               loading: () => const HomeBannerSkeleton(),
             ),
 
-            // 2. Hot Group Buy Section
+            // 2. Flash Sale Section (auto-hidden when no active sessions)
+            const SliverToBoxAdapter(child: FlashSaleSection()),
+
+            // 3. Hot Group Buy Section
             hotGroups.when(
               skipLoadingOnRefresh: true,
               skipLoadingOnReload: true, //  修复 3
@@ -119,7 +123,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
             ),
 
-            // 3. Treasures Waterfall
+            // 4. Treasures Waterfall
             treasures.when(
               skipLoadingOnRefresh: true,
               skipLoadingOnReload: true, //  修复 3

@@ -15,3 +15,5 @@ export 'page_request.dart';
 export 'order_item.dart';
 export 'address_res.dart';
 export 'auth.dart';
+export 'lucky_draw.dart';
+export 'flash_sale.dart';
