@@ -17,10 +17,11 @@ class HomeAd extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (list.isEmpty) return const SizedBox.shrink();
+    final visible = list.where((e) => e.status == 1).toList();
+    if (visible.isEmpty) return const SizedBox.shrink();
 
     return Column(
-      children: list.map((item) {
+      children: visible.map((item) {
 
         /// sortType 1 单图广告 single-image ad
         if (item.sortType == 1) {
@@ -45,7 +46,31 @@ class GridAd extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<BannerItem> bannerArray = ad?.bannerArray ?? [];
+    final List<BannerItem> bannerArray = ad?.bannerArray ?? const [];
+    if (bannerArray.isEmpty) return const SizedBox.shrink();
+
+    if (bannerArray.length < 3) {
+      // Degrade to a simple row when backend returns fewer than 3 banners.
+      return Row(
+        children: [
+          for (var i = 0; i < bannerArray.length; i++) ...[
+            Expanded(
+              child: AdImage(
+                src: bannerArray[i].img,
+                width: double.infinity,
+                height: 130,
+                relatedTitleId: bannerArray[i].relatedTitleId,
+                jumpCate: bannerArray[i].jumpCate,
+                jumpUrl: bannerArray[i].jumpUrl,
+                videoUrl: bannerArray[i].videoUrl,
+              ),
+            ),
+            if (i < bannerArray.length - 1) SizedBox(width: 8.w),
+          ]
+        ],
+      );
+    }
+
     final BannerItem? first = bannerArray.isNotEmpty ? bannerArray[0] : null;
     final BannerItem? second = bannerArray.length > 1 ? bannerArray[1] : null;
     final BannerItem? third = bannerArray.length > 2 ? bannerArray[2] : null;
@@ -55,35 +80,35 @@ class GridAd extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
         AdImage(
-          src: first!.img,
+          src: first?.img ?? '',
           width: 205,
           height: 267,
-          relatedTitleId: first.relatedTitleId,
-          jumpCate: first.jumpCate,
-          jumpUrl: first.jumpUrl,
-          videoUrl: first.videoUrl,
+          relatedTitleId: first?.relatedTitleId,
+          jumpCate: first?.jumpCate,
+          jumpUrl: first?.jumpUrl,
+          videoUrl: first?.videoUrl,
         ),
         SizedBox(width: 8.w,),
         Column(
           children: [
             AdImage(
-              src: second!.img,
+              src: second?.img ?? '',
               width: 130,
               height: 130,
-              relatedTitleId: second.relatedTitleId,
-              jumpCate: second.jumpCate,
-              jumpUrl: second.jumpUrl,
-              videoUrl: second.videoUrl,
+              relatedTitleId: second?.relatedTitleId,
+              jumpCate: second?.jumpCate,
+              jumpUrl: second?.jumpUrl,
+              videoUrl: second?.videoUrl,
             ),
             SizedBox(height: 8.h),
             AdImage(
-              src: third!.img,
+              src: third?.img ?? '',
               width: 130,
               height: 130,
-              relatedTitleId: third.relatedTitleId,
-              jumpCate: third.jumpCate,
-              jumpUrl: third.jumpUrl,
-              videoUrl: third.videoUrl,
+              relatedTitleId: third?.relatedTitleId,
+              jumpCate: third?.jumpCate,
+              jumpUrl: third?.jumpUrl,
+              videoUrl: third?.videoUrl,
             ),
 
           ],
@@ -101,14 +126,17 @@ class SingleAd extends StatelessWidget {
 
   @override
   build(BuildContext context){
+    final src = ad?.img ?? '';
+    if (src.isEmpty) return const SizedBox.shrink();
+
     return AdImage(
-      src: ad!.img!,
+      src: src,
       width: double.infinity,
       height: 114,
-      relatedTitleId: ad!.relatedTitleId,
-      jumpCate: ad!.jumpCate,
-      jumpUrl: ad!.jumpUrl,
-      videoUrl: ad!.videoUrl,
+      relatedTitleId: ad?.relatedTitleId,
+      jumpCate: ad?.jumpCate,
+      jumpUrl: ad?.jumpUrl,
+      videoUrl: ad?.videoUrl,
     );
   }
 }
@@ -140,6 +168,21 @@ class AdImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolvedWidth = width.isFinite ? width.w : null;
+    final resolvedHeight = height.isFinite ? height.h : null;
+
+    if (src.isEmpty) {
+      return Container(
+        width: resolvedWidth,
+        height: resolvedHeight,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8.r),
+        ),
+        child: Icon(CupertinoIcons.photo, size: 18.w, color: Colors.grey.shade500),
+      );
+    }
+
     return GestureDetector(
       onTap: () {
         final defaultClickable = DefaultClickableResource(
@@ -154,8 +197,8 @@ class AdImage extends StatelessWidget {
         borderRadius: BorderRadius.circular(8.r),
         child: AppCachedImage(
           RemoteUrlBuilder.fitAbsoluteUrl(src),
-          width: width.w,
-          height: height.h,
+          width: resolvedWidth,
+          height: resolvedHeight,
         ),
       ),
     );

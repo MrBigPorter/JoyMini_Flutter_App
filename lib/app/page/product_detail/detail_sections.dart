@@ -877,24 +877,120 @@ class _DetailContentSectionState extends State<DetailContentSection>
               curve: Curves.easeInOutCubic,
               alignment: Alignment.topCenter,
               child: _currentIndex == 0
-                  ? RepaintBoundary(
-                      child: HtmlWidget(
-                        widget.desc ?? 'common.no_data'.tr(),
-                        textStyle: TextStyle(fontSize: 13.sp),
-                        buildAsync: true,
-                      ),
-                    )
-                  : RepaintBoundary(
-                      child: HtmlWidget(
-                        widget.ruleContent ?? 'common.no_data'.tr(),
-                        textStyle: TextStyle(fontSize: 13.sp),
-                        buildAsync: true,
-                      ),
-                    ),
+                  ? _buildHtmlContent(widget.desc ?? 'common.no_data'.tr())
+                  : _buildHtmlContent(widget.ruleContent ?? 'common.no_data'.tr()),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHtmlContent(String html) {
+    return RepaintBoundary(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+            child: _buildHtmlWidget(
+              html,
+              maxWidth: constraints.maxWidth,
+              allowBlockScroll: true,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHtmlWidget(
+    String html, {
+    required double maxWidth,
+    required bool allowBlockScroll,
+  }) {
+    return HtmlWidget(
+      html,
+      textStyle: TextStyle(fontSize: 13.sp),
+      buildAsync: true,
+      customWidgetBuilder: allowBlockScroll
+          ? (element) {
+              final tag = element.localName;
+              if (tag == 'table' || tag == 'pre') {
+                // Only oversized blocks can scroll horizontally.
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: maxWidth),
+                    child: _buildHtmlWidget(
+                      element.outerHtml,
+                      maxWidth: maxWidth,
+                      allowBlockScroll: false,
+                    ),
+                  ),
+                );
+              }
+              return null;
+            }
+          : null,
+      customStylesBuilder: (element) {
+        final tag = element.localName;
+        final inlineStyle = (element.attributes['style'] ?? '').toLowerCase();
+
+        if (inlineStyle.contains('display:flex')) {
+          return {
+            'display': 'block',
+            'max-width': '100%',
+            'width': '100%',
+            'word-break': 'break-word',
+            'overflow-wrap': 'anywhere',
+          };
+        }
+
+        if (inlineStyle.contains('white-space:nowrap')) {
+          return {
+            'white-space': 'normal',
+            'word-break': 'break-word',
+            'overflow-wrap': 'anywhere',
+          };
+        }
+
+        if (const {'p', 'div', 'span', 'li', 'a', 'strong', 'em', 'td', 'th'}.contains(tag)) {
+          return {
+            'white-space': 'normal',
+            'word-break': 'break-word',
+            'overflow-wrap': 'anywhere',
+            'max-width': '100%',
+          };
+        }
+
+        if (tag == 'img') {
+          return {
+            'display': 'block',
+            'max-width': '100%',
+            'height': 'auto',
+          };
+        }
+
+        if (tag == 'table') {
+          return {
+            'max-width': '100%',
+            'width': '100%',
+            'table-layout': 'fixed',
+          };
+        }
+
+        if (tag == 'pre' || tag == 'code') {
+          return {
+            'white-space': 'pre-wrap',
+            'word-break': 'break-word',
+            'overflow-wrap': 'anywhere',
+            'max-width': '100%',
+          };
+        }
+
+        return null;
+      },
     );
   }
 }

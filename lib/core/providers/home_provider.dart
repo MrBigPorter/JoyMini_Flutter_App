@@ -86,28 +86,30 @@ final homeTreasuresProvider = AsyncNotifierProvider<HomeTreasuresNotifier, List<
 
 
 // ==============================================================================
-// 4. Ad SWR Provider (广告数据 - 如果需要)
+// 4. Ad SWR Provider (广告数据)
 // ==============================================================================
-class HomeAdNotifier extends AsyncNotifier<List<AdRes>> {
-  static const String _cacheKey = 'home_ad_cache_v1';
+class HomeAdNotifier extends FamilyAsyncNotifier<List<AdRes>, int> {
+  static String _cacheKeyOf(int adPosition) => 'home_ad_cache_v1_pos_$adPosition';
 
   @override
-  FutureOr<List<AdRes>> build() async {
-    final cachedData = ApiCacheManager.getCache(_cacheKey);
+  FutureOr<List<AdRes>> build(int adPosition) async {
+    final cacheKey = _cacheKeyOf(adPosition);
+    final cachedData = ApiCacheManager.getCache(cacheKey);
     if (cachedData != null) {
       try {
         final list = (cachedData as List).map((e) => AdRes.fromJson(e)).toList();
-        _fetchAndCache();
+        _fetchAndCache(adPosition);
         return list;
       } catch (_) {}
     }
-    return await _fetchAndCache();
+    return await _fetchAndCache(adPosition);
   }
 
-  Future<List<AdRes>> _fetchAndCache() async {
+  Future<List<AdRes>> _fetchAndCache(int adPosition) async {
+    final cacheKey = _cacheKeyOf(adPosition);
     try {
-      final freshData = await Api.indexAdApi(adPosition: 1);
-      ApiCacheManager.setCache(_cacheKey, freshData.map((e) => e.toJson()).toList());
+      final freshData = await Api.indexAdApi(adPosition: adPosition);
+      ApiCacheManager.setCache(cacheKey, freshData.map((e) => e.toJson()).toList());
       if (state.hasValue) state = AsyncData(freshData);
       return freshData;
     } catch (e) {
@@ -115,7 +117,10 @@ class HomeAdNotifier extends AsyncNotifier<List<AdRes>> {
       return state.value!;
     }
   }
-  Future<void> forceRefresh() async => await _fetchAndCache();
+
+  Future<void> forceRefresh() async => await _fetchAndCache(arg);
 }
-final homeAdProvider = AsyncNotifierProvider<HomeAdNotifier, List<AdRes>>(() => HomeAdNotifier());
+final homeAdProvider = AsyncNotifierProvider.family<HomeAdNotifier, List<AdRes>, int>(
+  () => HomeAdNotifier(),
+);
 
