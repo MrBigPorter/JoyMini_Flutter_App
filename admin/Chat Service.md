@@ -1058,58 +1058,31 @@ MVP 阶段建议：
 
 ---
 
-## 14. 前端缺口补充（后端已完成前提）
+## 14. 跨文档补充：秒杀（Flash Sale）
 
-> 本节用于回答：**如果后端能力已就绪，Flutter 前端还差什么**。  
-> 结论：不只是“秒杀 + 抽奖”，还包含**客服分流落地（business/support）**。
+> 你提到“还有秒杀的”，这里补充与本聊天文档相关的对齐口径。  
+> 秒杀实时策略主文档：`admin/FLASH_SALE_REALTIME_STRATEGY_CN.md`
 
-### 14.1 目前已对上的能力（代码已存在）
+### 14.1 已有策略结论（来自主文档）
 
-- 客服入口 API 已接：`GET /api/v1/chat/business?businessId=...`（`Api.chatBusinessApi`）
-- 会话类型模型已具备：`BUSINESS` / `SUPPORT`（`ConversationType`）
-- 下单主链路已具备：`orders/checkout`（`OrdersCheckoutParams` + `purchaseProvider`）
-- 拼团列表/详情接口已在后端控制器存在：
-  - `GET /client/groups/list`
-  - `GET /client/groups/:groupId`
-  - 见 `admin/group.controller.ts`（App 侧 list 强制 `GROUP_STATUS.ACTIVE`）
+- 默认采用 **普通接口 + 轮询**，WebSocket 作为二期增强。
+- 活动/库存/价格的一致性以服务端校验为准，不在前端“猜库存”。
+- 推荐轮询节奏：
+  - 场次列表 `15~30s`
+  - 场次商品 `3~5s`（活动进行中）
+  - 页面聚焦时主动刷新
 
-### 14.2 前端 P0 待办（必须先做）
+### 14.2 与 Flutter 当前任务的直接关系
 
-1. **抽奖链路落地（Lucky Draw）**
-   - 新增 Flutter API：
-     - `GET /api/v1/lucky-draw/my-tickets`
-     - `POST /api/v1/lucky-draw/tickets/:ticketId/draw`
-     - `GET /api/v1/lucky-draw/my-results`
-   - 新增页面/路由：抽奖券列表、抽奖执行页、历史结果页。
-   - 下单成功后的抽奖券引导（可从 `OrderCheckoutResponse.lotteryTickets` 衔接）。
+- Flutter 侧仍需补齐秒杀闭环：展示态（秒杀价/倒计时/库存/结束态）+ 结算透传字段（如 `flashSaleProductId`）。
+- 支付页与订单页价格文案必须统一，防止“展示价 != 结算价”。
+- 失败态需要统一：活动未开始、活动结束、库存不足、价格变更。
 
-2. **秒杀链路落地（Flash Sale）**
-   - 商品/详情页补齐秒杀态展示：秒杀价、倒计时、库存、活动结束态。
-   - 结算参数补齐秒杀透传字段（如 `flashSaleProductId`，以服务端 contract 为准）。
-   - 支付页与订单页价格文案统一（原价/秒杀价/优惠叠加顺序）。
+### 14.3 验收标准（秒杀）
 
-3. **客服分流参数化（Support vs Business）**
-   - `CustomerServiceHelper.startChat()` 改为支持场景参数，不再写死 `official_platform_support_v1`。
-   - 统一入口策略：
-     - 平台客服问题 -> `support`
-     - 商家/业务咨询 -> `business`（按 businessId）
-   - 会话列表增加标签或过滤，避免 support/business 混淆。
-
-### 14.3 前端 P1 待办（建议紧随其后）
-
-- 订单页客服入口携带上下文（订单号、商品ID、问题类型）到消息 `meta`，降低客服定位成本。
-- 抽奖与订单状态联动文案统一（待开奖/已开奖/未中奖）。
-- 秒杀活动结束、库存不足、价格变更时的统一错误提示与回退策略。
-
-### 14.4 联调验收标准（DoD）
-
-- 抽奖：用户可完成“看券 -> 抽奖 -> 看历史结果”闭环，且重复点击抽奖有幂等保护。
-- 秒杀：下单请求带秒杀标识，服务端按秒杀价结算，前端价格展示与订单结果一致。
-- 客服分流：同一用户可按场景进入不同客服会话，列表与路由可正确区分 `support/business`。
-
-### 14.5 一句话结论
-
-> 在“后端已完成”的前提下，前端至少还需完成三件事：**抽奖闭环、秒杀闭环、客服分流参数化**；否则 Admin 侧与客户端会出现流程和数据不一致。
+- 商品详情与支付页可见一致的秒杀状态与价格。
+- 下单请求带秒杀标识且后端按秒杀规则结算。
+- 订单结果页展示价格与支付页一致，无前后端价差。
 
 ---
 
