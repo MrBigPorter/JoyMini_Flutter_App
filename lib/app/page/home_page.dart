@@ -4,6 +4,7 @@ import 'package:flutter_app/app/page/home_components/flash_sale_section.dart';
 import 'package:flutter_app/app/page/home_components/home_treasures.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/components/lucky_custom_material_indicator.dart';
+import 'package:flutter_app/components/pwa_banners.dart';
 import 'package:flutter_app/components/swiper_banner.dart';
 import 'package:flutter_app/utils/helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,6 +90,9 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
           physics: platformScrollPhysics(),
           cacheExtent: 1500,
           slivers: [
+            // 0. PWA Install Banner (Web only, auto-hides when not applicable)
+            const SliverToBoxAdapter(child: PwaInstallBanner()),
+
             // 1. Banner Section
             banners.when(
               skipLoadingOnRefresh: true,
