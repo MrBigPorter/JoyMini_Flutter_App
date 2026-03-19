@@ -328,61 +328,87 @@ extension LoginPageUI on _LoginPageState {
 
                             if (showGoogleButton) ...[
                               if (kIsWeb) ...[
-                                // ─── Phase B: Official Google button (Web) ────
-                                // renderButton triggers auth via authenticationEvents.
-                                // Credential is handled by _handleGoogleWebAccount.
+                                // ─── Web: Google renderButton (bottom, clickable)
+                                //          + custom visual (top, IgnorePointer) ──
                                 if (_googleWebReady) ...[
-                                  IgnorePointer(
-                                    ignoring: socialLoading,
-                                    child: AnimatedOpacity(
-                                      opacity: socialLoading ? 0.4 : 1.0,
-                                      duration: const Duration(
-                                        milliseconds: 200,
-                                      ),
-                                      child: SizedBox(
-                                        width: double.infinity,
-                                        height: 44.h,
-                                        child: Builder(
-                                          builder: (context) {
-                                            final webButton =
-                                                buildGoogleSignInWebButton();
-                                            // Defensive fallback: if conditional export
-                                            // resolves to stub, keep a visible placeholder.
-                                            if (webButton is SizedBox) {
-                                              return Container(
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                  border: Border.all(
-                                                    color: const Color(
-                                                      0xFFDADCE0,
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48.h,
+                                    child: Stack(
+                                      children: [
+                                        // Bottom: real Google renderButton (receives clicks → popup)
+                                        Positioned.fill(
+                                          child: buildGoogleSignInWebButton(),
+                                        ),
+                                        // Top: our custom visual (pointer-transparent)
+                                        Positioned.fill(
+                                          child: IgnorePointer(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: socialLoading
+                                                    ? Colors.grey.shade100
+                                                    : Colors.white,
+                                                borderRadius:
+                                                    BorderRadius.circular(8.r),
+                                                border: Border.all(
+                                                  color: const Color(0xFFDADCE0),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  if (_socialOauthInFlight) ...[
+                                                    SizedBox(
+                                                      width: 18.w,
+                                                      height: 18.w,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: context
+                                                            .textTertiary600,
+                                                      ),
+                                                    ),
+                                                    SizedBox(width: 8.w),
+                                                  ] else
+                                                    Icon(
+                                                      Icons
+                                                          .g_mobiledata_rounded,
+                                                      size: 35.sp,
+                                                    ),
+                                                  Text(
+                                                    'login.oauth.google'.tr(),
+                                                    style: TextStyle(
+                                                      fontSize: context.textSm,
+                                                      fontWeight:
+                                                          FontWeight.w800,
                                                     ),
                                                   ),
-                                                  color: Colors.white,
-                                                ),
-                                                child: Text(
-                                                  'Google button unavailable',
-                                                  style: TextStyle(
-                                                    fontSize: context.textSm,
-                                                    color:
-                                                        context.textTertiary600,
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                            return webButton;
-                                          },
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        // Disable overlay when any OAuth is in flight
+                                        if (socialLoading)
+                                          Positioned.fill(
+                                            child: AbsorbPointer(
+                                              child: Container(
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.5),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ] else ...[
-                                  // Still initializing — show a disabled placeholder
+                                  // Still initializing
                                   Button(
                                     width: double.infinity,
+                                    height: 48.h,
                                     variant: ButtonVariant.secondary,
-                                    loading: true,
+                                    disabled: true,
                                     onPressed: null,
                                     leading: Icon(
                                       Icons.g_mobiledata_rounded,
@@ -395,9 +421,11 @@ extension LoginPageUI on _LoginPageState {
                                 // ─── Native: custom button ────────────────────
                                 Button(
                                   width: double.infinity,
+                                  height: 48.h,
                                   variant: ButtonVariant.secondary,
-                                  loading: googleOauth.isLoading ||
-                                      _socialOauthInFlight,
+                                  loading: googleOauth.isLoading,
+                                  disabled: socialLoading &&
+                                      !googleOauth.isLoading,
                                   onPressed: socialLoading ||
                                           !OauthSignInService
                                               .canShowGoogleButton
@@ -416,9 +444,11 @@ extension LoginPageUI on _LoginPageState {
                             if (showFacebookButton) ...[
                               Button(
                                 width: double.infinity,
+                                height: 48.h,
                                 variant: ButtonVariant.secondary,
-                                loading: facebookOauth.isLoading ||
-                                    _socialOauthInFlight,
+                                loading: facebookOauth.isLoading,
+                                disabled: socialLoading &&
+                                    !facebookOauth.isLoading,
                                 onPressed:
                                 socialLoading ||
                                     !OauthSignInService
@@ -435,9 +465,11 @@ extension LoginPageUI on _LoginPageState {
                               SizedBox(height: 10.w),
                               Button(
                                 width: double.infinity,
+                                height: 48.h,
                                 variant: ButtonVariant.secondary,
-                                loading: appleOauth.isLoading ||
-                                    _socialOauthInFlight,
+                                loading: appleOauth.isLoading,
+                                disabled: socialLoading &&
+                                    !appleOauth.isLoading,
                                 onPressed: socialLoading
                                     ? null
                                     : _loginWithAppleOauth,

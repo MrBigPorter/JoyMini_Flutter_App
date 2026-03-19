@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_app/core/config/app_config.dart';
@@ -6,7 +8,7 @@ import 'package:flutter_app/core/models/auth.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-// Web-only: sessionStorage used to persist init flag across hot-reloads
+// Web-only: JS global used to distinguish hot-reload vs page-refresh
 import 'package:web/web.dart' as web_pkg;
 
 class OauthCancelledException implements Exception {
@@ -219,15 +221,17 @@ class OauthSignInService {
     }
     if (_googleInitialized && _googleInitKey == initKey) return;
 
-    // On web: check sessionStorage to survive hot-reloads without
+    // On web: check a JS window global to survive hot-reloads without
     // calling id.initialize() a second time (which corrupts the FedCM callback).
-    if (kIsWeb && _webStorageGet('__gsiInited') == initKey) {
+    // JS globals survive hot-reload (same JS context) but reset on page
+    // refresh (new JS context) — so GSI is correctly re-initialized after F5.
+    if (kIsWeb && _jsGsiInitKey() == initKey) {
       _googleInitialized = true;
       _googleInitKey = initKey;
       // Re-establish Dart-side listener in case it was lost.
       _setupWebGlobalListener();
       _log(
-        'Google initialize() skipped – storage guard hit | trigger=$trigger | key=${initKey.substring(0, 12)}...',
+        'Google initialize() skipped – JS global guard hit | trigger=$trigger | key=${initKey.substring(0, 12)}...',
       );
       return;
     }
@@ -246,7 +250,7 @@ class OauthSignInService {
         await GoogleSignIn.instance.initialize(
           clientId: AppConfig.googleWebClientId,
         );
-        _webStorageSet('__gsiInited', initKey); // persist across hot-reloads
+        _setJsGsiInitKey(initKey); // persist across hot-reloads (JS global)
       } else {
         await GoogleSignIn.instance.initialize();
       }
@@ -288,24 +292,27 @@ class OauthSignInService {
     }
   }
 
-  // ─── sessionStorage helpers (web-only, survives hot-reload) ──────────────
+  // ─── JS window global helpers (web-only, survives hot-reload) ─────────────
+  // JS globals live in the same JS context as the GSI library. They survive
+  // Dart hot-reloads (no page navigation) but are destroyed on full page
+  // refresh — exactly matching the GSI library lifecycle.
 
-  static String? _webStorageGet(String key) {
+  static String? _jsGsiInitKey() {
     if (!kIsWeb) return null;
     try {
-      final fromSession = web_pkg.window.sessionStorage.getItem(key);
-      if (fromSession != null && fromSession.isNotEmpty) return fromSession;
-      return web_pkg.window.localStorage.getItem(key);
+      final v = (web_pkg.window as JSObject)
+          .getProperty<JSAny?>('__gsiInitKey'.toJS);
+      return v != null ? (v as JSString).toDart : null;
     } catch (_) {
       return null;
     }
   }
 
-  static void _webStorageSet(String key, String value) {
+  static void _setJsGsiInitKey(String value) {
     if (!kIsWeb) return;
     try {
-      web_pkg.window.sessionStorage.setItem(key, value);
-      web_pkg.window.localStorage.setItem(key, value);
+      (web_pkg.window as JSObject)
+          .setProperty('__gsiInitKey'.toJS, value.toJS);
     } catch (_) {}
   }
 
