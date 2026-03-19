@@ -25,15 +25,17 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     null,
   );
 
-  //  修改点 1：默认显示为邮箱登录
   String _loginMode = _modeEmailCode;
   bool _submitted = false;
+  bool _socialOauthInFlight = false;
+
+  // ─── Phase B: Web Google renderButton state ───────────────────────────────
+  bool _googleWebReady = false;
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _googleWebAuthSub;
 
   bool get _usePasswordLogin => _loginMode == _modePassword;
   bool get _useEmailCodeLogin => _loginMode == _modeEmailCode;
 
-  //  修改点 2：调整 Index，对应最新的 UI 顺序
-  // 0: 邮箱 (左), 1: 密码 (中), 2: 手机 (右)
   int get _modeIndex => switch (_loginMode) {
     _modeEmailCode => 0,
     _modePassword => 1,
@@ -46,6 +48,70 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     1 => Alignment.center,
     _ => Alignment.centerRight,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb && OauthSignInService.canShowGoogleButton) {
+      _initGoogleWebAuth();
+    }
+  }
+
+  /// Phase B: Initialize Google on Web and set up authenticationEvents listener.
+  /// The renderButton widget fires credentials through this stream.
+  Future<void> _initGoogleWebAuth() async {
+    try {
+      await OauthSignInService.initializeForWeb(
+        trigger: 'login_page.initState',
+      );
+      _googleWebAuthSub?.cancel();
+      _googleWebAuthSub = GoogleSignIn.instance.authenticationEvents.listen(
+        (event) {
+          if (event is GoogleSignInAuthenticationEventSignIn) {
+            _handleGoogleWebAccount(event.user);
+          }
+        },
+        onError: (Object error) {
+          // Cancelled/skipped prompts are normal — suppress silently.
+          if (error is GoogleSignInException &&
+              error.code == GoogleSignInExceptionCode.canceled) return;
+          _handleOauthError(error);
+        },
+        cancelOnError: false,
+      );
+      if (mounted) setState(() => _googleWebReady = true);
+    } catch (e) {
+      debugPrint('[LoginPage] Google Web init error: $e');
+    }
+  }
+
+  /// Phase B: Called when renderButton delivers a credential via authenticationEvents.
+  Future<void> _handleGoogleWebAccount(GoogleSignInAccount account) async {
+    if (_socialOauthInFlight) return;
+    final auth = account.authentication;
+    final idToken = auth.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      _handleOauthError(StateError('Google idToken is empty'));
+      return;
+    }
+    setState(() => _socialOauthInFlight = true);
+    try {
+      final result = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
+        idToken: idToken,
+        inviteCode: _currentInviteCode(),
+      ));
+      await _syncLoginTokens(
+        result.tokens.accessToken,
+        result.tokens.refreshToken,
+      );
+    } catch (e) {
+      _handleOauthError(e);
+    } finally {
+      if (mounted) setState(() => _socialOauthInFlight = false);
+    }
+  }
+
+
 
   void _setLoginMode(String mode) {
     otpForm.form.reset();
@@ -138,6 +204,8 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> _loginWithGoogleOauth() async {
+    if (_socialOauthInFlight) return;
+    setState(() => _socialOauthInFlight = true);
     try {
       final oauthParams = await OauthSignInService.signInWithGoogle(
         inviteCode: _currentInviteCode(),
@@ -152,10 +220,16 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       );
     } catch (e) {
       _handleOauthError(e);
+    } finally {
+      if (mounted) {
+        setState(() => _socialOauthInFlight = false);
+      }
     }
   }
 
   Future<void> _loginWithFacebookOauth() async {
+    if (_socialOauthInFlight) return;
+    setState(() => _socialOauthInFlight = true);
     try {
       final oauthParams = await OauthSignInService.signInWithFacebook(
         inviteCode: _currentInviteCode(),
@@ -173,10 +247,16 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       );
     } catch (e) {
       _handleOauthError(e);
+    } finally {
+      if (mounted) {
+        setState(() => _socialOauthInFlight = false);
+      }
     }
   }
 
   Future<void> _loginWithAppleOauth() async {
+    if (_socialOauthInFlight) return;
+    setState(() => _socialOauthInFlight = true);
     try {
       final oauthParams = await OauthSignInService.signInWithApple(
         inviteCode: _currentInviteCode(),
@@ -192,12 +272,23 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       );
     } catch (e) {
       _handleOauthError(e);
+    } finally {
+      if (mounted) {
+        setState(() => _socialOauthInFlight = false);
+      }
     }
   }
 
   void _handleOauthError(Object error) {
     if (error is OauthCancelledException) return;
-    final message = error.toString().replaceFirst('Exception: ', '');
+    final raw = error.toString();
+    if (raw.contains('origin_mismatch')) {
+      RadixToast.error(
+        'Google login blocked: origin_mismatch. Please add current Web origin to Google Cloud OAuth Authorized JavaScript origins.',
+      );
+      return;
+    }
+    final message = raw.replaceFirst('Exception: ', '');
     RadixToast.error(message);
   }
 
@@ -227,6 +318,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   @override
   void dispose() {
+    _googleWebAuthSub?.cancel();
     cd.dispose();
     super.dispose();
   }

@@ -14,7 +14,8 @@ extension LoginPageUI on _LoginPageState {
     final socialLoading =
         googleOauth.isLoading ||
             facebookOauth.isLoading ||
-            appleOauth.isLoading;
+            appleOauth.isLoading ||
+            _socialOauthInFlight;
     final emailLoading = sendEmail.isLoading || emailLogin.isLoading;
     final showGoogleButton = OauthSignInService.canShowGoogleButton || kIsWeb;
     final showFacebookButton =
@@ -326,22 +327,89 @@ extension LoginPageUI on _LoginPageState {
                             SizedBox(height: 12.w),
 
                             if (showGoogleButton) ...[
-                              Button(
-                                width: double.infinity,
-                                variant: ButtonVariant.secondary,
-                                loading: googleOauth.isLoading,
-                                onPressed:
-                                socialLoading ||
-                                    !OauthSignInService
-                                        .canShowGoogleButton
-                                    ? null
-                                    : _loginWithGoogleOauth,
-                                leading:  Icon(
-                                  Icons.g_mobiledata_rounded,
-                                  size: 35.sp,
+                              if (kIsWeb) ...[
+                                // ─── Phase B: Official Google button (Web) ────
+                                // renderButton triggers auth via authenticationEvents.
+                                // Credential is handled by _handleGoogleWebAccount.
+                                if (_googleWebReady) ...[
+                                  IgnorePointer(
+                                    ignoring: socialLoading,
+                                    child: AnimatedOpacity(
+                                      opacity: socialLoading ? 0.4 : 1.0,
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        height: 44.h,
+                                        child: Builder(
+                                          builder: (context) {
+                                            final webButton =
+                                                buildGoogleSignInWebButton();
+                                            // Defensive fallback: if conditional export
+                                            // resolves to stub, keep a visible placeholder.
+                                            if (webButton is SizedBox) {
+                                              return Container(
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: const Color(
+                                                      0xFFDADCE0,
+                                                    ),
+                                                  ),
+                                                  color: Colors.white,
+                                                ),
+                                                child: Text(
+                                                  'Google button unavailable',
+                                                  style: TextStyle(
+                                                    fontSize: context.textSm,
+                                                    color:
+                                                        context.textTertiary600,
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                            return webButton;
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ] else ...[
+                                  // Still initializing — show a disabled placeholder
+                                  Button(
+                                    width: double.infinity,
+                                    variant: ButtonVariant.secondary,
+                                    loading: true,
+                                    onPressed: null,
+                                    leading: Icon(
+                                      Icons.g_mobiledata_rounded,
+                                      size: 35.sp,
+                                    ),
+                                    child: Text('login.oauth.google'.tr()),
+                                  ),
+                                ],
+                              ] else ...[
+                                // ─── Native: custom button ────────────────────
+                                Button(
+                                  width: double.infinity,
+                                  variant: ButtonVariant.secondary,
+                                  loading: googleOauth.isLoading ||
+                                      _socialOauthInFlight,
+                                  onPressed: socialLoading ||
+                                          !OauthSignInService
+                                              .canShowGoogleButton
+                                      ? null
+                                      : _loginWithGoogleOauth,
+                                  leading: Icon(
+                                    Icons.g_mobiledata_rounded,
+                                    size: 35.sp,
+                                  ),
+                                  child: Text('login.oauth.google'.tr()),
                                 ),
-                                child: Text('login.oauth.google'.tr()),
-                              ),
+                              ],
                               SizedBox(height: 10.w),
                             ],
 
@@ -349,7 +417,8 @@ extension LoginPageUI on _LoginPageState {
                               Button(
                                 width: double.infinity,
                                 variant: ButtonVariant.secondary,
-                                loading: facebookOauth.isLoading,
+                                loading: facebookOauth.isLoading ||
+                                    _socialOauthInFlight,
                                 onPressed:
                                 socialLoading ||
                                     !OauthSignInService
@@ -367,7 +436,8 @@ extension LoginPageUI on _LoginPageState {
                               Button(
                                 width: double.infinity,
                                 variant: ButtonVariant.secondary,
-                                loading: appleOauth.isLoading,
+                                loading: appleOauth.isLoading ||
+                                    _socialOauthInFlight,
                                 onPressed: socialLoading
                                     ? null
                                     : _loginWithAppleOauth,

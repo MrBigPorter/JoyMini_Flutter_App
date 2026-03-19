@@ -18,8 +18,15 @@ void main() {
   group('LoginPage OAuth buttons', () {
     testWidgets('Google/Facebook visibility follows platform support flags',
         (tester) async {
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 20));
+      });
+
       await tester.pumpWidget(_wrap(const LoginPage()));
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
 
       final googleExpected = OauthSignInService.canShowGoogleButton
           ? findsOneWidget
@@ -34,8 +41,15 @@ void main() {
 
     testWidgets('apple button visibility follows platform support flag',
         (tester) async {
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 20));
+      });
+
       await tester.pumpWidget(_wrap(const LoginPage()));
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
 
       final expected = OauthSignInService.canShowAppleButton
           ? findsOneWidget
@@ -44,8 +58,15 @@ void main() {
     });
 
     testWidgets('can switch to email code login branch', (tester) async {
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 20));
+      });
+
       await tester.pumpWidget(_wrap(const LoginPage()));
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
 
       final toggleFinder = find.text('login.mode.email_code');
       await tester.ensureVisible(toggleFinder);

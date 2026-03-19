@@ -1,10 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_app/core/config/app_config.dart';
 import 'package:flutter_app/core/models/auth.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+// Web-only: sessionStorage used to persist init flag across hot-reloads
+import 'package:web/web.dart' as web_pkg;
 
 class OauthCancelledException implements Exception {
   final String message;
@@ -17,7 +20,27 @@ class OauthCancelledException implements Exception {
 class OauthSignInService {
   OauthSignInService._();
 
+  // ─── Google init guard ───────────────────────────────────────────────────
+  // Dart statics reset on hot-reload; use a JS-global as source of truth on
+  // web so we never call google.accounts.id.initialize() twice per page-load.
   static bool _googleInitialized = false;
+  static Future<void>? _googleInitFuture;
+  static String? _googleInitKey;
+  static Future<GoogleOauthLoginParams>? _googleSignInFuture;
+  static bool _googleWebDiagnosticsLogged = false;
+
+  // ─── Web credential cache ─────────────────────────────────────────────────
+  // The authenticationEvents stream is broadcast; events fired before a
+  // listener is attached are lost.  We subscribe globally right after
+  // initialize() so any "auto-fired" FedCM credential is captured here and
+  // can be returned immediately when the user later clicks the sign-in button.
+  static GoogleSignInAccount? _webCachedAccount;
+  static StreamSubscription<GoogleSignInAuthenticationEvent>? _webGlobalAuthSub;
+
+  // Per-request waiter (set only while _authenticateGoogleOnWeb is running).
+  static Completer<GoogleSignInAccount>? _webSignInWaiter;
+
+  // ─── Facebook ─────────────────────────────────────────────────────────────
   static bool _facebookInitialized = false;
 
   static bool get canShowGoogleButton {
@@ -30,6 +53,13 @@ class OauthSignInService {
     return AppConfig.facebookWebAppId.isNotEmpty;
   }
 
+  /// Ensures Google is initialized on Web before rendering [buildGoogleSignInWebButton].
+  /// No-op on native platforms. Safe to call multiple times.
+  static Future<void> initializeForWeb({String trigger = 'unknown'}) async {
+    if (!kIsWeb) return;
+    await _ensureGoogleInitialized(trigger: trigger);
+  }
+
   static bool get canShowAppleButton {
     if (kIsWeb) return false;
     return defaultTargetPlatform == TargetPlatform.iOS ||
@@ -39,33 +69,77 @@ class OauthSignInService {
   static Future<GoogleOauthLoginParams> signInWithGoogle({
     String? inviteCode,
   }) async {
+    if (_googleSignInFuture != null) {
+      _log('Google sign-in already in-flight; reusing the same request');
+      return _googleSignInFuture!;
+    }
+
+    final future = _signInWithGoogleInternal(inviteCode: inviteCode);
+    _googleSignInFuture = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_googleSignInFuture, future)) {
+        _googleSignInFuture = null;
+      }
+    }
+  }
+
+  static Future<GoogleOauthLoginParams> _signInWithGoogleInternal({
+    String? inviteCode,
+  }) async {
+    _log(
+      'Google sign-in start | isWeb=$kIsWeb | canShow=$canShowGoogleButton | clientIdLen=${AppConfig.googleWebClientId.length}',
+    );
+
     if (!canShowGoogleButton) {
+      _log('Google sign-in blocked: GOOGLE_WEB_CLIENT_ID is empty on Web');
       throw UnsupportedError(
         'Google sign-in is unavailable. Configure GOOGLE_WEB_CLIENT_ID for Web.',
       );
     }
 
-    await _ensureGoogleInitialized();
+    await _ensureGoogleInitialized(trigger: 'signInWithGoogle');
 
     try {
-      final account = await GoogleSignIn.instance.authenticate(
-        scopeHint: const ['email', 'profile'],
-      );
+      final GoogleSignInAccount account;
+      // Web 平台必须使用轻量级认证流程
+      if (kIsWeb) {
+        _log('Google web lightweight authentication() calling...');
+        account = await _authenticateGoogleOnWeb();
+      } else {
+        // Native 平台使用标准认证流程
+        _log('Google native authenticate() calling...');
+        account = await GoogleSignIn.instance.authenticate(
+          scopeHint: const ['email', 'profile'],
+        );
+      }
 
       final auth = account.authentication;
       final idToken = auth.idToken;
       if (idToken == null || idToken.isEmpty) {
+        _log('Google authenticate() returned empty idToken');
         throw StateError('Google idToken is empty');
       }
+
+      _log(
+        'Google authenticate() success | email=${account.email} | idTokenLen=${idToken.length} | tokenHead=${_maskHead(idToken)}',
+      );
 
       return GoogleOauthLoginParams(
         idToken: idToken,
         inviteCode: _normalizedInviteCode(inviteCode),
       );
+    } on OauthCancelledException {
+      rethrow;
     } on GoogleSignInException catch (e) {
+      _log('GoogleSignInException | code=${e.code} | desc=${e.description}');
       if (e.code == GoogleSignInExceptionCode.canceled) {
         throw OauthCancelledException('Google sign-in cancelled');
       }
+      rethrow;
+    } catch (e) {
+      _log('Google sign-in unknown error: $e');
       rethrow;
     }
   }
@@ -135,16 +209,244 @@ class OauthSignInService {
     return trimmed;
   }
 
-  static Future<void> _ensureGoogleInitialized() async {
-    if (_googleInitialized) return;
+  static Future<void> _ensureGoogleInitialized({
+    required String trigger,
+  }) async {
+    final initKey = kIsWeb ? AppConfig.googleWebClientId : '__native__';
     if (kIsWeb) {
-      await GoogleSignIn.instance.initialize(
-        clientId: AppConfig.googleWebClientId,
-      );
-    } else {
-      await GoogleSignIn.instance.initialize();
+      _logGoogleWebDiagnosticsOnce(stage: 'ensureGoogleInitialized');
+      _log('Google initialize() requested | trigger=$trigger');
     }
-    _googleInitialized = true;
+    if (_googleInitialized && _googleInitKey == initKey) return;
+
+    // On web: check sessionStorage to survive hot-reloads without
+    // calling id.initialize() a second time (which corrupts the FedCM callback).
+    if (kIsWeb && _webStorageGet('__gsiInited') == initKey) {
+      _googleInitialized = true;
+      _googleInitKey = initKey;
+      // Re-establish Dart-side listener in case it was lost.
+      _setupWebGlobalListener();
+      _log(
+        'Google initialize() skipped – storage guard hit | trigger=$trigger | key=${initKey.substring(0, 12)}...',
+      );
+      return;
+    }
+
+    if (_googleInitFuture != null) {
+      await _googleInitFuture!;
+      return;
+    }
+
+    final completer = Completer<void>();
+    _googleInitFuture = completer.future;
+
+    try {
+      _log('Google initialize() start | keyLen=${initKey.length}');
+      if (kIsWeb) {
+        await GoogleSignIn.instance.initialize(
+          clientId: AppConfig.googleWebClientId,
+        );
+        _webStorageSet('__gsiInited', initKey); // persist across hot-reloads
+      } else {
+        await GoogleSignIn.instance.initialize();
+      }
+      _googleInitialized = true;
+      _googleInitKey = initKey;
+      _log('Google initialize() success | trigger=$trigger');
+      if (kIsWeb) _setupWebGlobalListener();
+      completer.complete();
+    } catch (e, s) {
+      _log('Google initialize() failed: $e');
+      if ('$e'.contains('origin_mismatch')) {
+        _log(
+          'Google initialize() origin_mismatch hint: check Google Cloud Console -> OAuth Client (Web) -> Authorized JavaScript origins',
+        );
+      }
+      completer.completeError(e, s);
+      rethrow;
+    } finally {
+      _googleInitFuture = null;
+    }
+  }
+
+  static void _logGoogleWebDiagnosticsOnce({required String stage}) {
+    if (!kIsWeb || _googleWebDiagnosticsLogged) return;
+    _googleWebDiagnosticsLogged = true;
+    final origin = _safeWebOrigin();
+    final key = AppConfig.googleWebClientId;
+    _log(
+      'Google web diagnostics | stage=$stage | origin=$origin | clientIdHead=${_maskHead(key)} | clientIdLen=${key.length}',
+    );
+  }
+
+  static String _safeWebOrigin() {
+    if (!kIsWeb) return 'n/a';
+    try {
+      return web_pkg.window.location.origin;
+    } catch (_) {
+      return 'unknown';
+    }
+  }
+
+  // ─── sessionStorage helpers (web-only, survives hot-reload) ──────────────
+
+  static String? _webStorageGet(String key) {
+    if (!kIsWeb) return null;
+    try {
+      final fromSession = web_pkg.window.sessionStorage.getItem(key);
+      if (fromSession != null && fromSession.isNotEmpty) return fromSession;
+      return web_pkg.window.localStorage.getItem(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static void _webStorageSet(String key, String value) {
+    if (!kIsWeb) return;
+    try {
+      web_pkg.window.sessionStorage.setItem(key, value);
+      web_pkg.window.localStorage.setItem(key, value);
+    } catch (_) {}
+  }
+
+  /// Establishes a long-lived subscription to [authenticationEvents] so that
+  /// credentials delivered by FedCM *before* the user clicks the sign-in
+  /// button (e.g. auto-triggered One Tap on page load) are cached and not lost.
+  static void _setupWebGlobalListener() {
+    _webGlobalAuthSub?.cancel();
+    _webGlobalAuthSub = GoogleSignIn.instance.authenticationEvents.listen(
+      (event) {
+        _log('Google web global: event type=${event.runtimeType}');
+        if (event is GoogleSignInAuthenticationEventSignIn) {
+          _log(
+            'Google web global: SignIn event | email=${event.user.email}',
+          );
+          if (_webSignInWaiter != null && !_webSignInWaiter!.isCompleted) {
+            // An active sign-in request is waiting — deliver directly.
+            _webSignInWaiter!.complete(event.user);
+            _webSignInWaiter = null;
+          } else {
+            // Cache it; _authenticateGoogleOnWeb() will pick it up.
+            _webCachedAccount = event.user;
+          }
+        } else if (event is GoogleSignInAuthenticationEventSignOut) {
+          _log('Google web global: SignOut event');
+          _webCachedAccount = null;
+          if (_webSignInWaiter != null && !_webSignInWaiter!.isCompleted) {
+            _webSignInWaiter!.completeError(
+              OauthCancelledException('User signed out during authentication'),
+            );
+            _webSignInWaiter = null;
+          }
+        } else {
+          // Other events (e.g. unknown future event types) — log and ignore.
+          _log('Google web global: unhandled event type: ${event.runtimeType}');
+        }
+      },
+      onError: (Object error, StackTrace stack) {
+        // ─── DO NOT immediately cancel the waiter ───────────────────────────
+        // FedCM with auto_select:true fires an automatic id.prompt() on page
+        // load.  When the user then clicks our button a second concurrent
+        // id.prompt() is issued.  The second prompt may emit isSkippedMoment
+        // (→ GoogleSignInExceptionCode.canceled) because a prompt is already
+        // running.  If we cancel the waiter here, the credential from the
+        // *first* prompt (the one that shows the dialog) is lost.
+        //
+        // Strategy:
+        //  • SignIn success events are caught in the regular handler above.
+        //  • Errors are logged but only propagated after a short grace period.
+        //    If a SignIn event arrives within the grace period, the timer is
+        //    cancelled and we succeed.  Otherwise we fail after the grace period.
+        // ────────────────────────────────────────────────────────────────────
+        _log('Google web global: auth stream error (grace-period): $error');
+
+        if (_webSignInWaiter == null || _webSignInWaiter!.isCompleted) {
+          // No waiter active — nothing to do.
+          return;
+        }
+
+        // Give the auto-triggered FedCM 5 seconds to deliver a credential
+        // before propagating this error.
+        Future.delayed(const Duration(seconds: 5), () {
+          if (_webSignInWaiter != null && !_webSignInWaiter!.isCompleted) {
+            _log('Google web global: propagating deferred error: $error');
+            _webSignInWaiter!.completeError(error, stack);
+            _webSignInWaiter = null;
+          }
+        });
+      },
+    );
+    _log('Google web: global auth listener (re)established');
+  }
+
+  static Future<GoogleSignInAccount> _authenticateGoogleOnWeb() async {
+    // Fast path: a credential arrived before the user clicked (e.g. auto
+    // One Tap on page load). Consume it immediately.
+    if (_webCachedAccount != null) {
+      final account = _webCachedAccount!;
+      _webCachedAccount = null;
+      _log(
+        'Google web: returning pre-cached account | email=${account.email}',
+      );
+      return account;
+    }
+
+    // Cancel any stale waiter from a previous interrupted request.
+    if (_webSignInWaiter != null && !_webSignInWaiter!.isCompleted) {
+      _log('Google web: cancelling stale waiter (superseded)');
+      _webSignInWaiter!.completeError(
+        OauthCancelledException('Superseded by new sign-in request'),
+      );
+    }
+    _webSignInWaiter = Completer<GoogleSignInAccount>();
+
+    try {
+      _log('Google web: calling attemptLightweightAuthentication()');
+      // This always returns null on web but internally calls id.prompt()
+      // which triggers the FedCM / One Tap UI.  The credential response will
+      // arrive via the global authenticationEvents listener above.
+      GoogleSignIn.instance.attemptLightweightAuthentication(
+        reportAllExceptions: true,
+      );
+
+      final result = await _webSignInWaiter!.future.timeout(
+        const Duration(seconds: 120),
+        onTimeout: () {
+          _log('Google web: sign-in timed out after 120s');
+          throw OauthCancelledException('Google sign-in timed out');
+        },
+      );
+
+      _log('Google web: sign-in completed | email=${result.email}');
+      return result;
+    } on OauthCancelledException {
+      rethrow;
+    } on GoogleSignInException catch (e) {
+      _log('Google web: GoogleSignInException code=${e.code}');
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw OauthCancelledException('Google sign-in cancelled');
+      }
+      rethrow;
+    } catch (e) {
+      _log('Google web: sign-in error: $e');
+      rethrow;
+    } finally {
+      // Clean up waiter reference if it's still pending (shouldn't happen normally)
+      if (_webSignInWaiter != null && !_webSignInWaiter!.isCompleted) {
+        _webSignInWaiter = null;
+      }
+    }
+  }
+
+  static void _log(String message) {
+    if (!kDebugMode) return;
+    debugPrint('[OAuthSignInService] $message');
+  }
+
+  static String _maskHead(String value, {int keep = 12}) {
+    if (value.isEmpty) return '';
+    if (value.length <= keep) return value;
+    return '${value.substring(0, keep)}...';
   }
 
   static Future<void> _ensureFacebookInitialized() async {
@@ -158,4 +460,3 @@ class OauthSignInService {
     _facebookInitialized = true;
   }
 }
-
