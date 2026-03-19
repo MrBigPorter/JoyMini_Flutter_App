@@ -29,7 +29,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   bool _submitted = false;
   bool _socialOauthInFlight = false;
 
-  // ─── Phase B: Web Google renderButton state ───────────────────────────────
+  // ─── Web: Google renderButton state ─────────────────────────────────────
+  // On web, Google auth MUST go through renderButton (popup flow).
+  // id.prompt() (One Tap) requires strict origin allowlisting that
+  // renderButton's popup flow does not.
   bool _googleWebReady = false;
   StreamSubscription<GoogleSignInAuthenticationEvent>? _googleWebAuthSub;
 
@@ -53,13 +56,12 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   void initState() {
     super.initState();
     if (kIsWeb && OauthSignInService.canShowGoogleButton) {
-      _initGoogleWebAuth();
+      _initGoogleWebSignIn();
     }
   }
 
-  /// Phase B: Initialize Google on Web and set up authenticationEvents listener.
-  /// The renderButton widget fires credentials through this stream.
-  Future<void> _initGoogleWebAuth() async {
+  /// Web only: initialize Google SDK and listen for credentials from renderButton.
+  Future<void> _initGoogleWebSignIn() async {
     try {
       await OauthSignInService.initializeForWeb(
         trigger: 'login_page.initState',
@@ -68,11 +70,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       _googleWebAuthSub = GoogleSignIn.instance.authenticationEvents.listen(
         (event) {
           if (event is GoogleSignInAuthenticationEventSignIn) {
-            _handleGoogleWebAccount(event.user);
+            _processGoogleWebCredential(event.user);
           }
         },
         onError: (Object error) {
-          // Cancelled/skipped prompts are normal — suppress silently.
           if (error is GoogleSignInException &&
               error.code == GoogleSignInExceptionCode.canceled) return;
           _handleOauthError(error);
@@ -81,15 +82,14 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       );
       if (mounted) setState(() => _googleWebReady = true);
     } catch (e) {
-      debugPrint('[LoginPage] Google Web init error: $e');
+      debugPrint('[LoginPage] Google web init error: $e');
     }
   }
 
-  /// Phase B: Called when renderButton delivers a credential via authenticationEvents.
-  Future<void> _handleGoogleWebAccount(GoogleSignInAccount account) async {
+  /// Web only: called when renderButton delivers a credential.
+  Future<void> _processGoogleWebCredential(GoogleSignInAccount account) async {
     if (_socialOauthInFlight) return;
-    final auth = account.authentication;
-    final idToken = auth.idToken;
+    final idToken = account.authentication.idToken;
     if (idToken == null || idToken.isEmpty) {
       _handleOauthError(StateError('Google idToken is empty'));
       return;
@@ -110,8 +110,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       if (mounted) setState(() => _socialOauthInFlight = false);
     }
   }
-
-
 
   void _setLoginMode(String mode) {
     otpForm.form.reset();
