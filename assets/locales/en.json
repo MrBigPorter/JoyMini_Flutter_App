@@ -207,6 +207,7 @@
   "login.mode.password": "Password",
   "login.phone.label": "Phone Number",
   "login.phone.hint": "Enter your phone number",
+  "login.welcome_subtitle": "Welcome back. Enter your details to continue.",
   "login.password.label": "Password",
   "login.password.hint": "Enter your password",
   "login.phone_code.label": "Code",
