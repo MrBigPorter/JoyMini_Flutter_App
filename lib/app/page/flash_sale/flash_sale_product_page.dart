@@ -11,6 +11,7 @@ import 'package:flutter_app/ui/img/app_image.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 
 // ---------------------------------------------------------------------------
 // Flash Sale Product Detail Page
@@ -181,10 +182,7 @@ class _DetailBodyState extends State<_DetailBody> {
               _SectionDivider(title: 'Description'),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                child: Text(
-                  detail.product.desc!,
-                  style: TextStyle(fontSize: 13.sp, color: context.textSecondary700, height: 1.6),
-                ),
+                child: _buildHtmlContent(detail.product.desc!),
               ),
             ],
 
@@ -193,10 +191,7 @@ class _DetailBodyState extends State<_DetailBody> {
               _SectionDivider(title: 'Rules'),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                child: Text(
-                  detail.product.ruleContent!,
-                  style: TextStyle(fontSize: 13.sp, color: context.textSecondary700, height: 1.6),
-                ),
+                child: _buildHtmlContent(detail.product.ruleContent!),
               ),
             ],
 
@@ -216,6 +211,128 @@ class _DetailBodyState extends State<_DetailBody> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHtmlContent(String html) {
+    return RepaintBoundary(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+            child: _buildHtmlWidget(
+              html,
+              maxWidth: constraints.maxWidth,
+              allowBlockScroll: true,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHtmlWidget(
+    String html, {
+    required double maxWidth,
+    required bool allowBlockScroll,
+  }) {
+    return HtmlWidget(
+      html,
+      textStyle: TextStyle(
+        fontSize: 13.sp,
+        color: context.textSecondary700,
+        height: 1.6,
+      ),
+      buildAsync: true,
+      customWidgetBuilder: allowBlockScroll
+          ? (element) {
+              final tag = element.localName;
+              if (tag == 'table' || tag == 'pre') {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: maxWidth),
+                    child: _buildHtmlWidget(
+                      element.outerHtml,
+                      maxWidth: maxWidth,
+                      allowBlockScroll: false,
+                    ),
+                  ),
+                );
+              }
+              return null;
+            }
+          : null,
+      customStylesBuilder: (element) {
+        final tag = element.localName;
+        final inlineStyle =
+            (element.attributes['style'] ?? '').toLowerCase();
+
+        if (inlineStyle.contains('display:flex')) {
+          return {
+            'display': 'block',
+            'max-width': '100%',
+            'width': '100%',
+            'word-break': 'break-word',
+            'overflow-wrap': 'anywhere',
+          };
+        }
+
+        if (inlineStyle.contains('white-space:nowrap')) {
+          return {
+            'white-space': 'normal',
+            'word-break': 'break-word',
+            'overflow-wrap': 'anywhere',
+          };
+        }
+
+        if (const {
+          'p',
+          'div',
+          'span',
+          'li',
+          'a',
+          'strong',
+          'em',
+          'td',
+          'th',
+        }.contains(tag)) {
+          return {
+            'white-space': 'normal',
+            'word-break': 'break-word',
+            'overflow-wrap': 'anywhere',
+            'max-width': '100%',
+          };
+        }
+
+        if (tag == 'img') {
+          return {
+            'display': 'block',
+            'max-width': '100%',
+            'height': 'auto',
+          };
+        }
+
+        if (tag == 'table') {
+          return {
+            'max-width': '100%',
+            'width': '100%',
+            'table-layout': 'fixed',
+          };
+        }
+
+        if (tag == 'pre' || tag == 'code') {
+          return {
+            'white-space': 'pre-wrap',
+            'word-break': 'break-word',
+            'overflow-wrap': 'anywhere',
+            'max-width': '100%',
+          };
+        }
+
+        return null;
+      },
     );
   }
 }
