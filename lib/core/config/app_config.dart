@@ -64,7 +64,6 @@ class AppConfig {
   // 3. 工具方法：Android 模拟器 Localhost 修复
   // =========================================================
   static String _resolveLocalhost(String url) {
-    print('[AppConfig] 原始 URL: $url');
     // Web 端不需要处理，localhost 就是本机
     if (kIsWeb) return url;
 
