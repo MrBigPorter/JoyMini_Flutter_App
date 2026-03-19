@@ -210,6 +210,7 @@
   "login.mode.password": "Password",
   "login.phone.label": "Numero ng Telepono",
   "login.phone.hint": "Ilagay ang iyong numero ng telepono",
+  "login.welcome_subtitle": "Maligayang pagbabalik. Ilagay ang iyong detalye para magpatuloy.",
   "login.password.label": "Password",
   "login.password.hint": "Ilagay ang iyong password",
   "login.phone_code.label": "Code",

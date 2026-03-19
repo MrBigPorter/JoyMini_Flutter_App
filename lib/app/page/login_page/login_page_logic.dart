@@ -1,56 +1,24 @@
 part of 'login_page.dart';
 
 mixin LoginPageLogic on ConsumerState<LoginPage> {
-  static const _modePhoneCode = 'phoneCode';
-  static const _modeEmailCode = 'emailCode';
-  static const _modePassword = 'password';
-
   late final Countdown cd = Countdown();
 
-  // OTP 登录表单
-  late final LoginOtpModelForm otpForm = LoginOtpModelForm(
-    LoginOtpModelForm.formElements(const LoginOtpModel()),
-    null,
-  );
-
-  // 密码登录表单
-  late final LoginPasswordModelForm passwordForm = LoginPasswordModelForm(
-    LoginPasswordModelForm.formElements(const LoginPasswordModel()),
-    null,
-  );
-
-  // 邮箱验证码登录表单
   late final LoginEmailModelForm emailForm = LoginEmailModelForm(
     LoginEmailModelForm.formElements(const LoginEmailModel()),
     null,
   );
 
-  String _loginMode = _modeEmailCode;
   bool _submitted = false;
-  bool _socialOauthInFlight = false;
 
-  // ─── Web: Google renderButton state ─────────────────────────────────────
-  // On web, Google auth MUST go through renderButton (popup flow).
-  // id.prompt() (One Tap) requires strict origin allowlisting that
-  // renderButton's popup flow does not.
+  // 新增：专门追踪邮箱登录的完整生命周期
+  bool _emailLoginInFlight = false;
+  // 追踪社交登录的完整生命周期
+  bool _socialOauthInFlight = false;
+  // 新增：标记是否已经登录成功，正在等待路由跳转
+  bool _isSuccessRedirecting = false;
+
   bool _googleWebReady = false;
   StreamSubscription<GoogleSignInAuthenticationEvent>? _googleWebAuthSub;
-
-  bool get _usePasswordLogin => _loginMode == _modePassword;
-  bool get _useEmailCodeLogin => _loginMode == _modeEmailCode;
-
-  int get _modeIndex => switch (_loginMode) {
-    _modeEmailCode => 0,
-    _modePassword => 1,
-    _modePhoneCode => 2,
-    _ => 0,
-  };
-
-  Alignment get _modeHighlightAlignment => switch (_modeIndex) {
-    0 => Alignment.centerLeft,
-    1 => Alignment.center,
-    _ => Alignment.centerRight,
-  };
 
   @override
   void initState() {
@@ -60,22 +28,18 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     }
   }
 
-  /// Web only: initialize Google SDK and listen for credentials from renderButton.
   Future<void> _initGoogleWebSignIn() async {
     try {
-      await OauthSignInService.initializeForWeb(
-        trigger: 'login_page.initState',
-      );
+      await OauthSignInService.initializeForWeb(trigger: 'login_page.initState');
       _googleWebAuthSub?.cancel();
       _googleWebAuthSub = GoogleSignIn.instance.authenticationEvents.listen(
-        (event) {
+            (event) {
           if (event is GoogleSignInAuthenticationEventSignIn) {
             _processGoogleWebCredential(event.user);
           }
         },
         onError: (Object error) {
-          if (error is GoogleSignInException &&
-              error.code == GoogleSignInExceptionCode.canceled) return;
+          if (error is GoogleSignInException && error.code == GoogleSignInExceptionCode.canceled) return;
           _handleOauthError(error);
         },
         cancelOnError: false,
@@ -86,114 +50,77 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     }
   }
 
-  /// Web only: called when renderButton delivers a credential.
   Future<void> _processGoogleWebCredential(GoogleSignInAccount account) async {
-    if (_socialOauthInFlight) return;
+    if (_socialOauthInFlight || _isSuccessRedirecting) return;
     final idToken = account.authentication.idToken;
     if (idToken == null || idToken.isEmpty) {
       _handleOauthError(StateError('Google idToken is empty'));
       return;
     }
+
     setState(() => _socialOauthInFlight = true);
     try {
       final result = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
-        idToken: idToken,
-        inviteCode: _currentInviteCode(),
+      idToken: idToken,
+      inviteCode: _currentInviteCode(),
       ));
-      await _syncLoginTokens(
-        result.tokens.accessToken,
-        result.tokens.refreshToken,
-      );
+
+      // 成功获取 Token 后，标记正在重定向，保持 Loading 状态
+      _isSuccessRedirecting = true;
+      await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      if (mounted) setState(() => _socialOauthInFlight = false);
+      // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
+      if (mounted && !_isSuccessRedirecting) setState(() => _socialOauthInFlight = false);
     }
-  }
-
-  void _setLoginMode(String mode) {
-    otpForm.form.reset();
-    passwordForm.form.reset();
-    emailForm.form.reset();
-    cd.stop();
-    setState(() {
-      _loginMode = mode;
-      _submitted = false;
-    });
   }
 
   void submit() {
-    final form = _usePasswordLogin
-        ? passwordForm.form
-        : (_useEmailCodeLogin ? emailForm.form : otpForm.form);
     setState(() {
       _submitted = true;
-      form.markAllAsTouched();
+      emailForm.form.markAllAsTouched();
     });
 
-    if (!form.valid) return;
-
-    if (_usePasswordLogin) {
-      // TODO: 密码登录
-    } else {
-      if (_useEmailCodeLogin) {
-        loginWithEmailCode();
-      } else {
-        loginWithOtp();
-      }
-    }
-  }
-
-  Future<void> loginWithOtp() async {
-    final model = otpForm.model;
-    if (ref.watch(verifyOtpCtrlProvider).isLoading) return;
-
-    final verify = await ref
-        .read(verifyOtpCtrlProvider.notifier)
-        .run(model.phone, model.otp);
-    if (!verify) return;
-
-    final result = await ref.read(authLoginOtpCtrlProvider.notifier).run((
-    phone: model.phone,
-    ));
-
-    if (result.isNotNullOrEmpty && result.tokens.isNotNullOrEmpty) {
-      final auth = ref.read(authProvider.notifier);
-      await auth.login(result.tokens.accessToken, result.tokens.refreshToken);
-    }
+    if (!emailForm.form.valid) return;
+    loginWithEmailCode();
   }
 
   Future<void> loginWithEmailCode() async {
+    if (ref.watch(authLoginEmailCtrlProvider).isLoading || _emailLoginInFlight || _isSuccessRedirecting) return;
+
     final model = emailForm.model;
-    if (ref.watch(authLoginEmailCtrlProvider).isLoading) return;
+    setState(() => _emailLoginInFlight = true); // 开启本地死锁 Loading
 
-    final result = await ref.read(authLoginEmailCtrlProvider.notifier).run((
-    email: model.email,
-    code: model.code,
-    ));
+    try {
+      final result = await ref.read(authLoginEmailCtrlProvider.notifier).run((
+      email: model.email,
+      code: model.code,
+      ));
 
-    if (result.isNotNullOrEmpty && result.tokens.isNotNullOrEmpty) {
-      await _syncLoginTokens(
-        result.tokens.accessToken,
-        result.tokens.refreshToken,
-      );
+      if (result.isNotNullOrEmpty && result.tokens.isNotNullOrEmpty) {
+        // 成功！标记重定向状态
+        _isSuccessRedirecting = true;
+        await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
+      }
+    } catch (e) {
+      // 处理错误，API 的错误通常被 Controller 内部处理了，这里做个兜底
+    } finally {
+      // 如果登录失败，解除 Loading 状态；如果成功，保持 Loading 陪伴用户度过路由延迟
+      if (mounted && !_isSuccessRedirecting) setState(() => _emailLoginInFlight = false);
     }
   }
 
   String? _currentInviteCode() {
-    final form = _usePasswordLogin
-        ? passwordForm.form
-        : (_useEmailCodeLogin ? emailForm.form : otpForm.form);
     final AbstractControl<dynamic>? control;
     try {
-      control = form.control('inviteCode');
+      control = emailForm.form.control('inviteCode');
     } catch (_) {
       return null;
     }
     final value = control.value?.toString();
     final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) return null;
-    return normalized;
+    return (normalized == null || normalized.isEmpty) ? null : normalized;
   }
 
   Future<void> _syncLoginTokens(String accessToken, String refreshToken) async {
@@ -202,78 +129,61 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> _loginWithGoogleOauth() async {
-    if (_socialOauthInFlight) return;
+    if (_socialOauthInFlight || _isSuccessRedirecting) return;
     setState(() => _socialOauthInFlight = true);
     try {
-      final oauthParams = await OauthSignInService.signInWithGoogle(
-        inviteCode: _currentInviteCode(),
-      );
+      final oauthParams = await OauthSignInService.signInWithGoogle(inviteCode: _currentInviteCode());
       final result = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
       idToken: oauthParams.idToken,
       inviteCode: oauthParams.inviteCode,
       ));
-      await _syncLoginTokens(
-        result.tokens.accessToken,
-        result.tokens.refreshToken,
-      );
+
+      _isSuccessRedirecting = true;
+      await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      if (mounted) {
-        setState(() => _socialOauthInFlight = false);
-      }
+      if (mounted && !_isSuccessRedirecting) setState(() => _socialOauthInFlight = false);
     }
   }
 
   Future<void> _loginWithFacebookOauth() async {
-    if (_socialOauthInFlight) return;
+    if (_socialOauthInFlight || _isSuccessRedirecting) return;
     setState(() => _socialOauthInFlight = true);
     try {
-      final oauthParams = await OauthSignInService.signInWithFacebook(
-        inviteCode: _currentInviteCode(),
-      );
-      final result = await ref
-          .read(authLoginFacebookCtrlProvider.notifier)
-          .run((
+      final oauthParams = await OauthSignInService.signInWithFacebook(inviteCode: _currentInviteCode());
+      final result = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
       accessToken: oauthParams.accessToken,
       userId: oauthParams.userId,
       inviteCode: oauthParams.inviteCode,
       ));
-      await _syncLoginTokens(
-        result.tokens.accessToken,
-        result.tokens.refreshToken,
-      );
+
+      _isSuccessRedirecting = true;
+      await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      if (mounted) {
-        setState(() => _socialOauthInFlight = false);
-      }
+      if (mounted && !_isSuccessRedirecting) setState(() => _socialOauthInFlight = false);
     }
   }
 
   Future<void> _loginWithAppleOauth() async {
-    if (_socialOauthInFlight) return;
+    if (_socialOauthInFlight || _isSuccessRedirecting) return;
     setState(() => _socialOauthInFlight = true);
     try {
-      final oauthParams = await OauthSignInService.signInWithApple(
-        inviteCode: _currentInviteCode(),
-      );
+      final oauthParams = await OauthSignInService.signInWithApple(inviteCode: _currentInviteCode());
       final result = await ref.read(authLoginAppleCtrlProvider.notifier).run((
       idToken: oauthParams.idToken,
       code: oauthParams.code,
       inviteCode: oauthParams.inviteCode,
       ));
-      await _syncLoginTokens(
-        result.tokens.accessToken,
-        result.tokens.refreshToken,
-      );
+
+      _isSuccessRedirecting = true;
+      await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      if (mounted) {
-        setState(() => _socialOauthInFlight = false);
-      }
+      if (mounted && !_isSuccessRedirecting) setState(() => _socialOauthInFlight = false);
     }
   }
 
@@ -281,9 +191,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     if (error is OauthCancelledException) return;
     final raw = error.toString();
     if (raw.contains('origin_mismatch')) {
-      RadixToast.error(
-        'Google login blocked: origin_mismatch. Please add current Web origin to Google Cloud OAuth Authorized JavaScript origins.',
-      );
+      RadixToast.error('Google login blocked: origin_mismatch.');
       return;
     }
     final message = raw.replaceFirst('Exception: ', '');
@@ -291,26 +199,13 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> sendCode() async {
-    if (cd.running) return;
+    if (cd.running || _emailLoginInFlight || _socialOauthInFlight || _isSuccessRedirecting) return;
 
-    if (_useEmailCodeLogin) {
-      final email = emailForm.form.control('email');
-      email.markAsTouched();
-      if (email.invalid) return;
+    final email = emailForm.form.control('email');
+    email.markAsTouched();
+    if (email.invalid) return;
 
-      await ref
-          .read(sendEmailCodeCtrlProvider.notifier)
-          .run(email.value.toString());
-      cd.start(60);
-      return;
-    }
-
-    final phone = otpForm.form.control('phone');
-    phone.markAsTouched();
-    if (phone.invalid) return;
-
-    final sendCtrl = ref.read(sendOtpCtrlProvider.notifier);
-    await sendCtrl.run(phone.value);
+    await ref.read(sendEmailCodeCtrlProvider.notifier).run(email.value.toString());
     cd.start(60);
   }
 
