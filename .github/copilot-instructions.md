@@ -7,7 +7,7 @@
 ## 🎯 当前任务（每次对话从这里开始）
 
 **阶段**: Phase F1 — Flutter 商业链路闭环  
-**上次停留**: Flash Sale 前端闭环完成（2026-03-18）  
+**上次停留**: OAuth 对接基础层完成（2026-03-19）  
 **立即执行**:
 - [x] 客服分流参数化：`CustomerServiceHelper.startChat()` 支持 `support/business` 场景与可配置 `businessId`
 - [x] Lucky Draw API 接入：`my-tickets` / `draw` / `my-results`
@@ -15,8 +15,16 @@
 - [x] Flash Sale 前端态补齐：秒杀价、倒计时、库存、结束态
 - [x] 结算透传秒杀标识（如 `flashSaleProductId`，以后端 contract 为准）并统一支付/订单价格文案
 - [x] 为以上改动补最小测试（Provider/Widget）与关键错误态
+- [x] OAuth 对接基础层：`google/facebook/apple` API + Model + Provider（不含 UI/SDK）
+- [x] Admin 对接说明文档：`admin/FLUTTER_OAUTH_INTEGRATION_GUIDE_CN.md`
+- [x] 启动 Logo 统一规划文档：`STARTUP_LOGO_UNIFICATION_PLAN.md`
+- [x] 自动化测试学习手册：`AUTOMATED_TESTING_MANUAL.md`
+- [x] OAuth 登录 UI 闭环：登录页三方按钮 + loading/错误态 + 邀请码透传
+- [x] OAuth 平台 SDK 接入：Google/Facebook/Apple（按平台条件显示）
+- [x] OAuth 最小测试补齐：Provider 失败态 + 登录页 Widget 分支
+- [x] `auth` 字段对齐清理：`avatar/avartar`、`Profile.lastLoginAt` 类型与后端一致
 
-> 最后对齐时间：2026-03-18。完成一项就地打勾并更新时间。
+> 最后对齐时间：2026-03-19。完成一项就地打勾并更新时间。
 
 ---
 

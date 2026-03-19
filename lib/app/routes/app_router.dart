@@ -38,7 +38,7 @@ import 'package:flutter_app/app/page/product_page.dart';
 import 'package:flutter_app/app/page/transaction/transaction_ui_model.dart';
 import 'package:flutter_app/app/page/transaction_record_page.dart';
 import 'package:flutter_app/app/page/me_components/me_page.dart';
-import 'package:flutter_app/app/page/login_page.dart';
+import 'package:flutter_app/app/page/login_page/login_page.dart';
 import 'package:flutter_app/app/page/lucky_draw/lucky_draw_page.dart';
 import 'package:flutter_app/app/page/product_detail_page.dart';
 import 'package:flutter_app/app/page/withdraw/withdraw_page.dart';
