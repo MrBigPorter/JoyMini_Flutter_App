@@ -1,14 +1,23 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <base href="$FLUTTER_BASE_HREF">
     <meta charset="UTF-8">
     <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-    <meta name="description" content="JoyMini Web App">
+    <!-- ===== PWA Core Meta ===== -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="description" content="JoyMini — Flash Sale, Lucky Draw, Group Buying & more. Shop smarter.">
+    <meta name="theme-color" content="#FF5722">
+    <meta name="color-scheme" content="light">
+    <!-- ===== iOS PWA Meta ===== -->
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="JoyMini">
-    <link rel="apple-touch-icon" href="icons/Icon-192.png">
+    <!-- ===== Apple Touch Icons ===== -->
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
+    <!-- ===== Favicon & Manifest ===== -->
     <link rel="icon" type="image/png" href="favicon.png"/>
     <title>JoyMini</title>
     <link rel="manifest" href="manifest.json">
@@ -98,6 +107,61 @@
     });
     // 让监控器盯紧 <body> 标签
     observer.observe(document.body, { childList: true, subtree: true });
+</script>
+
+<!-- ===== PWA: Install Prompt ===== -->
+<script>
+    // Capture install prompt for manual triggering later
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        // Expose to Flutter via js channel if needed
+        window.__pwaInstallReady = true;
+        console.log('[PWA] Install prompt ready');
+    });
+
+    window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        window.__pwaInstalled = true;
+        console.log('[PWA] App installed successfully');
+    });
+
+    // Allow Flutter to trigger install prompt via JS interop
+    window.triggerPwaInstall = function() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((result) => {
+                console.log('[PWA] User choice:', result.outcome);
+                deferredPrompt = null;
+            });
+            return true;
+        }
+        return false;
+    };
+</script>
+
+<!-- ===== PWA: Custom Service Worker Registration ===== -->
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/pwa_sw.js', { scope: '/' })
+                .then((reg) => {
+                    console.log('[PWA] SW registered, scope:', reg.scope);
+                    // Notify app when SW update is available
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                window.__pwaUpdateReady = true;
+                                console.log('[PWA] New version available');
+                            }
+                        });
+                    });
+                })
+                .catch((err) => console.warn('[PWA] SW registration failed:', err));
+        });
+    }
 </script>
 
 </body>
