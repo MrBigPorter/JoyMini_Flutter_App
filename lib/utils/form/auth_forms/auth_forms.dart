@@ -28,3 +28,15 @@ class LoginPasswordModel {
   final String password;
   final String? inviteCode;
 }
+
+@Rf()
+class LoginEmailModel {
+  const LoginEmailModel({
+    @RfControl(validators: [EmailAddress()]) this.email = '',
+    @RfControl(validators: [OtpLen(6)]) this.code = '',
+  });
+
+  final String email;
+  final String code;
+}
+

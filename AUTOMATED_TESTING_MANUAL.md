@@ -303,7 +303,47 @@ jobs:
 
 ---
 
-## 13. 看这些就能“完全掌握” Flutter 自动化测试（通俗版）
+## 13. 登录链路回归（OTP + OAuth）
+
+为了避免登录改动引入回归，建议优先使用一键脚本：
+
+```bash
+cd /Volumes/MySSD/work/dev/flutter_happy_app
+./tool/test_login_regression.sh
+```
+
+脚本会自动使用 `fvm flutter`（如未安装 FVM 则回退到 `flutter`），并执行固定回归集。
+
+等价原始命令（便于临时拆分定位）：
+
+```bash
+cd /Volumes/MySSD/work/dev/flutter_happy_app
+fvm flutter test \
+  test/providers/auth_oauth_model_test.dart \
+  test/widgets/login_page_oauth_test.dart \
+  test/providers/flash_sale_model_test.dart \
+  test/providers/purchase_state_flash_sale_test.dart \
+  test/widgets/flash_sale_product_page_test.dart
+```
+
+覆盖范围：
+
+- OAuth 模型字段与兼容逻辑（`avatar/avartar`、`lastLoginAt`）
+- 登录页 OAuth 按钮分支（Google/Facebook/Apple 条件显示）
+- Flash Sale 模型与购买状态回归（防止商业链路连带回归）
+
+### 本次执行记录（2026-03-19）
+
+- 执行结果：`All tests passed!`
+- 观察到的非阻塞提示：
+  - `flutter_facebook_auth` 在 macOS 下的 `facebook_auth_desktop` 插件提示（当前不阻塞测试通过）
+  - Easy Localization 的 key 警告（测试环境未注入完整多语言资源）
+
+建议：把这组命令加入 PR 前自检或本地脚本，作为登录功能改动的最小回归门禁。
+
+---
+
+## 14. 看这些就能“完全掌握” Flutter 自动化测试（通俗版）
 
 下面这 7 项是最短学习路径。每项都按「看什么 -> 跑什么 -> 学会标准」来做。
 
@@ -328,5 +368,49 @@ jobs:
 1. 你能独立给一个新功能补 1 个 Unit + 1 个 Widget 测试。
 2. 你能在 10 分钟内定位“是模型问题、状态问题还是 UI 渲染问题”。
 3. 你能在提 PR 前稳定跑完：`analyze + test + coverage`。
+
+---
+
+## 15. 要“完整掌握”你需要会这 6 件事（最终清单）
+
+如果你把下面 6 件事都做熟，就可以认为已经完整掌握本项目 Flutter 自动化测试。
+
+### 1) 会分层设计测试（先想测什么）
+
+- 能区分：Unit 测逻辑、Widget 测渲染分支、Integration 测业务链路。
+- 新功能进来时，能先写出“该放哪一层测”。
+
+### 2) 会写稳定的断言（再想怎么证明）
+
+- Unit：能覆盖正常值 + 缺字段兜底 + 边界值。
+- Widget：能覆盖空态/错误态/加载态，且使用 `tester.takeException()` 防崩回归。
+
+### 3) 会覆盖高风险业务分支（避免线上回归）
+
+- 价格、库存、倒计时、售罄、结束态、接口失败态。
+- 能把一次线上 bug 转成一个回归测试用例。
+
+### 4) 会跑全流程命令（本地自检闭环）
+
+- `fvm flutter analyze`
+- `fvm flutter test`
+- `fvm flutter test --coverage`
+
+### 5) 会看失败原因并定位（10 分钟内判断方向）
+
+- 能快速判断失败属于：模型解析、状态流、UI 渲染、测试环境壳子缺失。
+- 能从报错堆栈定位到对应测试文件与业务代码。
+
+### 6) 会把测试纳入提交流程（团队可持续）
+
+- 每次改动都能补最小测试，不做“裸改业务逻辑”。
+- PR 描述能说明：新增了哪些测试、覆盖了哪些分支、结果是否通过。
+
+### 最终自测（全部满足=完整掌握）
+
+- [ ] 你能独立给一个新需求补 1 个 Unit + 1 个 Widget 测试并通过
+- [ ] 你能在一次失败中快速定位根因并修复
+- [ ] 你能稳定跑完 `analyze + test + coverage`
+- [ ] 你写的测试能被团队成员复现并长期稳定通过
 
 

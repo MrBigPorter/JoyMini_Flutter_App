@@ -351,6 +351,62 @@ class Api {
     return AuthLoginOtp.fromJson(res);
   }
 
+  /// Send email OTP code for login
+  static Future<EmailSendCodeResponse> sendEmailCodeApi({
+    required String email,
+  }) async {
+    final res = await Http.post(
+      '/api/v1/auth/email/send-code',
+      data: {'email': email},
+    );
+    return EmailSendCodeResponse.fromJson(res);
+  }
+
+  /// Login with email OTP code
+  static Future<AuthLoginEmail> loginWithEmailCodeApi({
+    required String email,
+    required String code,
+  }) async {
+    final res = await Http.post(
+      '/api/v1/auth/email/login',
+      data: {'email': email, 'code': code},
+    );
+    return AuthLoginEmail.fromJson(res);
+  }
+
+  /// Login with Google OAuth
+  static Future<AuthLoginOauth> loginWithGoogleOauthApi(
+    GoogleOauthLoginParams params,
+  ) async {
+    final res = await Http.post(
+      '/api/v1/auth/oauth/google',
+      data: params.toJson(),
+    );
+    return AuthLoginOauth.fromJson(res);
+  }
+
+  /// Login with Facebook OAuth
+  static Future<AuthLoginOauth> loginWithFacebookOauthApi(
+    FacebookOauthLoginParams params,
+  ) async {
+    final res = await Http.post(
+      '/api/v1/auth/oauth/facebook',
+      data: params.toJson(),
+    );
+    return AuthLoginOauth.fromJson(res);
+  }
+
+  /// Login with Apple OAuth
+  static Future<AuthLoginOauth> loginWithAppleOauthApi(
+    AppleOauthLoginParams params,
+  ) async {
+    final res = await Http.post(
+      '/api/v1/auth/oauth/apple',
+      data: params.toJson(),
+    );
+    return AuthLoginOauth.fromJson(res);
+  }
+
   /// Get user profile
   static Future<Profile> profileApi() async {
     final res = await Http.get('/api/v1/auth/profile');
