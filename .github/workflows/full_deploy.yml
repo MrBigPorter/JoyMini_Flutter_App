@@ -147,21 +147,9 @@ jobs:
           
           rm -f "$FB_KEY_PATH"
 
-      # ================= Phase 10: Artifact Archiving =================
-      - name: 💾 Archive Android Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-${{ env.APP_VERSION }}
-          path: |
-            build/app/outputs/flutter-apk/*.apk
-          if-no-files-found: warn
-
-      - name: 💾 Archive iOS Archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-archive-${{ env.APP_VERSION }}
-          path: build/ios/archive/
-          if-no-files-found: ignore
+      # ================= Phase 10: Skip Artifact Upload =================
+      # 为节省 GitHub Actions 存储空间，不再上传 APK/IPA 到 Artifacts。
+      # 安装分发仍通过 Firebase App Distribution，Web 仍部署到 Cloudflare。
 
       # ================= Phase 11: Telegram Notification =================
       - name: 📱 Send Detailed Telegram Report
