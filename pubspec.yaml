@@ -136,7 +136,7 @@ dependencies:
   cross_file: ^0.3.5+1
   ffmpeg_kit_flutter_new: ^4.1.0
   google_sign_in: ^7.2.0
-  flutter_facebook_auth: ^6.0.4
+  flutter_facebook_auth: ^7.1.6
   sign_in_with_apple: ^7.0.1
   blurhash: ^1.2.0
   universal_html: ^2.3.0

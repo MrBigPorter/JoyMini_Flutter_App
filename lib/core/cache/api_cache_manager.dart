@@ -6,10 +6,26 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum CacheState { miss, fresh, stale }
+
+class CacheReadResult {
+  const CacheReadResult({required this.state, this.data, this.expiresAt});
+
+  final CacheState state;
+  final dynamic data;
+  final DateTime? expiresAt;
+
+  bool get hasData => data != null;
+}
+
 /// 全局 API JSON 缓存管理器 (支持 Web WASM 双端融合)
 /// 架构定位：Core/Infrastructure Layer
 class ApiCacheManager {
   static const String _boxName = 'app_api_cache_box';
+  static const String _dataKey = 'data';
+  static const String _cachedAtKey = 'cachedAt';
+  static const String _expiresAtKey = 'expiresAt';
+  static const Duration defaultTtl = Duration(minutes: 3);
   static Box? _box;
   static SharedPreferences? _prefs;
 
@@ -28,9 +44,13 @@ class ApiCacheManager {
   }
 
   /// 2. 写入缓存
-  static Future<void> setCache(String key, dynamic data) async {
+  static Future<void> setCache(
+    String key,
+    dynamic data, {
+    Duration ttl = defaultTtl,
+  }) async {
     try {
-      final String jsonString = jsonEncode(data);
+      final String jsonString = jsonEncode(buildCacheEnvelope(data, ttl: ttl));
       if (kIsWeb) {
         // Web 端加上前缀隔离，防止覆盖其他业务数据
         await _prefs?.setString('${_boxName}_$key', jsonString);
@@ -44,19 +64,71 @@ class ApiCacheManager {
 
   /// 3. 读取缓存 (极速瞬间返回)
   static dynamic getCache(String key) {
+    final entry = getCacheEntry(key);
+    return entry.data;
+  }
+
+  /// 3.1 读取缓存并返回 freshness（SWR 用）
+  static CacheReadResult getCacheEntry(
+    String key, {
+    Duration legacyFallbackTtl = defaultTtl,
+  }) {
     try {
       final String? jsonString = kIsWeb
           ? _prefs?.getString('${_boxName}_$key')
           : _box?.get(key);
 
       if (jsonString != null && jsonString.isNotEmpty) {
-        return jsonDecode(jsonString);
+        final dynamic decoded = jsonDecode(jsonString);
+        return parseCachedPayload(decoded, fallbackTtl: legacyFallbackTtl);
       }
-      return null;
+      return const CacheReadResult(state: CacheState.miss);
     } catch (e) {
       debugPrint(' [ApiCacheManager] Get Cache Error: $e');
-      return null;
+      return const CacheReadResult(state: CacheState.miss);
     }
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> buildCacheEnvelope(
+    dynamic data, {
+    required Duration ttl,
+    DateTime? now,
+  }) {
+    final ts = (now ?? DateTime.now()).millisecondsSinceEpoch;
+    return {
+      _dataKey: data,
+      _cachedAtKey: ts,
+      _expiresAtKey: ts + ttl.inMilliseconds,
+    };
+  }
+
+  @visibleForTesting
+  static CacheReadResult parseCachedPayload(
+    dynamic decoded, {
+    required Duration fallbackTtl,
+    DateTime? now,
+  }) {
+    final current = now ?? DateTime.now();
+    if (decoded is Map<String, dynamic> && decoded.containsKey(_dataKey)) {
+      final expiresAtRaw = decoded[_expiresAtKey];
+      final expiresAt = expiresAtRaw is int
+          ? DateTime.fromMillisecondsSinceEpoch(expiresAtRaw)
+          : null;
+      final isFresh = expiresAt != null && current.isBefore(expiresAt);
+      return CacheReadResult(
+        state: isFresh ? CacheState.fresh : CacheState.stale,
+        data: decoded[_dataKey],
+        expiresAt: expiresAt,
+      );
+    }
+
+    // Legacy payloads without envelope are treated as stale once discovered.
+    return CacheReadResult(
+      state: CacheState.stale,
+      data: decoded,
+      expiresAt: current.subtract(fallbackTtl),
+    );
   }
 
   /// 4. 清理特定缓存
