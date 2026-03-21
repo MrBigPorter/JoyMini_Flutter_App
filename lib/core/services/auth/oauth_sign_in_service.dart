@@ -165,9 +165,16 @@ class OauthSignInService {
       throw StateError(result.message ?? 'Facebook sign-in failed');
     }
 
+    final accessToken = result.accessToken!;
+    final userId = switch (accessToken) {
+      ClassicToken token => token.userId,
+      LimitedToken token => token.userId,
+      _ => throw StateError('Unsupported Facebook access token type'),
+    };
+
     return FacebookOauthLoginParams(
-      accessToken: result.accessToken!.token,
-      userId: result.accessToken!.userId,
+      accessToken: accessToken.tokenString,
+      userId: userId,
       inviteCode: _normalizedInviteCode(inviteCode),
     );
   }
