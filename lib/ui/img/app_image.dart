@@ -1,4 +1,3 @@
-import 'dart:developer' as dev;
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
@@ -98,8 +97,12 @@ class AppCachedImage extends StatelessWidget {
   }
 
   Widget _buildNetworkImage(BuildContext context, String path) {
-    // 1. 确保逻辑宽度归一化
-    final double fixedWidth = width?.toInt().toDouble() ?? 240.0;
+    // 1. Ensure width normalization is safe: toInt() on Infinity throws.
+    final double? normalizedWidth =
+        (width != null && width!.isFinite && width! > 0)
+            ? width!.toInt().toDouble()
+            : null;
+    final double fixedWidth = normalizedWidth ?? 240.0;
     final url = UrlResolver.resolveImage(context, path, logicalWidth: fixedWidth, fit: fit);
 
     if (url.isEmpty) return _buildFallback();
@@ -147,7 +150,7 @@ class AppCachedImage extends StatelessWidget {
     if (isPlaceholder) {
       return Shimmer.fromColors(
         baseColor: placeholderColor,
-        highlightColor: Colors.white.withOpacity(0.5),
+        highlightColor: Colors.white.withValues(alpha: 0.5),
         child: Container(width: width, height: height, color: Colors.white),
       );
     }

@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/common.dart';
+import 'package:flutter_app/components/pwa_banners.dart';
 import 'package:flutter_app/core/events/global_handler.dart';
 import 'package:flutter_app/core/providers/app_router_provider.dart';
 import 'package:flutter_app/core/providers/fcm_service_provider.dart';
@@ -80,7 +81,15 @@ class _MyAppState extends ConsumerState<MyApp> {
         // 2. 包裹你的全局逻辑处理 (Socket监听等)
         child = GlobalHandler(child: content);
 
-        // 3. 最外层包裹 BotToastInit
+        // 3. PWA Update Banner（Web only, no-op on native）
+        child = Column(
+          children: [
+            const PwaUpdateBanner(),
+            Expanded(child: child),
+          ],
+        );
+
+        // 4. 最外层包裹 BotToastInit
         // 这样 BotToast 才能覆盖在所有页面(包括 GlobalHandler)之上
         return BotToastInit()(context, child);
       },

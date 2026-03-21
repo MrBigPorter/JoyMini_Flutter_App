@@ -6,6 +6,7 @@ final Map<String, ValidationMessageFunction> kGlobalValidationMessages = {
   'phone': (_) =>
   'Phone must be a valid 10-digit number starting with a non-zero digit.',
   'countryCode': (_) => 'Country code must be 1-3 digits.',
+  'email': (_) => 'Please enter a valid email address.',
   'otp': (error) {
     if (error is Map && error['len'] != null) {
       return 'Enter the ${error['len']}-digit code.';

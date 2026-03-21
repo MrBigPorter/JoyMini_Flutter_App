@@ -351,6 +351,62 @@ class Api {
     return AuthLoginOtp.fromJson(res);
   }
 
+  /// Send email OTP code for login
+  static Future<EmailSendCodeResponse> sendEmailCodeApi({
+    required String email,
+  }) async {
+    final res = await Http.post(
+      '/api/v1/auth/email/send-code',
+      data: {'email': email},
+    );
+    return EmailSendCodeResponse.fromJson(res);
+  }
+
+  /// Login with email OTP code
+  static Future<AuthLoginEmail> loginWithEmailCodeApi({
+    required String email,
+    required String code,
+  }) async {
+    final res = await Http.post(
+      '/api/v1/auth/email/login',
+      data: {'email': email, 'code': code},
+    );
+    return AuthLoginEmail.fromJson(res);
+  }
+
+  /// Login with Google OAuth
+  static Future<AuthLoginOauth> loginWithGoogleOauthApi(
+    GoogleOauthLoginParams params,
+  ) async {
+    final res = await Http.post(
+      '/api/v1/auth/oauth/google',
+      data: params.toJson(),
+    );
+    return AuthLoginOauth.fromJson(res);
+  }
+
+  /// Login with Facebook OAuth
+  static Future<AuthLoginOauth> loginWithFacebookOauthApi(
+    FacebookOauthLoginParams params,
+  ) async {
+    final res = await Http.post(
+      '/api/v1/auth/oauth/facebook',
+      data: params.toJson(),
+    );
+    return AuthLoginOauth.fromJson(res);
+  }
+
+  /// Login with Apple OAuth
+  static Future<AuthLoginOauth> loginWithAppleOauthApi(
+    AppleOauthLoginParams params,
+  ) async {
+    final res = await Http.post(
+      '/api/v1/auth/oauth/apple',
+      data: params.toJson(),
+    );
+    return AuthLoginOauth.fromJson(res);
+  }
+
   /// Get user profile
   static Future<Profile> profileApi() async {
     final res = await Http.get('/api/v1/auth/profile');
@@ -559,6 +615,57 @@ class Api {
   static Future<List<ClaimableCoupon>> claimableCouponsApi() async {
     final res = await Http.get('/api/v1/client/coupons/claimable');
     return parseList<ClaimableCoupon>(res, (e) => ClaimableCoupon.fromJson(e));
+  }
+
+  /// Get current user's lucky draw tickets
+  static Future<PageResult<LuckyDrawTicket>> luckyDrawMyTicketsApi(
+    LuckyDrawTicketQuery query,
+  ) async {
+    final res = await Http.get(
+      '/api/v1/lucky-draw/my-tickets',
+      query: query.toJson(),
+    );
+    return parsePageResponse(res, (e) => LuckyDrawTicket.fromJson(e));
+  }
+
+  /// Execute draw with a ticket
+  static Future<LuckyDrawActionResult> luckyDrawExecuteApi(String ticketId) async {
+    final res = await Http.post('/api/v1/lucky-draw/tickets/$ticketId/draw');
+    return LuckyDrawActionResult.fromJson(Map<String, dynamic>.from(res));
+  }
+
+  /// Get current user's lucky draw history results
+  static Future<PageResult<LuckyDrawResultItem>> luckyDrawMyResultsApi(
+    LuckyDrawTicketQuery query,
+  ) async {
+    final res = await Http.get(
+      '/api/v1/lucky-draw/my-results',
+      query: query.toJson(),
+    );
+    return parsePageResponse(res, (e) => LuckyDrawResultItem.fromJson(e));
+  }
+
+  /// Get currently active flash sale sessions
+  static Future<List<FlashSaleSession>> flashSaleActiveSessionsApi() async {
+    final res = await Http.get('/api/v1/flash-sale/sessions/active');
+    final list = (res as Map<String, dynamic>)['list'];
+    return parseList<FlashSaleSession>(list, (e) => FlashSaleSession.fromJson(e));
+  }
+
+  /// Get flash sale products under one active session
+  static Future<FlashSaleSessionProducts> flashSaleSessionProductsApi(
+    String sessionId,
+  ) async {
+    final res = await Http.get('/api/v1/flash-sale/sessions/$sessionId/products');
+    return FlashSaleSessionProducts.fromJson(Map<String, dynamic>.from(res));
+  }
+
+  /// Get one flash sale product detail by flashSaleProductId
+  static Future<FlashSaleProductDetail> flashSaleProductDetailApi(
+    String productId,
+  ) async {
+    final res = await Http.get('/api/v1/flash-sale/products/$productId');
+    return FlashSaleProductDetail.fromJson(Map<String, dynamic>.from(res));
   }
 
   /// Get conversation list

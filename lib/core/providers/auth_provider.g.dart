@@ -75,5 +75,89 @@ final authLoginOtpCtrlProvider =
 );
 
 typedef _$AuthLoginOtpCtrl = Notifier<AsyncValue<AuthLoginOtp?>>;
+String _$sendEmailCodeCtrlHash() => r'4d6cc3c113ce7d226b51119f6de60249e04a4132';
+
+/// See also [SendEmailCodeCtrl].
+@ProviderFor(SendEmailCodeCtrl)
+final sendEmailCodeCtrlProvider = NotifierProvider<SendEmailCodeCtrl,
+    AsyncValue<EmailSendCodeResponse?>>.internal(
+  SendEmailCodeCtrl.new,
+  name: r'sendEmailCodeCtrlProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$sendEmailCodeCtrlHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$SendEmailCodeCtrl = Notifier<AsyncValue<EmailSendCodeResponse?>>;
+String _$authLoginEmailCtrlHash() =>
+    r'276d318cf84e69fb9ba243d2e186fcd6d16431fd';
+
+/// See also [AuthLoginEmailCtrl].
+@ProviderFor(AuthLoginEmailCtrl)
+final authLoginEmailCtrlProvider =
+    NotifierProvider<AuthLoginEmailCtrl, AsyncValue<AuthLoginEmail?>>.internal(
+  AuthLoginEmailCtrl.new,
+  name: r'authLoginEmailCtrlProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$authLoginEmailCtrlHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$AuthLoginEmailCtrl = Notifier<AsyncValue<AuthLoginEmail?>>;
+String _$authLoginGoogleCtrlHash() =>
+    r'ede9beaca90f587eda92be38daf527851500ff8e';
+
+/// See also [AuthLoginGoogleCtrl].
+@ProviderFor(AuthLoginGoogleCtrl)
+final authLoginGoogleCtrlProvider =
+    NotifierProvider<AuthLoginGoogleCtrl, AsyncValue<AuthLoginOauth?>>.internal(
+  AuthLoginGoogleCtrl.new,
+  name: r'authLoginGoogleCtrlProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$authLoginGoogleCtrlHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$AuthLoginGoogleCtrl = Notifier<AsyncValue<AuthLoginOauth?>>;
+String _$authLoginFacebookCtrlHash() =>
+    r'7d59855471443794fc045c6ee75d8d00bfa6eef8';
+
+/// See also [AuthLoginFacebookCtrl].
+@ProviderFor(AuthLoginFacebookCtrl)
+final authLoginFacebookCtrlProvider = NotifierProvider<AuthLoginFacebookCtrl,
+    AsyncValue<AuthLoginOauth?>>.internal(
+  AuthLoginFacebookCtrl.new,
+  name: r'authLoginFacebookCtrlProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$authLoginFacebookCtrlHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$AuthLoginFacebookCtrl = Notifier<AsyncValue<AuthLoginOauth?>>;
+String _$authLoginAppleCtrlHash() =>
+    r'2c64ed220d53a1cad42e3f70e57cd825bb2eca61';
+
+/// See also [AuthLoginAppleCtrl].
+@ProviderFor(AuthLoginAppleCtrl)
+final authLoginAppleCtrlProvider =
+    NotifierProvider<AuthLoginAppleCtrl, AsyncValue<AuthLoginOauth?>>.internal(
+  AuthLoginAppleCtrl.new,
+  name: r'authLoginAppleCtrlProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$authLoginAppleCtrlHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$AuthLoginAppleCtrl = Notifier<AsyncValue<AuthLoginOauth?>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

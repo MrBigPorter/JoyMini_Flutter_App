@@ -77,6 +77,153 @@ class AuthLoginOtpCtrl extends _$AuthLoginOtpCtrl {
   void reset() => state = const AsyncData(null);
 }
 
+@Riverpod(keepAlive: true)
+class SendEmailCodeCtrl extends _$SendEmailCodeCtrl {
+  @override
+  AsyncValue<EmailSendCodeResponse?> build() => const AsyncData(null);
+
+  Future<EmailSendCodeResponse> run(String email) async {
+    state = const AsyncLoading();
+
+    try {
+      final res = await Api.sendEmailCodeApi(email: email);
+      state = AsyncData(res);
+      return res;
+    } catch (e, s) {
+      state = AsyncError(e, s);
+      rethrow;
+    }
+  }
+
+  void reset() => state = const AsyncData(null);
+}
+
+typedef LoginWithEmailCodeParams = ({
+  String email,
+  String code,
+});
+
+@Riverpod(keepAlive: true)
+class AuthLoginEmailCtrl extends _$AuthLoginEmailCtrl {
+  @override
+  AsyncValue<AuthLoginEmail?> build() => const AsyncData(null);
+
+  Future<AuthLoginEmail> run(LoginWithEmailCodeParams params) async {
+    state = const AsyncLoading();
+
+    try {
+      final res = await Api.loginWithEmailCodeApi(
+        email: params.email,
+        code: params.code,
+      );
+      state = AsyncData(res);
+      return res;
+    } catch (e, s) {
+      state = AsyncError(e, s);
+      rethrow;
+    }
+  }
+
+  void reset() => state = const AsyncData(null);
+}
+
+typedef LoginWithGoogleOauthParams = ({
+  String idToken,
+  String? inviteCode,
+});
+
+@Riverpod(keepAlive: true)
+class AuthLoginGoogleCtrl extends _$AuthLoginGoogleCtrl {
+  @override
+  AsyncValue<AuthLoginOauth?> build() => const AsyncData(null);
+
+  Future<AuthLoginOauth> run(LoginWithGoogleOauthParams params) async {
+    state = const AsyncLoading();
+
+    try {
+      final res = await Api.loginWithGoogleOauthApi(
+        GoogleOauthLoginParams(
+          idToken: params.idToken,
+          inviteCode: params.inviteCode,
+        ),
+      );
+      state = AsyncData(res);
+      return res;
+    } catch (e, s) {
+      state = AsyncError(e, s);
+      rethrow;
+    }
+  }
+
+  void reset() => state = const AsyncData(null);
+}
+
+typedef LoginWithFacebookOauthParams = ({
+  String accessToken,
+  String userId,
+  String? inviteCode,
+});
+
+@Riverpod(keepAlive: true)
+class AuthLoginFacebookCtrl extends _$AuthLoginFacebookCtrl {
+  @override
+  AsyncValue<AuthLoginOauth?> build() => const AsyncData(null);
+
+  Future<AuthLoginOauth> run(LoginWithFacebookOauthParams params) async {
+    state = const AsyncLoading();
+
+    try {
+      final res = await Api.loginWithFacebookOauthApi(
+        FacebookOauthLoginParams(
+          accessToken: params.accessToken,
+          userId: params.userId,
+          inviteCode: params.inviteCode,
+        ),
+      );
+      state = AsyncData(res);
+      return res;
+    } catch (e, s) {
+      state = AsyncError(e, s);
+      rethrow;
+    }
+  }
+
+  void reset() => state = const AsyncData(null);
+}
+
+typedef LoginWithAppleOauthParams = ({
+  String idToken,
+  String? code,
+  String? inviteCode,
+});
+
+@Riverpod(keepAlive: true)
+class AuthLoginAppleCtrl extends _$AuthLoginAppleCtrl {
+  @override
+  AsyncValue<AuthLoginOauth?> build() => const AsyncData(null);
+
+  Future<AuthLoginOauth> run(LoginWithAppleOauthParams params) async {
+    state = const AsyncLoading();
+
+    try {
+      final res = await Api.loginWithAppleOauthApi(
+        AppleOauthLoginParams(
+          idToken: params.idToken,
+          code: params.code,
+          inviteCode: params.inviteCode,
+        ),
+      );
+      state = AsyncData(res);
+      return res;
+    } catch (e, s) {
+      state = AsyncError(e, s);
+      rethrow;
+    }
+  }
+
+  void reset() => state = const AsyncData(null);
+}
+
 /// 5) Profile Provider（函数式写法：注意是小写 @riverpod）
 @riverpod
 Future<Profile> profile(ProfileRef ref) async {

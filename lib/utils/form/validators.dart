@@ -33,6 +33,18 @@ class CountryCode extends Validator<dynamic> {
   }
 }
 
+class EmailAddress extends Validator<dynamic> {
+  const EmailAddress();
+  static final _re = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+
+  @override
+  Map<String, dynamic>? validate(AbstractControl<dynamic> control) {
+    final v = (control.value ?? '').toString().trim();
+    if (v.isEmpty) return {'required': true};
+    return _re.hasMatch(v) ? null : {'email': true};
+  }
+}
+
 class OtpLen extends Validator<dynamic> {
   final int length;
   const OtpLen([this.length = 6]);

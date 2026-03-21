@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#FF5722">
+    <title>JoyMini — Offline</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #F8F9FA;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 32px 24px;
+            text-align: center;
+        }
+        .icon {
+            width: 80px;
+            height: 80px;
+            background-image: url("app_icon.png");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            margin-bottom: 24px;
+            opacity: 0.5;
+        }
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1A1A1A;
+            margin-bottom: 12px;
+        }
+        p {
+            font-size: 15px;
+            color: #666;
+            line-height: 1.6;
+            max-width: 300px;
+            margin-bottom: 32px;
+        }
+        button {
+            background: #FF5722;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: 0.3px;
+        }
+        button:active { opacity: 0.85; }
+    </style>
+</head>
+<body>
+    <div class="icon"></div>
+    <h1>You're offline</h1>
+    <p>Check your internet connection and try again. JoyMini needs connectivity to load the latest deals.</p>
+    <button onclick="window.location.reload()">Try Again</button>
+</body>
+</html>
+

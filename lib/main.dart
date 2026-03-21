@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -7,6 +8,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'app/app.dart';
 import 'app/app_startup.dart';
 import 'app/bootstrap.dart';
+import 'utils/pwa_helper_web.dart'
+    if (dart.library.io) 'utils/pwa_helper_stub.dart';
 
 void main() {
   // 第一道防线：捕捉 Flutter UI 渲染层的报错
@@ -18,6 +21,9 @@ void main() {
   runZonedGuarded(() async {
     // 必须加上这句：确保 Flutter 底层绑定初始化完成
     WidgetsFlutterBinding.ensureInitialized();
+
+    // PWA: Register web implementation on web platform
+    if (kIsWeb) registerPwaHelperWeb();
 
     // 1. 系统初始化 (无返回值，纯副作用)
     await AppBootstrap.initSystem();
