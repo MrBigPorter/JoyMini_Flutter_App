@@ -8,6 +8,14 @@ on:
     # 逻辑 2：只有推送 v 开头的标签时，才触发正式环境打包
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - main
+      - test
+    types:
+      - opened
+      - synchronize
+      - reopened
   # 逻辑 3：保留手动点击按钮触发，以防万一
   workflow_dispatch:
 
@@ -16,7 +24,38 @@ permissions:
   deployments: write
 
 jobs:
+  preflight-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish self-hosted runner reminder
+        run: |
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## 🖥️ Self-hosted Runner Reminder
+
+          This workflow continues on your local Mac self-hosted runner.
+
+          If the next job stays in **Queued**, please start the runner first:
+
+          ```bash
+          cd /Volumes/MySSD/github-runner
+          ./run.sh
+          ```
+
+          Wait until the terminal shows **Connected to GitHub**.
+
+          Current trigger details:
+          - Event: `${{ github.event_name }}`
+          - Ref: `${{ github.ref }}`
+          - Actor: `${{ github.actor }}`
+
+          For PR/web preview runs, the workflow still needs the local self-hosted runner to pick up the build job.
+          EOF
+
+          echo "Reminder published: start the local self-hosted runner and wait for 'Connected to GitHub' if the next job is queued."
+
   build-and-deploy:
+    needs: preflight-reminder
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted
     # [优化] 加入全局环境变量，强行使用 Node.js 24 新引擎
     env:
@@ -30,6 +69,7 @@ jobs:
 
       # ================= Phase 1.5: Auto Versioning =================
       - name: 🤖 1.5. Auto Bump Build Number
+        if: github.event_name != 'pull_request'
         run: |
           VERSION_NAME=$(grep '^version: ' pubspec.yaml | sed 's/version: //g' | cut -d '+' -f 1)
           NEW_VERSION="$VERSION_NAME+${{ github.run_number }}"
@@ -40,16 +80,27 @@ jobs:
       - name: 2. Determine Deployment Environment
         id: set_env
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/v* ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "ENV_TAG=[PR PREVIEW]" >> $GITHUB_ENV
+            echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
+            echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}" >> $GITHUB_ENV
+            echo "IS_PROD=false" >> $GITHUB_ENV
+            echo "IS_PR=true" >> $GITHUB_ENV
+            echo "CF_BRANCH=pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "ENV_TAG=[PROD]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
             echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_PROD }}" >> $GITHUB_ENV
             echo "IS_PROD=true" >> $GITHUB_ENV
+            echo "IS_PR=false" >> $GITHUB_ENV
+            echo "CF_BRANCH=main" >> $GITHUB_ENV
           else
             echo "ENV_TAG=[TEST]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
             echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}" >> $GITHUB_ENV
             echo "IS_PROD=false" >> $GITHUB_ENV
+            echo "IS_PR=false" >> $GITHUB_ENV
+            echo "CF_BRANCH=test" >> $GITHUB_ENV
           fi
 
       # ================= Phase 3: Extract Metadata =================
@@ -59,7 +110,7 @@ jobs:
           # [核心修复] 保留带 + 号的完整版本号
           APP_VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //g')
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          echo "SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       # ================= Phase 4: Environment Setup =================
       - name: 🐦 4a. Expose Local FVM to Runner
@@ -85,17 +136,19 @@ jobs:
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           projectName: ${{ env.CF_PROJECT || 'joymini-web' }}
           directory: build/web
+          branch: ${{ env.CF_BRANCH }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       # ================= Phase 6: iOS Dynamic Config =================
       - name: 🍏 Dynamically Adjust iOS Project Files (Test Only)
-        if: env.IS_PROD == 'false'
+        if: github.event_name != 'pull_request' && env.IS_PROD == 'false'
         run: |
           sed -i '' "s/com.porter.joyminis/com.porter.joyminis.test/g" ios/Runner.xcodeproj/project.pbxproj
           echo "✅ iOS Bundle ID changed to .test"
 
       # ================= Phase 7: Android Build with Shorebird =================
       - name: 🔐 Restore Android Keystore
+        if: github.event_name != 'pull_request'
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
@@ -104,10 +157,12 @@ jobs:
           storeFile=upload-keystore.jks" > android/key.properties
 
       - name: 🐦 7a. Setup Shorebird
+        if: github.event_name != 'pull_request'
         uses: shorebirdtech/setup-shorebird@v1
 
       # 【本次核心修改 1】：强制产出 APK
       - name: 🚀 7b. Build Android via Shorebird (Force APK)
+        if: github.event_name != 'pull_request'
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
@@ -115,12 +170,14 @@ jobs:
 
       # ================= Phase 8: iOS Build =================
       - name: 🚀 Build iOS (IPA)
+        if: github.event_name != 'pull_request'
         run: |
           fvm flutter build ipa --release --no-codesign --dart-define-from-file=${{ env.ENV_FILE }}
 
       # ================= Phase 9: Firebase Distribution =================
       # 【本次核心修改 2】：只认 APK，失败即报错！
       - name: 🦅 9. Distribute to Firebase App Distribution
+        if: github.event_name != 'pull_request'
         run: |
           if ! command -v firebase &> /dev/null; then
               curl -sL https://firebase.tools | upgrade=true bash
@@ -153,7 +210,7 @@ jobs:
 
       # ================= Phase 11: Telegram Notification =================
       - name: 📱 Send Detailed Telegram Report
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         run: |
           MESSAGE="🐺 *JoyMini CI/CD Pipeline*
           📌 *Status*: ${{ job.status }}
