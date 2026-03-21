@@ -18,6 +18,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   bool _isSuccessRedirecting = false;
 
   bool _googleWebReady = false;
+  bool _googleWebUserInitiated = false;
   StreamSubscription<GoogleSignInAuthenticationEvent>? _googleWebAuthSub;
 
   @override
@@ -51,6 +52,13 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> _processGoogleWebCredential(GoogleSignInAccount account) async {
+    // Ignore passive FedCM/OneTap events unless the user actually tapped the Google area.
+    if (!_googleWebUserInitiated) {
+      debugPrint('[LoginPage] Ignore Google web credential without user tap');
+      return;
+    }
+    _googleWebUserInitiated = false;
+
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     final idToken = account.authentication.idToken;
     if (idToken == null || idToken.isEmpty) {
@@ -147,6 +155,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     }
   }
 
+  void _markGoogleWebUserInitiated() {
+    _googleWebUserInitiated = true;
+  }
+
   Future<void> _loginWithFacebookOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     setState(() => _socialOauthInFlight = true);
@@ -205,8 +217,17 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     email.markAsTouched();
     if (email.invalid) return;
 
-    await ref.read(sendEmailCodeCtrlProvider.notifier).run(email.value.toString());
-    cd.start(60);
+    final emailValue = email.value.toString();
+    try {
+      await ref.read(sendEmailCodeCtrlProvider.notifier).run(emailValue);
+      RadixToast.success(
+        'login.email_code_sent'.tr(namedArgs: {'email': emailValue}),
+      );
+      cd.start(60);
+    } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      RadixToast.error(message);
+    }
   }
 
   @override

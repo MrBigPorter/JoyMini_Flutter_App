@@ -218,6 +218,7 @@
   "login.email.hint": "Enter your email address",
   "login.email_code.label": "Email Code",
   "login.email_code.hint": "Enter code from email",
+  "login.email_code_sent": "Verification code has been sent to {email}",
   "login.send_code": "send code",
   "login.resend_in": "Resend in {seconds}s",
   "login.or_continue_with": "or continue with",

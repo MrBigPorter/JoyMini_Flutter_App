@@ -169,24 +169,28 @@ extension LoginPageUI on _LoginPageState {
                                         SizedBox(
                                           width: double.infinity,
                                           height: 48.h,
-                                          child: Stack(
-                                            fit: StackFit.expand,
-                                            children: [
-                                              Opacity(
-                                                opacity: 0.01,
-                                                child: buildGoogleSignInWebButton(),
-                                              ),
-                                              IgnorePointer(
-                                                child: Button(
-                                                  width: double.infinity,
-                                                  height: 48.h,
-                                                  variant: ButtonVariant.secondary,
-                                                  loading: isSocialBtnLoading, // 注入 Loading
-                                                  leading: Icon(Icons.g_mobiledata_rounded, size: 35.sp),
-                                                  child: Text('login.oauth.google'.tr()),
+                                          child: Listener(
+                                            behavior: HitTestBehavior.translucent,
+                                            onPointerDown: (_) => _markGoogleWebUserInitiated(),
+                                            child: Stack(
+                                              fit: StackFit.expand,
+                                              children: [
+                                                Opacity(
+                                                  opacity: 0.01,
+                                                  child: buildGoogleSignInWebButton(),
                                                 ),
-                                              ),
-                                            ],
+                                                IgnorePointer(
+                                                  child: Button(
+                                                    width: double.infinity,
+                                                    height: 48.h,
+                                                    variant: ButtonVariant.secondary,
+                                                    loading: isSocialBtnLoading,
+                                                    leading: Icon(Icons.g_mobiledata_rounded, size: 35.sp),
+                                                    child: Text('login.oauth.google'.tr()),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ] else ...[
@@ -195,7 +199,7 @@ extension LoginPageUI on _LoginPageState {
                                           height: 48.h,
                                           variant: ButtonVariant.secondary,
                                           disabled: true,
-                                          loading: true,
+                                          loading: false,
                                           onPressed: null,
                                           leading: Icon(Icons.g_mobiledata_rounded, size: 35.sp),
                                           child: Text('login.oauth.google'.tr()),

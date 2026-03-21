@@ -139,6 +139,42 @@
         }
         return false;
     };
+
+    // Allow Flutter to apply a waiting SW update before reloading.
+    // Some SWs require an explicit skipWaiting message; plain reload is not enough.
+    window.applyPwaUpdate = function() {
+        if (!('serviceWorker' in navigator)) {
+            window.location.reload();
+            return true;
+        }
+
+        navigator.serviceWorker.getRegistration().then((reg) => {
+            if (reg && reg.waiting) {
+                const waiting = reg.waiting;
+                const done = () => {
+                    window.__pwaUpdateReady = false;
+                    window.location.reload();
+                };
+
+                navigator.serviceWorker.addEventListener('controllerchange', done, { once: true });
+
+                // Compatible with common SW conventions.
+                try { waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (_) {}
+                try { waiting.postMessage('skipWaiting'); } catch (_) {}
+
+                // Fallback to avoid being stuck if controllerchange is not fired.
+                setTimeout(done, 1500);
+            } else {
+                window.__pwaUpdateReady = false;
+                window.location.reload();
+            }
+        }).catch(() => {
+            window.__pwaUpdateReady = false;
+            window.location.reload();
+        });
+
+        return true;
+    };
 </script>
 
 <!-- ===== PWA: Custom Service Worker Registration ===== -->
@@ -148,15 +184,26 @@
             navigator.serviceWorker.register('/pwa_sw.js', { scope: '/' })
                 .then((reg) => {
                     console.log('[PWA] SW registered, scope:', reg.scope);
-                    // Notify app when SW update is available
+                    const syncUpdateReady = () => {
+                        const hasWaitingWorker = !!reg.waiting;
+                        window.__pwaUpdateReady = hasWaitingWorker;
+                        if (hasWaitingWorker) {
+                            console.log('[PWA] New version available (waiting worker)');
+                        }
+                    };
+
+                    // Keep flag in sync with real SW lifecycle.
+                    syncUpdateReady();
                     reg.addEventListener('updatefound', () => {
                         const newWorker = reg.installing;
+                        if (!newWorker) return;
                         newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                window.__pwaUpdateReady = true;
-                                console.log('[PWA] New version available');
-                            }
+                            syncUpdateReady();
                         });
+                    });
+
+                    navigator.serviceWorker.addEventListener('controllerchange', () => {
+                        window.__pwaUpdateReady = false;
                     });
                 })
                 .catch((err) => console.warn('[PWA] SW registration failed:', err));
