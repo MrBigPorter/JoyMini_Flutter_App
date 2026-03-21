@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/components/list.dart';
@@ -15,14 +17,38 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'package:nested_scroll_view_plus/nested_scroll_view_plus.dart';
 
-final productListRefreshEventProvider = StateProvider.family<int, int>((ref, categoryId) => 0);
+final productListRefreshEventProvider = StateProvider.family<int, int>(
+  (ref, categoryId) => 0,
+);
 
 /// 商品页状态 Product Page State
-class ProductPage extends ConsumerWidget {
+class ProductPage extends ConsumerStatefulWidget {
   const ProductPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProductPage> createState() => _ProductPageState();
+}
+
+class _ProductPageState extends ConsumerState<ProductPage> {
+  Future<void> _refreshCurrentCategory() async {
+    final currentCategory = ref.read(activeCategoryProvider);
+    ref.read(forceRefreshListProvider(currentCategory.id).notifier).state =
+        true;
+    ref
+        .read(productListRefreshEventProvider(currentCategory.id).notifier)
+        .state++;
+    await ref.read(categoryProvider.notifier).forceRefresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(productNeedsRefreshProvider, (previous, next) {
+      if (next == true) {
+        unawaited(_refreshCurrentCategory());
+        ref.read(productNeedsRefreshProvider.notifier).state = false;
+      }
+    });
+
     // 监听分类数据，使用 SWR 机制，缓存瞬间直出
     final categoriesAsync = ref.watch(categoryProvider);
 
@@ -80,7 +106,10 @@ class _ProductContentState extends ConsumerState<_ProductContent>
 
     // 核心优化：深度比较 ID
     // 防止 SWR 后台拉取新数据时，因为内存地址变更导致 TabController 强行重置
-    bool isSameCategories = _checkIfCategoriesSame(oldWidget.categories, widget.categories);
+    bool isSameCategories = _checkIfCategoriesSame(
+      oldWidget.categories,
+      widget.categories,
+    );
 
     if (!isSameCategories) {
       _tabController.dispose();
@@ -90,7 +119,10 @@ class _ProductContentState extends ConsumerState<_ProductContent>
   }
 
   // 手动比对 ID 和长度，确保滑动位置绝对稳定
-  bool _checkIfCategoriesSame(List<ProductCategoryItem> oldList, List<ProductCategoryItem> newList) {
+  bool _checkIfCategoriesSame(
+    List<ProductCategoryItem> oldList,
+    List<ProductCategoryItem> newList,
+  ) {
     if (oldList.length != newList.length) return false;
     for (int i = 0; i < oldList.length; i++) {
       if (oldList[i].id != newList[i].id) return false;
@@ -126,9 +158,10 @@ class _ProductContentState extends ConsumerState<_ProductContent>
         //  1. 挂上“强制刷新”的免死金牌！告诉底层 Provider：“这次不要给我看缓存，去拿真数据！”
         ref.read(forceRefreshListProvider(currentCatId).notifier).state = true;
 
-
         // 2. 开枪发送信号：让内层 _ListState 里的 Controller 执行刷新
-        ref.read(productListRefreshEventProvider(currentCatId).notifier).state++;
+        ref
+            .read(productListRefreshEventProvider(currentCatId).notifier)
+            .state++;
 
         // 2.  使用 forceRefresh 强制且静默更新顶部分类栏，不闪白屏
         ref.read(categoryProvider.notifier).forceRefresh();
@@ -216,7 +249,10 @@ class _ListState extends ConsumerState<_List>
   Widget build(BuildContext context) {
     super.build(context);
 
-    ref.listen(productListRefreshEventProvider(widget.categoryId), (previous, next) {
+    ref.listen(productListRefreshEventProvider(widget.categoryId), (
+      previous,
+      next,
+    ) {
       if (next > (previous ?? 0)) {
         _ctl.refresh(); // 这才是真正让你的 PageListController 清空旧数据、去拉新数据的指令！
       }
@@ -269,7 +305,7 @@ class _ProductLoadingSkeleton extends StatelessWidget {
               height: 60,
               tabs: List.generate(
                 4,
-                    (index) => ProductCategoryItem(id: index, name: '分类$index'),
+                (index) => ProductCategoryItem(id: index, name: '分类$index'),
               ),
               renderItem: (t) => Skeleton.react(
                 width: 60.w,
@@ -293,7 +329,7 @@ class _ProductLoadingSkeleton extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
             sliver: SliverGrid(
               delegate: SliverChildBuilderDelegate(
-                    (context, index) =>
+                (context, index) =>
                     RepaintBoundary(child: const ProductItemSkeleton()),
                 childCount: 10,
               ),

@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app/core/providers/index.dart';
 import 'package:flutter_app/core/store/auth/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_app/common.dart';
@@ -45,9 +46,7 @@ class LuckyTabBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isAuthenticated = ref.watch(
-      authProvider.select((value) => value.isAuthenticated),
-    );
+    ref.watch(authProvider.select((value) => value.isAuthenticated));
     final String location = GoRouterState.of(context).uri.toString();
     int currentIndex = _tabs.indexWhere(
       (tab) => location.startsWith(tab.location),
@@ -64,7 +63,16 @@ class LuckyTabBar extends ConsumerWidget {
         child: BottomNavigationBar(
           backgroundColor: context.bgPrimary,
           currentIndex: currentIndex,
-          onTap: (index) => context.go(_tabs[index].location),
+          onTap: (index) {
+            final destination = _tabs[index].location;
+            if (destination == '/home') {
+              ref.read(homeNeedsRefreshProvider.notifier).state = true;
+            }
+            if (destination == '/product') {
+              ref.read(productNeedsRefreshProvider.notifier).state = true;
+            }
+            context.go(destination);
+          },
           type: BottomNavigationBarType.fixed,
           selectedItemColor: context.fgBrandPrimary,
           unselectedItemColor: context.fgQuinary400,

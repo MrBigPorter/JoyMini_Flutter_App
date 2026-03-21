@@ -17,19 +17,18 @@ class CategoryNotifier extends AsyncNotifier<List<ProductCategoryItem>> {
 
   @override
   FutureOr<List<ProductCategoryItem>> build() async {
-    //  SWR 阶段 1: 极速读取缓存
-    final cachedData = ApiCacheManager.getCache(_cacheKey);
-    if (cachedData != null) {
+    final cacheEntry = ApiCacheManager.getCacheEntry(_cacheKey);
+    if (cacheEntry.hasData) {
       try {
-        final list = (cachedData as List)
+        final list = (cacheEntry.data as List)
             .map((e) => ProductCategoryItem.fromJson(e))
             .toList();
-        _fetchAndCache(); // 后台静默拉取最新分类
-        return list; // 瞬间返回，UI 的 TabBar 立即渲染！
+        if (cacheEntry.state == CacheState.stale) {
+          unawaited(_fetchAndCache());
+        }
+        return list;
       } catch (_) {}
     }
-
-    //  SWR 阶段 2: 无缓存时，阻塞等待网络
     return await _fetchAndCache();
   }
 
@@ -67,8 +66,12 @@ final activeCategoryProvider = StateProvider<ProductCategoryItem>((ref) {
   return ProductCategoryItem(name: "all", id: 0);
 });
 
+final productNeedsRefreshProvider = StateProvider<bool>((ref) => false);
+
 //  1. 新增：记录对应分类 ID 是否处于“强刷模式”的标记
-final forceRefreshListProvider = StateProvider.family<bool, int>((ref, id) => false);
+final forceRefreshListProvider = StateProvider.family<bool, int>(
+  (ref, id) => false,
+);
 
 // ==============================================================================
 // 2. 核心列表 Provider (拦截 page == 1 实现列表首屏秒开)
@@ -87,10 +90,11 @@ final productListProvider = Provider.family<PageRequest<ProductListItem>, int>((
     //// 如果是第一页，且【不是强刷模式】，才允许走缓存秒开！
     // Banners 核心优化：拦截第一页请求，尝试瞬间返回缓存
     if (page == 1 && !isForceRefresh) {
-      final cachedData = ApiCacheManager.getCache(cacheKey);
+      final cacheEntry = ApiCacheManager.getCacheEntry(cacheKey);
 
-      if (cachedData != null) {
+      if (cacheEntry.hasData) {
         try {
+          final cachedData = cacheEntry.data as Map<String, dynamic>;
           final List<dynamic> rawList = cachedData['list'] ?? [];
           final items = rawList
               .map((e) => ProductListItem.fromJson(e))
@@ -106,17 +110,24 @@ final productListProvider = Provider.family<PageRequest<ProductListItem>, int>((
             // 当前页数量
             pageSize: pageSize, // UI 传进来的 pageSize
           );
-          //  静默后台刷新：派出一个小弟去后台拉取最新数据，保证数据新鲜
-          Future.microtask(() async {
-            try {
-              final freshData = await Api.getProductList(
-                ProductListParams(categoryId: id, page: 1, pageSize: pageSize),
-              );
-              ApiCacheManager.setCache(cacheKey, {
-                'list': freshData.list.map((e) => e.toJson()).toList(),
-              });
-            } catch (_) {}
-          });
+          if (cacheEntry.state == CacheState.stale) {
+            //  静默后台刷新：派出一个小弟去后台拉取最新数据，保证数据新鲜
+            Future.microtask(() async {
+              try {
+                final freshData = await Api.getProductList(
+                  ProductListParams(
+                    categoryId: id,
+                    page: 1,
+                    pageSize: pageSize,
+                  ),
+                );
+                ApiCacheManager.setCache(cacheKey, {
+                  'list': freshData.list.map((e) => e.toJson()).toList(),
+                  'total': freshData.total,
+                });
+              } catch (_) {}
+            });
+          }
 
           return cachedResult; //  瞬间出图！没有任何骨架屏等待！
         } catch (e) {
@@ -134,6 +145,7 @@ final productListProvider = Provider.family<PageRequest<ProductListItem>, int>((
     if (page == 1) {
       ApiCacheManager.setCache(cacheKey, {
         'list': res.list.map((e) => e.toJson()).toList(),
+        'total': res.total,
       });
 
       //  4. 如果本次是强刷，既然拿到了新数据，记得把金牌“没收”（重置为 false）
@@ -146,7 +158,6 @@ final productListProvider = Provider.family<PageRequest<ProductListItem>, int>((
     return res;
   };
 });
-
 
 /// Product detail provider (保留你原来的智能销毁策略)
 final productDetailProvider = FutureProvider.autoDispose
@@ -227,13 +238,15 @@ class HomeGroupBuyingNotifier extends AsyncNotifier<List<ProductListItem>> {
 
   @override
   FutureOr<List<ProductListItem>> build() async {
-    final cachedData = ApiCacheManager.getCache(_cacheKey);
-    if (cachedData != null) {
+    final cacheEntry = ApiCacheManager.getCacheEntry(_cacheKey);
+    if (cacheEntry.hasData) {
       try {
-        final list = (cachedData as List)
+        final list = (cacheEntry.data as List)
             .map((e) => ProductListItem.fromJson(e))
             .toList();
-        _fetchAndCache();
+        if (cacheEntry.state == CacheState.stale) {
+          unawaited(_fetchAndCache());
+        }
         return list;
       } catch (_) {}
     }
@@ -243,10 +256,7 @@ class HomeGroupBuyingNotifier extends AsyncNotifier<List<ProductListItem>> {
   Future<List<ProductListItem>> _fetchAndCache() async {
     try {
       final hotList = await Api.getTreasureHotGroups(10);
-      ApiCacheManager.setCache(
-        _cacheKey,
-          hotList
-      );
+      ApiCacheManager.setCache(_cacheKey, hotList);
       if (state.hasValue) state = AsyncData(hotList);
       return hotList;
     } catch (e) {

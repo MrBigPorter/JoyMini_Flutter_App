@@ -16,16 +16,18 @@ class HomeBannerNotifier extends AsyncNotifier<List<Banners>> {
 
   @override
   FutureOr<List<Banners>> build() async {
-    //  SWR 阶段 1: 极速读取缓存
-    final cachedData = ApiCacheManager.getCache(_cacheKey);
-    if (cachedData != null) {
+    final cacheEntry = ApiCacheManager.getCacheEntry(_cacheKey);
+    if (cacheEntry.hasData) {
       try {
-        final list = (cachedData as List).map((e) => Banners.fromJson(e)).toList();
-        _fetchAndCache(); // 后台静默刷新
-        return list;      // 瞬间返回缓存，秒开
+        final list = (cacheEntry.data as List)
+            .map((e) => Banners.fromJson(e))
+            .toList();
+        if (cacheEntry.state == CacheState.stale) {
+          unawaited(_fetchAndCache());
+        }
+        return list;
       } catch (_) {}
     }
-    //  SWR 阶段 2: 无缓存时阻塞等网络
     return await _fetchAndCache();
   }
 
@@ -33,7 +35,10 @@ class HomeBannerNotifier extends AsyncNotifier<List<Banners>> {
     try {
       final freshData = await Api.bannersApi(bannerCate: 1);
       // 写入缓存
-      ApiCacheManager.setCache(_cacheKey, freshData.map((e) => e.toJson()).toList());
+      ApiCacheManager.setCache(
+        _cacheKey,
+        freshData.map((e) => e.toJson()).toList(),
+      );
       // 静默覆盖 UI
       if (state.hasValue) state = AsyncData(freshData);
       return freshData;
@@ -45,8 +50,11 @@ class HomeBannerNotifier extends AsyncNotifier<List<Banners>> {
 
   Future<void> forceRefresh() async => await _fetchAndCache();
 }
-final homeBannerProvider = AsyncNotifierProvider<HomeBannerNotifier, List<Banners>>(() => HomeBannerNotifier());
 
+final homeBannerProvider =
+    AsyncNotifierProvider<HomeBannerNotifier, List<Banners>>(
+      () => HomeBannerNotifier(),
+    );
 
 // ==============================================================================
 // 2. Treasures SWR Provider (瀑布流商品)
@@ -56,11 +64,15 @@ class HomeTreasuresNotifier extends AsyncNotifier<List<IndexTreasureItem>> {
 
   @override
   FutureOr<List<IndexTreasureItem>> build() async {
-    final cachedData = ApiCacheManager.getCache(_cacheKey);
-    if (cachedData != null) {
+    final cacheEntry = ApiCacheManager.getCacheEntry(_cacheKey);
+    if (cacheEntry.hasData) {
       try {
-        final list = (cachedData as List).map((e) => IndexTreasureItem.fromJson(e)).toList();
-        _fetchAndCache();
+        final list = (cacheEntry.data as List)
+            .map((e) => IndexTreasureItem.fromJson(e))
+            .toList();
+        if (cacheEntry.state == CacheState.stale) {
+          unawaited(_fetchAndCache());
+        }
         return list;
       } catch (_) {}
     }
@@ -70,7 +82,10 @@ class HomeTreasuresNotifier extends AsyncNotifier<List<IndexTreasureItem>> {
   Future<List<IndexTreasureItem>> _fetchAndCache() async {
     try {
       final freshData = await Api.indexTreasuresApi();
-      ApiCacheManager.setCache(_cacheKey, freshData.map((e) => e.toJson()).toList());
+      ApiCacheManager.setCache(
+        _cacheKey,
+        freshData.map((e) => e.toJson()).toList(),
+      );
       if (state.hasValue) state = AsyncData(freshData);
       return freshData;
     } catch (e) {
@@ -81,24 +96,31 @@ class HomeTreasuresNotifier extends AsyncNotifier<List<IndexTreasureItem>> {
 
   Future<void> forceRefresh() async => await _fetchAndCache();
 }
-final homeTreasuresProvider = AsyncNotifierProvider<HomeTreasuresNotifier, List<IndexTreasureItem>>(() => HomeTreasuresNotifier());
 
-
+final homeTreasuresProvider =
+    AsyncNotifierProvider<HomeTreasuresNotifier, List<IndexTreasureItem>>(
+      () => HomeTreasuresNotifier(),
+    );
 
 // ==============================================================================
 // 4. Ad SWR Provider (广告数据)
 // ==============================================================================
 class HomeAdNotifier extends FamilyAsyncNotifier<List<AdRes>, int> {
-  static String _cacheKeyOf(int adPosition) => 'home_ad_cache_v1_pos_$adPosition';
+  static String _cacheKeyOf(int adPosition) =>
+      'home_ad_cache_v1_pos_$adPosition';
 
   @override
   FutureOr<List<AdRes>> build(int adPosition) async {
     final cacheKey = _cacheKeyOf(adPosition);
-    final cachedData = ApiCacheManager.getCache(cacheKey);
-    if (cachedData != null) {
+    final cacheEntry = ApiCacheManager.getCacheEntry(cacheKey);
+    if (cacheEntry.hasData) {
       try {
-        final list = (cachedData as List).map((e) => AdRes.fromJson(e)).toList();
-        _fetchAndCache(adPosition);
+        final list = (cacheEntry.data as List)
+            .map((e) => AdRes.fromJson(e))
+            .toList();
+        if (cacheEntry.state == CacheState.stale) {
+          unawaited(_fetchAndCache(adPosition));
+        }
         return list;
       } catch (_) {}
     }
@@ -109,7 +131,10 @@ class HomeAdNotifier extends FamilyAsyncNotifier<List<AdRes>, int> {
     final cacheKey = _cacheKeyOf(adPosition);
     try {
       final freshData = await Api.indexAdApi(adPosition: adPosition);
-      ApiCacheManager.setCache(cacheKey, freshData.map((e) => e.toJson()).toList());
+      ApiCacheManager.setCache(
+        cacheKey,
+        freshData.map((e) => e.toJson()).toList(),
+      );
       if (state.hasValue) state = AsyncData(freshData);
       return freshData;
     } catch (e) {
@@ -120,7 +145,8 @@ class HomeAdNotifier extends FamilyAsyncNotifier<List<AdRes>, int> {
 
   Future<void> forceRefresh() async => await _fetchAndCache(arg);
 }
-final homeAdProvider = AsyncNotifierProvider.family<HomeAdNotifier, List<AdRes>, int>(
-  () => HomeAdNotifier(),
-);
 
+final homeAdProvider =
+    AsyncNotifierProvider.family<HomeAdNotifier, List<AdRes>, int>(
+      () => HomeAdNotifier(),
+    );

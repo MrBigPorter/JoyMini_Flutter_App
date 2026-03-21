@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/app/routes/app_router.dart';
 import 'package:flutter_app/common.dart';
@@ -76,7 +77,7 @@ class _SettingPageState extends ConsumerState<SettingPage> {
     // Only fetch KYC status if authenticated to avoid 401 errors.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (ref.read(authProvider).isAuthenticated) {
-        ref.refresh(kycMeProvider);
+        ref.invalidate(kycMeProvider);
       }
     });
   }
@@ -304,6 +305,14 @@ class _BottomNavigationBar extends ConsumerWidget {
               'version 1.0.0',
               style: TextStyle(color: context.textPrimary900, fontSize: 12.sp),
             ),
+            if (kIsWeb && kDebugMode) ...[
+              SizedBox(height: 8.h),
+              TextButton.icon(
+                onPressed: () => appRouter.push('/debug/pwa'),
+                icon: const Icon(Icons.bug_report_outlined),
+                label: const Text('PWA Debug'),
+              ),
+            ],
           ],
         ),
       ),
