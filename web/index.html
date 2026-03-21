@@ -148,7 +148,7 @@
             return true;
         }
 
-        navigator.serviceWorker.getRegistration().then((reg) => {
+        navigator.serviceWorker.getRegistration('/').then((reg) => {
             if (reg && reg.waiting) {
                 const waiting = reg.waiting;
                 const done = () => {
@@ -175,6 +175,31 @@
 
         return true;
     };
+
+    // Let Flutter trigger a manual SW update check in debug/support flows.
+    window.forcePwaUpdateCheck = function() {
+        if (!('serviceWorker' in navigator)) {
+            window.__pwaUpdateReady = false;
+            return false;
+        }
+
+        navigator.serviceWorker.getRegistration('/').then((reg) => {
+            if (!reg) {
+                window.__pwaUpdateReady = false;
+                return;
+            }
+
+            reg.update()
+                .then(() => {
+                    window.__pwaUpdateReady = !!reg.waiting;
+                })
+                .catch(() => {
+                    // Keep previous state on transient failures.
+                });
+        });
+
+        return true;
+    };
 </script>
 
 <!-- ===== PWA: Custom Service Worker Registration ===== -->
@@ -184,6 +209,7 @@
             navigator.serviceWorker.register('/pwa_sw.js', { scope: '/' })
                 .then((reg) => {
                     console.log('[PWA] SW registered, scope:', reg.scope);
+
                     const syncUpdateReady = () => {
                         const hasWaitingWorker = !!reg.waiting;
                         window.__pwaUpdateReady = hasWaitingWorker;
@@ -198,9 +224,16 @@
                         const newWorker = reg.installing;
                         if (!newWorker) return;
                         newWorker.addEventListener('statechange', () => {
+                            // installed + existing controller means update is ready for activation.
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                window.__pwaUpdateReady = true;
+                            }
                             syncUpdateReady();
                         });
                     });
+
+                    // Force one update check so first paint can discover waiting updates quickly.
+                    reg.update().catch(() => {});
 
                     navigator.serviceWorker.addEventListener('controllerchange', () => {
                         window.__pwaUpdateReady = false;

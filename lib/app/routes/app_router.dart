@@ -1,4 +1,3 @@
-
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_app/app/page/deposit/deposit_page.dart';
@@ -40,6 +39,7 @@ import 'package:flutter_app/app/page/transaction_record_page.dart';
 import 'package:flutter_app/app/page/me_components/me_page.dart';
 import 'package:flutter_app/app/page/login_page/login_page.dart';
 import 'package:flutter_app/app/page/lucky_draw/lucky_draw_page.dart';
+import 'package:flutter_app/app/page/pwa_debug_page.dart';
 import 'package:flutter_app/app/page/product_detail_page.dart';
 import 'package:flutter_app/app/page/withdraw/withdraw_page.dart';
 import 'package:flutter_app/ui/chat/group/group_request_list/group_request_list_page.dart';
@@ -76,17 +76,20 @@ class AppRouter {
   /// 集中注册所有需要支持序列化的参数类
   static void _registerRoutes() {
     // 以后每增加一个 Args 类，就在这里加一行
-    RouteArgsRegistry.register('ContactSelectionArgs', ContactSelectionArgs.fromJson);
+    RouteArgsRegistry.register(
+      'ContactSelectionArgs',
+      ContactSelectionArgs.fromJson,
+    );
 
     // 示例：如果有其他页面参数
     // RouteArgsRegistry.register('PaymentParams', PaymentParams.fromJson);
   }
 
   static GoRouter create(Ref ref) {
-   //  就在这里调用！确保在 GoRouter 初始化之前完成注册
+    //  就在这里调用！确保在 GoRouter 初始化之前完成注册
     _registerRoutes();
 
-    final router =  GoRouter(
+    final router = GoRouter(
       debugLogDiagnostics: true,
       //让全局弹层系统使用同一个 Navigator：
       // allow the global modal system to use the same Navigator:
@@ -101,20 +104,23 @@ class AppRouter {
         routeObserver,
         ModalManager.instance,
         ModalAutoCloseObserver(),
-        BotToastNavigatorObserver()
+        BotToastNavigatorObserver(),
       ],
       initialLocation: '/home',
       routes: [
         // 不带底部导航栏的页面 (全屏页)
         // 把 ChatPage 放在这里，和 ShellRoute 平级！
         GoRoute(
-            path: '/chat/group/select/member',
-            parentNavigatorKey: NavHub.key,
-            builder: (context, state) {
-              final groupId = state.uri.queryParameters['groupId'];
-              final preSelectedId = state.uri.queryParameters['preSelectedId'];
-              return GroupMemberSelectPage(existingGroupId: groupId, preSelectedId: preSelectedId,);
-            }
+          path: '/chat/group/select/member',
+          parentNavigatorKey: NavHub.key,
+          builder: (context, state) {
+            final groupId = state.uri.queryParameters['groupId'];
+            final preSelectedId = state.uri.queryParameters['preSelectedId'];
+            return GroupMemberSelectPage(
+              existingGroupId: groupId,
+              preSelectedId: preSelectedId,
+            );
+          },
         ),
         GoRoute(
           path: '/chat/group/requests/:groupId',
@@ -159,12 +165,11 @@ class AppRouter {
           path: '/chat/search',
           name: 'chat_search',
           pageBuilder: (context, state) {
-            final conversationId = state.uri.queryParameters['conversationId'] ?? '';
+            final conversationId =
+                state.uri.queryParameters['conversationId'] ?? '';
             return fxPage(
               key: state.pageKey,
-              child: ChatSearchPage(
-                conversationId: conversationId,
-              ),
+              child: ChatSearchPage(conversationId: conversationId),
               fx: RouteFx.slideUp,
             );
           },
@@ -183,7 +188,7 @@ class AppRouter {
         ),
         GoRoute(
           path: '/contact/profile/:userId',
-          builder: (context, state){
+          builder: (context, state) {
             final userId = state.pathParameters['userId']!;
             final cachedUser = state.extra as ChatUser;
 
@@ -194,7 +199,9 @@ class AppRouter {
           path: '/contact/selector',
           pageBuilder: (context, state) {
             // 必须传递 extra 参数
-            final args = state.extra is ContactSelectionArgs ? state.extra as ContactSelectionArgs :  ContactSelectionArgs();
+            final args = state.extra is ContactSelectionArgs
+                ? state.extra as ContactSelectionArgs
+                : ContactSelectionArgs();
             return fxPage(
               key: state.pageKey,
               child: ContactSelectionPage(args: args),
@@ -206,40 +213,40 @@ class AppRouter {
           path: '/chat/room/:conversationId',
           parentNavigatorKey: NavHub.key,
           builder: (context, state) {
-            return ChatPage(conversationId: state.pathParameters['conversationId']!);
+            return ChatPage(
+              conversationId: state.pathParameters['conversationId']!,
+            );
           },
         ),
         GoRoute(
-            name:"login",
-            path: '/login',
-            builder: (context, state) =>   LoginPage()
+          name: "login",
+          path: '/login',
+          builder: (context, state) => LoginPage(),
         ),
 
         // 这样 /product/123 会先被这里匹配，而不会被误认为是 ShellRoute 里的 /product
         GoRoute(
-            name: 'productDetail',
-            path: '/product-detail/:id',
-            parentNavigatorKey: NavHub.key,
-            pageBuilder: (ctx, state) {
-              final id = state.pathParameters['id']!;
-              final  queryParams = state.uri.queryParameters;
-              return fxPage(
-                key: state.pageKey,
-                child: ProductDetailPage(productId: id,queryParams:queryParams),
-                fx: RouteFx.zoomIn,
-              );
-            }
+          name: 'productDetail',
+          path: '/product-detail/:id',
+          parentNavigatorKey: NavHub.key,
+          pageBuilder: (ctx, state) {
+            final id = state.pathParameters['id']!;
+            final queryParams = state.uri.queryParameters;
+            return fxPage(
+              key: state.pageKey,
+              child: ProductDetailPage(productId: id, queryParams: queryParams),
+              fx: RouteFx.zoomIn,
+            );
+          },
         ),
 
         ShellRoute(
           navigatorKey: _shellKey,
-          observers: [
-            ModalAutoCloseObserver()
-          ],
+          observers: [ModalAutoCloseObserver()],
           builder: (context, state, child) => LuckyTabBar(child: child),
           routes: [
             GoRoute(
-              name:'home',
+              name: 'home',
               path: '/home',
               builder: (context, state) => const HomePage(),
             ),
@@ -256,111 +263,115 @@ class AppRouter {
             GoRoute(
               name: 'me',
               path: '/me',
-              builder: (context, state) =>const MePage(),
+              builder: (context, state) => const MePage(),
             ),
           ],
         ),
         GoRoute(
-            name: 'walletDetail',
-            path: '/winners/:id',
-            pageBuilder: (ctx,state){
-              final id = state.pathParameters['id']!;
-              return fxPage(
-                  key: state.pageKey,
-                  child: WinnerDetailPage(winnerId: id),
-                  fx: RouteFx.sharedScale
-              );
-            }
+          name: 'walletDetail',
+          path: '/winners/:id',
+          pageBuilder: (ctx, state) {
+            final id = state.pathParameters['id']!;
+            return fxPage(
+              key: state.pageKey,
+              child: WinnerDetailPage(winnerId: id),
+              fx: RouteFx.sharedScale,
+            );
+          },
         ),
         GoRoute(
-            name: 'productGroup',
-            path: '/product/:id/group',
-            pageBuilder: (ctx, state) {
-              final  id = state.pathParameters['id'] ?? '';
-              return fxPage(
-                key: state.pageKey,
-                child: ProductGroupPage(treasureId: id),
-                fx: RouteFx.slideUp,
-              );
-            }
+          name: 'productGroup',
+          path: '/product/:id/group',
+          pageBuilder: (ctx, state) {
+            final id = state.pathParameters['id'] ?? '';
+            return fxPage(
+              key: state.pageKey,
+              child: ProductGroupPage(treasureId: id),
+              fx: RouteFx.slideUp,
+            );
+          },
         ),
         GoRoute(
           name: 'meVoucher',
           path: '/me/voucher',
-            pageBuilder: (ctx, state) {
-              return fxPage(
-                key: state.pageKey,
-                child: MyVouchersPage(),
-                fx: RouteFx.slideUp,
-              );
-            }
+          pageBuilder: (ctx, state) {
+            return fxPage(
+              key: state.pageKey,
+              child: MyVouchersPage(),
+              fx: RouteFx.slideUp,
+            );
+          },
         ),
         GoRoute(
-            name: 'groupRoom',
-            path: '/group-room',
-            pageBuilder: (ctx, state) {
-              final  id = state.uri.queryParameters['groupId'];
-              return fxPage(
-                key: state.pageKey,
-                child: GroupRoomPage(groupId: id ?? ''),
-                fx: RouteFx.slideUp,
-              );
-            }
+          name: 'groupRoom',
+          path: '/group-room',
+          pageBuilder: (ctx, state) {
+            final id = state.uri.queryParameters['groupId'];
+            return fxPage(
+              key: state.pageKey,
+              child: GroupRoomPage(groupId: id ?? ''),
+              fx: RouteFx.slideUp,
+            );
+          },
         ),
         GoRoute(
-            name: 'groupMember',
-            path: '/group-member',
-            pageBuilder: (ctx, state) {
-              final id = state.uri.queryParameters['groupId'] ?? '';
-              return fxPage(
-                key: state.pageKey,
-                child: GroupMemberPage(groupId:id),
-                fx: RouteFx.slideUp,
-              );
-            }
+          name: 'groupMember',
+          path: '/group-member',
+          pageBuilder: (ctx, state) {
+            final id = state.uri.queryParameters['groupId'] ?? '';
+            return fxPage(
+              key: state.pageKey,
+              child: GroupMemberPage(groupId: id),
+              fx: RouteFx.slideUp,
+            );
+          },
         ),
         GoRoute(
-          name:'payment',
-           path: '/payment',
-           pageBuilder: (ctx, state){
-
-            final  queryParams = state.uri.queryParameters;
+          name: 'payment',
+          path: '/payment',
+          pageBuilder: (ctx, state) {
+            final queryParams = state.uri.queryParameters;
             final PagePaymentParams params = (
-            entries: queryParams['entries'],
-            treasureId: queryParams['treasureId'],
-            paymentMethod: queryParams['paymentMethod'] ?? '1',
-            flashSaleProductId: queryParams['flashSaleProductId'],
+              entries: queryParams['entries'],
+              treasureId: queryParams['treasureId'],
+              paymentMethod: queryParams['paymentMethod'] ?? '1',
+              flashSaleProductId: queryParams['flashSaleProductId'],
 
-            // groupId 如果是 null，代表"开团"；如果是字符串，代表"参团"
-            groupId: queryParams['groupId'],
+              // groupId 如果是 null，代表"开团"；如果是字符串，代表"参团"
+              groupId: queryParams['groupId'],
 
-            // 只有接收到这个参数，PaymentPage 才知道这是"开团"行为
-            isGroupBuy: queryParams['isGroupBuy'],
+              // 只有接收到这个参数，PaymentPage 才知道这是"开团"行为
+              isGroupBuy: queryParams['isGroupBuy'],
             );
             return fxPage(
-                child: PaymentPage(params: params),
-                key: state.pageKey,
-                fx: RouteFx.slideUp
+              child: PaymentPage(params: params),
+              key: state.pageKey,
+              fx: RouteFx.slideUp,
             );
-           }
+          },
         ),
         GoRoute(
-          name:"orderList",
-          path:'/order/list',
-          builder: (context,state){
+          name: "orderList",
+          path: '/order/list',
+          builder: (context, state) {
             final queryParams = state.uri.queryParameters;
-            return OrderListPage(args: queryParams,);
-          }
+            return OrderListPage(args: queryParams);
+          },
         ),
         GoRoute(
-            name: 'guide',
-            path: '/guide',
-            builder: (context, state) => GuidePage()
+          name: 'guide',
+          path: '/guide',
+          builder: (context, state) => GuidePage(),
         ),
         GoRoute(
-            name: 'setting',
-            path: '/setting',
-            builder: (context, state) => SettingPage()
+          name: 'setting',
+          path: '/setting',
+          builder: (context, state) => SettingPage(),
+        ),
+        GoRoute(
+          name: 'pwaDebug',
+          path: '/debug/pwa',
+          builder: (context, state) => const PwaDebugPage(),
         ),
         GoRoute(
           name: 'luckyDraw',
@@ -394,49 +405,51 @@ class AppRouter {
           builder: (context, state) => const KycStatusPage(),
         ),
         GoRoute(
-            name: 'kycVerify',
-            path: '/me/kyc/verify',
-            builder: (context, state) => KycVerifyPage()
+          name: 'kycVerify',
+          path: '/me/kyc/verify',
+          builder: (context, state) => KycVerifyPage(),
         ),
         GoRoute(
-            name: 'deposit',
-            path: '/me/wallet/deposit',
-            builder: (context, state) => DepositPage()
+          name: 'deposit',
+          path: '/me/wallet/deposit',
+          builder: (context, state) => DepositPage(),
         ),
         GoRoute(
-            name: 'walletRechargeFailure',
-            path: '/wallet/recharge/failure/:orderNo',
-            builder: (context, state) {
-              final  orderNo = state.pathParameters['orderNo'] ?? '';
-              return DepositResultPage(orderNo: orderNo);
-            }
+          name: 'walletRechargeFailure',
+          path: '/wallet/recharge/failure/:orderNo',
+          builder: (context, state) {
+            final orderNo = state.pathParameters['orderNo'] ?? '';
+            return DepositResultPage(orderNo: orderNo);
+          },
         ),
         GoRoute(
-            name: 'walletRechargeSuccess',
-            path: '/wallet/recharge/success/:orderNo',
-            builder: (context, state) {
-              final  orderNo = state.pathParameters['orderNo'] ?? '';
-              return DepositResultPage(orderNo: orderNo);
-            }
+          name: 'walletRechargeSuccess',
+          path: '/wallet/recharge/success/:orderNo',
+          builder: (context, state) {
+            final orderNo = state.pathParameters['orderNo'] ?? '';
+            return DepositResultPage(orderNo: orderNo);
+          },
         ),
         GoRoute(
-            name: 'transactionRecord',
-            path: '/me/wallet/transaction/record',
-            builder: (context, state){
-              final tab = state.uri.queryParameters['tab'];
-              final type = tab == 'withdraw' ? UiTransactionType.withdraw : UiTransactionType.deposit;
-              return TransactionHistoryPage(initialType: type);
-            }
+          name: 'transactionRecord',
+          path: '/me/wallet/transaction/record',
+          builder: (context, state) {
+            final tab = state.uri.queryParameters['tab'];
+            final type = tab == 'withdraw'
+                ? UiTransactionType.withdraw
+                : UiTransactionType.deposit;
+            return TransactionHistoryPage(initialType: type);
+          },
         ),
         GoRoute(
-            name: 'withdraw',
-            path: '/me/wallet/withdraw',
-            builder: (context, state) => WithdrawPage()
+          name: 'withdraw',
+          path: '/me/wallet/withdraw',
+          builder: (context, state) => WithdrawPage(),
         ),
         GoRoute(
-            name: 'debug-liveness',
-            path: '/me/kyc/debug-liveness',
-            builder: (context, state) => LivenessDebugPage()
+          name: 'debug-liveness',
+          path: '/me/kyc/debug-liveness',
+          builder: (context, state) => LivenessDebugPage(),
         ),
         GoRoute(
           name: 'product-groups-detail',
@@ -445,7 +458,7 @@ class AppRouter {
             String? id = state.uri.queryParameters['treasureId'];
             return fxPage(
               key: state.pageKey,
-              child: GroupLobbyPage(treasureId: id,),
+              child: GroupLobbyPage(treasureId: id),
               fx: RouteFx.slideUp,
             );
           },
@@ -455,17 +468,23 @@ class AppRouter {
         final uri = state.uri;
         // 拦截原生协议
         if (uri.scheme == 'joymini' && uri.host == 'product') {
-          final pid = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+          final pid = uri.pathSegments.isNotEmpty
+              ? uri.pathSegments.first
+              : null;
           if (pid != null) {
-            final gid = uri.queryParameters['groupId'] ?? uri.queryParameters['gid'];
+            final gid =
+                uri.queryParameters['groupId'] ?? uri.queryParameters['gid'];
             // 这里重定向后，GoRouter 会直接去目的地，DeepLinkService 就会被上面的时间锁拦住
-            return gid != null ? '/product-detail/$pid?groupId=$gid' : '/product-detail/$pid';
+            return gid != null
+                ? '/product-detail/$pid?groupId=$gid'
+                : '/product-detail/$pid';
           }
         }
 
         final String path = state.matchedLocation;
-        final isAuthenticated = ref.read(authProvider.select((auth) => auth.isAuthenticated));
-
+        final isAuthenticated = ref.read(
+          authProvider.select((auth) => auth.isAuthenticated),
+        );
 
         // Check if the target route requires authentication.
         final bool needLogin = RouteAuthConfig.needLoginForPath(path);
@@ -494,7 +513,6 @@ class AppRouter {
           fx: RouteFx.fadeThrough,
         );
       },
-
     );
 
     // assign to the global instance, so that other parts of the app can access it
@@ -503,4 +521,3 @@ class AppRouter {
     return router;
   }
 }
-

@@ -26,8 +26,9 @@ class PwaHelperWeb extends PwaHelperPlatform {
   @override
   Future<bool> promptInstall() async {
     try {
-      final result = (web.window as JSObject)
-          .callMethod<JSBoolean>('triggerPwaInstall'.toJS);
+      final result = (web.window as JSObject).callMethod<JSBoolean>(
+        'triggerPwaInstall'.toJS,
+      );
       return result.toDart;
     } catch (_) {
       return false;
@@ -52,13 +53,23 @@ class PwaHelperWeb extends PwaHelperPlatform {
           .hasProperty('applyPwaUpdate'.toJS)
           .toDart;
       if (hasHook) {
-        (web.window as JSObject)
-            .callMethod<JSAny?>('applyPwaUpdate'.toJS);
+        (web.window as JSObject).callMethod<JSAny?>('applyPwaUpdate'.toJS);
         return;
       }
-      (web.window as JSObject)
-          .setProperty('__pwaUpdateReady'.toJS, false.toJS);
+      (web.window as JSObject).setProperty('__pwaUpdateReady'.toJS, false.toJS);
       web.window.location.reload();
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> checkForUpdate() async {
+    try {
+      final hasHook = (web.window as JSObject)
+          .hasProperty('forcePwaUpdateCheck'.toJS)
+          .toDart;
+      if (hasHook) {
+        (web.window as JSObject).callMethod<JSAny?>('forcePwaUpdateCheck'.toJS);
+      }
     } catch (_) {}
   }
 
@@ -71,7 +82,3 @@ class PwaHelperWeb extends PwaHelperPlatform {
     }
   }
 }
-
-
-
-
