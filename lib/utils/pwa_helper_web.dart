@@ -48,6 +48,16 @@ class PwaHelperWeb extends PwaHelperPlatform {
   @override
   void applyUpdate() {
     try {
+      final hasHook = (web.window as JSObject)
+          .hasProperty('applyPwaUpdate'.toJS)
+          .toDart;
+      if (hasHook) {
+        (web.window as JSObject)
+            .callMethod<JSAny?>('applyPwaUpdate'.toJS);
+        return;
+      }
+      (web.window as JSObject)
+          .setProperty('__pwaUpdateReady'.toJS, false.toJS);
       web.window.location.reload();
     } catch (_) {}
   }
