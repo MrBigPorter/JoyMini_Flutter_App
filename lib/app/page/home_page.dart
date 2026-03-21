@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_app/app/page/home_components/flash_sale_section.dart';
 import 'package:flutter_app/app/page/home_components/home_treasures.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/components/lucky_custom_material_indicator.dart';
+import 'package:flutter_app/components/pwa_banners.dart';
 import 'package:flutter_app/components/swiper_banner.dart';
 import 'package:flutter_app/utils/helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -88,6 +90,9 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
           physics: platformScrollPhysics(),
           cacheExtent: 1500,
           slivers: [
+            // 0. PWA Install Banner (Web only, auto-hides when not applicable)
+            const SliverToBoxAdapter(child: PwaInstallBanner()),
+
             // 1. Banner Section
             banners.when(
               skipLoadingOnRefresh: true,
@@ -102,7 +107,10 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               loading: () => const HomeBannerSkeleton(),
             ),
 
-            // 2. Hot Group Buy Section
+            // 2. Flash Sale Section (auto-hidden when no active sessions)
+            const SliverToBoxAdapter(child: FlashSaleSection()),
+
+            // 3. Hot Group Buy Section
             hotGroups.when(
               skipLoadingOnRefresh: true,
               skipLoadingOnReload: true, //  修复 3
@@ -119,7 +127,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
             ),
 
-            // 3. Treasures Waterfall
+            // 4. Treasures Waterfall
             treasures.when(
               skipLoadingOnRefresh: true,
               skipLoadingOnReload: true, //  修复 3

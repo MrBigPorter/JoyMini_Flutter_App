@@ -16,20 +16,18 @@ AdRes _$AdResFromJson(Map<String, dynamic> json) => $checkedCreate(
           img: $checkedConvert('img', (v) => v as String?),
           videoUrl: $checkedConvert('videoUrl', (v) => v as String?),
           gridId: $checkedConvert('gridId', (v) => (v as num?)?.toInt()),
-          id: $checkedConvert('id', (v) => v as String),
+          id: $checkedConvert('id', (v) => AdRes._stringFromAny(v)),
           jumpCate: $checkedConvert('jumpCate', (v) => (v as num?)?.toInt()),
-          jumpUrl: $checkedConvert('jumpUrl', (v) => v as String?),
+          jumpUrl: $checkedConvert(
+              'jumpUrl', (v) => AdRes._nullableStringFromAny(v)),
           position: $checkedConvert('position', (v) => (v as num?)?.toInt()),
-          relatedTitleId:
-              $checkedConvert('relatedTitleId', (v) => v as String?),
+          relatedTitleId: $checkedConvert(
+              'relatedTitleId', (v) => AdRes._nullableStringFromAny(v)),
           sortOrder: $checkedConvert('sortOrder', (v) => (v as num).toInt()),
           sortType: $checkedConvert('sortType', (v) => (v as num).toInt()),
           status: $checkedConvert('status', (v) => (v as num).toInt()),
-          bannerArray: $checkedConvert(
-              'bannerArray',
-              (v) => (v as List<dynamic>?)
-                  ?.map((e) => BannerItem.fromJson(e as Map<String, dynamic>))
-                  .toList()),
+          bannerArray: $checkedConvert('bannerArray',
+              (v) => v == null ? const [] : AdRes._bannerArrayFromAny(v)),
           fileType: $checkedConvert('fileType', (v) => (v as num).toInt()),
         );
         return val;
@@ -59,19 +57,19 @@ BannerItem _$BannerItemFromJson(Map<String, dynamic> json) => $checkedCreate(
       ($checkedConvert) {
         final val = BannerItem(
           gridId: $checkedConvert('gridId', (v) => (v as num?)?.toInt()),
-          img: $checkedConvert('img', (v) => v as String),
+          img: $checkedConvert('img', (v) => AdRes._stringFromAny(v)),
           imgStyleType:
               $checkedConvert('imgStyleType', (v) => (v as num).toInt()),
           videoUrl: $checkedConvert('videoUrl', (v) => v as String?),
           jumpCate: $checkedConvert('jumpCate', (v) => (v as num).toInt()),
-          jumpUrl: $checkedConvert('jumpUrl', (v) => v as String),
-          relatedTitleId:
-              $checkedConvert('relatedTitleId', (v) => v as String?),
+          jumpUrl: $checkedConvert('jumpUrl', (v) => AdRes._stringFromAny(v)),
+          relatedTitleId: $checkedConvert(
+              'relatedTitleId', (v) => AdRes._nullableStringFromAny(v)),
           sortOrder: $checkedConvert('sortOrder', (v) => (v as num?)?.toInt()),
           sortType: $checkedConvert('sortType', (v) => (v as num?)?.toInt()),
           position: $checkedConvert('position', (v) => (v as num?)?.toInt()),
           status: $checkedConvert('status', (v) => (v as num?)?.toInt()),
-          title: $checkedConvert('title', (v) => v as String),
+          title: $checkedConvert('title', (v) => AdRes._stringFromAny(v)),
           validState:
               $checkedConvert('validState', (v) => (v as num?)?.toInt()),
         );

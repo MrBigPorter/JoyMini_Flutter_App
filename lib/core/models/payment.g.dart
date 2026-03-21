@@ -20,6 +20,8 @@ OrdersCheckoutParams _$OrdersCheckoutParamsFromJson(
           paymentMethod:
               $checkedConvert('paymentMethod', (v) => (v as num).toInt()),
           addressId: $checkedConvert('addressId', (v) => v as String?),
+          flashSaleProductId:
+              $checkedConvert('flashSaleProductId', (v) => v as String?),
           isGroup: $checkedConvert('isGroup', (v) => v as bool?),
         );
         return val;
@@ -35,6 +37,7 @@ Map<String, dynamic> _$OrdersCheckoutParamsToJson(
       'couponId': instance.couponId,
       'paymentMethod': instance.paymentMethod,
       'addressId': instance.addressId,
+      'flashSaleProductId': instance.flashSaleProductId,
       'isGroup': instance.isGroup,
     };
 
@@ -53,6 +56,9 @@ OrderCheckoutResponse _$OrderCheckoutResponseFromJson(
           activityCoin:
               $checkedConvert('activityCoin', (v) => (v as num).toInt()),
           treasureId: $checkedConvert('treasureId', (v) => v as String?),
+          alreadyInGroup: $checkedConvert('alreadyInGroup', (v) => v as bool?),
+          isGroupOwner:
+              $checkedConvert('isGroupOwner', (v) => (v as num?)?.toInt()),
         );
         return val;
       },
@@ -67,4 +73,6 @@ Map<String, dynamic> _$OrderCheckoutResponseToJson(
       'lotteryTickets': instance.lotteryTickets,
       'activityCoin': instance.activityCoin,
       'treasureId': instance.treasureId,
+      'alreadyInGroup': instance.alreadyInGroup,
+      'isGroupOwner': instance.isGroupOwner,
     };

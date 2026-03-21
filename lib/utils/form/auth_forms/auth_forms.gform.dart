@@ -1346,3 +1346,568 @@ class ReactiveLoginPasswordModelFormFormGroupArrayBuilder<
     );
   }
 }
+
+class ReactiveLoginEmailModelFormConsumer extends StatelessWidget {
+  const ReactiveLoginEmailModelFormConsumer({
+    Key? key,
+    required this.builder,
+    this.child,
+  }) : super(key: key);
+
+  final Widget? child;
+
+  final Widget Function(
+          BuildContext context, LoginEmailModelForm formModel, Widget? child)
+      builder;
+
+  @override
+  Widget build(BuildContext context) {
+    final formModel = ReactiveLoginEmailModelForm.of(context);
+
+    if (formModel is! LoginEmailModelForm) {
+      throw FormControlParentNotFoundException(this);
+    }
+    return builder(context, formModel, child);
+  }
+}
+
+class LoginEmailModelFormInheritedStreamer extends InheritedStreamer<dynamic> {
+  const LoginEmailModelFormInheritedStreamer({
+    Key? key,
+    required this.form,
+    required Stream<dynamic> stream,
+    required Widget child,
+  }) : super(
+          stream,
+          child,
+          key: key,
+        );
+
+  final LoginEmailModelForm form;
+}
+
+class ReactiveLoginEmailModelForm extends StatelessWidget {
+  const ReactiveLoginEmailModelForm({
+    Key? key,
+    required this.form,
+    required this.child,
+    this.canPop,
+    this.onPopInvoked,
+  }) : super(key: key);
+
+  final Widget child;
+
+  final LoginEmailModelForm form;
+
+  final bool Function(FormGroup formGroup)? canPop;
+
+  final void Function(FormGroup formGroup, bool didPop)? onPopInvoked;
+
+  static LoginEmailModelForm? of(
+    BuildContext context, {
+    bool listen = true,
+  }) {
+    if (listen) {
+      return context
+          .dependOnInheritedWidgetOfExactType<
+              LoginEmailModelFormInheritedStreamer>()
+          ?.form;
+    }
+
+    final element = context.getElementForInheritedWidgetOfExactType<
+        LoginEmailModelFormInheritedStreamer>();
+    return element == null
+        ? null
+        : (element.widget as LoginEmailModelFormInheritedStreamer).form;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LoginEmailModelFormInheritedStreamer(
+      form: form,
+      stream: form.form.statusChanged,
+      child: ReactiveFormPopScope(
+        canPop: canPop,
+        onPopInvoked: onPopInvoked,
+        child: child,
+      ),
+    );
+  }
+}
+
+extension ReactiveReactiveLoginEmailModelFormExt on BuildContext {
+  LoginEmailModelForm? loginEmailModelFormWatch() =>
+      ReactiveLoginEmailModelForm.of(this);
+
+  LoginEmailModelForm? loginEmailModelFormRead() =>
+      ReactiveLoginEmailModelForm.of(this, listen: false);
+}
+
+class LoginEmailModelFormBuilder extends StatefulWidget {
+  const LoginEmailModelFormBuilder({
+    Key? key,
+    this.model,
+    this.child,
+    this.canPop,
+    this.onPopInvoked,
+    required this.builder,
+    this.initState,
+  }) : super(key: key);
+
+  final LoginEmailModel? model;
+
+  final Widget? child;
+
+  final bool Function(FormGroup formGroup)? canPop;
+
+  final void Function(FormGroup formGroup, bool didPop)? onPopInvoked;
+
+  final Widget Function(
+          BuildContext context, LoginEmailModelForm formModel, Widget? child)
+      builder;
+
+  final void Function(BuildContext context, LoginEmailModelForm formModel)?
+      initState;
+
+  @override
+  _LoginEmailModelFormBuilderState createState() =>
+      _LoginEmailModelFormBuilderState();
+}
+
+class _LoginEmailModelFormBuilderState
+    extends State<LoginEmailModelFormBuilder> {
+  late LoginEmailModelForm _formModel;
+
+  @override
+  void initState() {
+    _formModel = LoginEmailModelForm(
+        LoginEmailModelForm.formElements(widget.model), null);
+
+    if (_formModel.form.disabled) {
+      _formModel.form.markAsDisabled();
+    }
+
+    widget.initState?.call(context, _formModel);
+
+    super.initState();
+  }
+
+  @override
+  void didUpdateWidget(covariant LoginEmailModelFormBuilder oldWidget) {
+    if (widget.model != oldWidget.model) {
+      _formModel.updateValue(widget.model);
+    }
+
+    super.didUpdateWidget(oldWidget);
+  }
+
+  @override
+  void dispose() {
+    _formModel.form.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ReactiveLoginEmailModelForm(
+      key: ObjectKey(_formModel),
+      form: _formModel,
+      canPop: widget.canPop,
+      onPopInvoked: widget.onPopInvoked,
+      child: ReactiveFormBuilder(
+        form: () => _formModel.form,
+        canPop: widget.canPop,
+        onPopInvoked: widget.onPopInvoked,
+        builder: (context, formGroup, child) =>
+            widget.builder(context, _formModel, widget.child),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class LoginEmailModelForm implements FormModel<LoginEmailModel> {
+  LoginEmailModelForm(
+    this.form,
+    this.path,
+  );
+
+  static const String emailControlName = "email";
+
+  static const String codeControlName = "code";
+
+  final FormGroup form;
+
+  final String? path;
+
+  final Map<String, bool> _disabled = {};
+
+  String emailControlPath() => pathBuilder(emailControlName);
+
+  String codeControlPath() => pathBuilder(codeControlName);
+
+  String get _emailValue => emailControl.value ?? "";
+
+  String get _codeValue => codeControl.value ?? "";
+
+  bool get containsEmail {
+    try {
+      form.control(emailControlPath());
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool get containsCode {
+    try {
+      form.control(codeControlPath());
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Object? get emailErrors => emailControl.errors;
+
+  Object? get codeErrors => codeControl.errors;
+
+  void get emailFocus => form.focus(emailControlPath());
+
+  void get codeFocus => form.focus(codeControlPath());
+
+  void emailValueUpdate(
+    String value, {
+    bool updateParent = true,
+    bool emitEvent = true,
+  }) {
+    emailControl.updateValue(value,
+        updateParent: updateParent, emitEvent: emitEvent);
+  }
+
+  void codeValueUpdate(
+    String value, {
+    bool updateParent = true,
+    bool emitEvent = true,
+  }) {
+    codeControl.updateValue(value,
+        updateParent: updateParent, emitEvent: emitEvent);
+  }
+
+  void emailValuePatch(
+    String value, {
+    bool updateParent = true,
+    bool emitEvent = true,
+  }) {
+    emailControl.patchValue(value,
+        updateParent: updateParent, emitEvent: emitEvent);
+  }
+
+  void codeValuePatch(
+    String value, {
+    bool updateParent = true,
+    bool emitEvent = true,
+  }) {
+    codeControl.patchValue(value,
+        updateParent: updateParent, emitEvent: emitEvent);
+  }
+
+  void emailValueReset(
+    String value, {
+    bool updateParent = true,
+    bool emitEvent = true,
+    bool removeFocus = false,
+    bool? disabled,
+  }) =>
+      emailControl.reset(
+          value: value, updateParent: updateParent, emitEvent: emitEvent);
+
+  void codeValueReset(
+    String value, {
+    bool updateParent = true,
+    bool emitEvent = true,
+    bool removeFocus = false,
+    bool? disabled,
+  }) =>
+      codeControl.reset(
+          value: value, updateParent: updateParent, emitEvent: emitEvent);
+
+  FormControl<String> get emailControl =>
+      form.control(emailControlPath()) as FormControl<String>;
+
+  FormControl<String> get codeControl =>
+      form.control(codeControlPath()) as FormControl<String>;
+
+  void emailSetDisabled(
+    bool disabled, {
+    bool updateParent = true,
+    bool emitEvent = true,
+  }) {
+    if (disabled) {
+      emailControl.markAsDisabled(
+        updateParent: updateParent,
+        emitEvent: emitEvent,
+      );
+    } else {
+      emailControl.markAsEnabled(
+        updateParent: updateParent,
+        emitEvent: emitEvent,
+      );
+    }
+  }
+
+  void codeSetDisabled(
+    bool disabled, {
+    bool updateParent = true,
+    bool emitEvent = true,
+  }) {
+    if (disabled) {
+      codeControl.markAsDisabled(
+        updateParent: updateParent,
+        emitEvent: emitEvent,
+      );
+    } else {
+      codeControl.markAsEnabled(
+        updateParent: updateParent,
+        emitEvent: emitEvent,
+      );
+    }
+  }
+
+  @override
+  LoginEmailModel get model {
+    final isValid = !currentForm.hasErrors && currentForm.errors.isEmpty;
+
+    if (!isValid) {
+      debugPrintStack(
+          label:
+              '[${path ?? 'LoginEmailModelForm'}]\n┗━ Avoid calling `model` on invalid form. Possible exceptions for non-nullable fields which should be guarded by `required` validator.');
+    }
+    return LoginEmailModel(email: _emailValue, code: _codeValue);
+  }
+
+  @override
+  void toggleDisabled({
+    bool updateParent = true,
+    bool emitEvent = true,
+  }) {
+    final currentFormInstance = currentForm;
+
+    if (currentFormInstance is! FormGroup) {
+      return;
+    }
+
+    if (_disabled.isEmpty) {
+      currentFormInstance.controls.forEach((key, control) {
+        _disabled[key] = control.disabled;
+      });
+
+      currentForm.markAsDisabled(
+          updateParent: updateParent, emitEvent: emitEvent);
+    } else {
+      currentFormInstance.controls.forEach((key, control) {
+        if (_disabled[key] == false) {
+          currentFormInstance.controls[key]?.markAsEnabled(
+            updateParent: updateParent,
+            emitEvent: emitEvent,
+          );
+        }
+
+        _disabled.remove(key);
+      });
+    }
+  }
+
+  @override
+  void submit({
+    required void Function(LoginEmailModel model) onValid,
+    void Function()? onNotValid,
+  }) {
+    currentForm.markAllAsTouched();
+    if (currentForm.valid) {
+      onValid(model);
+    } else {
+      onNotValid?.call();
+    }
+  }
+
+  AbstractControl<dynamic> get currentForm {
+    return path == null ? form : form.control(path!);
+  }
+
+  @override
+  void updateValue(
+    LoginEmailModel? value, {
+    bool updateParent = true,
+    bool emitEvent = true,
+  }) =>
+      form.updateValue(LoginEmailModelForm.formElements(value).rawValue,
+          updateParent: updateParent, emitEvent: emitEvent);
+
+  @override
+  void reset({
+    LoginEmailModel? value,
+    bool updateParent = true,
+    bool emitEvent = true,
+  }) =>
+      form.reset(
+          value: value != null ? formElements(value).rawValue : null,
+          updateParent: updateParent,
+          emitEvent: emitEvent);
+
+  String pathBuilder(String? pathItem) =>
+      [path, pathItem].whereType<String>().join(".");
+
+  static FormGroup formElements(LoginEmailModel? loginEmailModel) => FormGroup({
+        emailControlName: FormControl<String>(
+            value: loginEmailModel?.email,
+            validators: [EmailAddress()],
+            asyncValidators: [],
+            asyncValidatorsDebounceTime: 250,
+            disabled: false,
+            touched: false),
+        codeControlName: FormControl<String>(
+            value: loginEmailModel?.code,
+            validators: [OtpLen(6)],
+            asyncValidators: [],
+            asyncValidatorsDebounceTime: 250,
+            disabled: false,
+            touched: false)
+      },
+          validators: [],
+          asyncValidators: [],
+          asyncValidatorsDebounceTime: 250,
+          disabled: false);
+}
+
+class ReactiveLoginEmailModelFormArrayBuilder<
+    ReactiveLoginEmailModelFormArrayBuilderT> extends StatelessWidget {
+  const ReactiveLoginEmailModelFormArrayBuilder({
+    Key? key,
+    this.control,
+    this.formControl,
+    this.builder,
+    required this.itemBuilder,
+  })  : assert(control != null || formControl != null,
+            "You have to specify `control` or `formControl`!"),
+        super(key: key);
+
+  final FormArray<ReactiveLoginEmailModelFormArrayBuilderT>? formControl;
+
+  final FormArray<ReactiveLoginEmailModelFormArrayBuilderT>? Function(
+      LoginEmailModelForm formModel)? control;
+
+  final Widget Function(BuildContext context, List<Widget> itemList,
+      LoginEmailModelForm formModel)? builder;
+
+  final Widget Function(
+      BuildContext context,
+      int i,
+      ReactiveLoginEmailModelFormArrayBuilderT? item,
+      LoginEmailModelForm formModel) itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final formModel = ReactiveLoginEmailModelForm.of(context);
+
+    if (formModel == null) {
+      throw FormControlParentNotFoundException(this);
+    }
+
+    return ReactiveFormArray<ReactiveLoginEmailModelFormArrayBuilderT>(
+      formArray: formControl ?? control?.call(formModel),
+      builder: (context, formArray, child) {
+        final values = formArray.controls.map((e) => e.value).toList();
+        final itemList = values
+            .asMap()
+            .map((i, item) {
+              return MapEntry(
+                i,
+                itemBuilder(
+                  context,
+                  i,
+                  item,
+                  formModel,
+                ),
+              );
+            })
+            .values
+            .toList();
+
+        return builder?.call(
+              context,
+              itemList,
+              formModel,
+            ) ??
+            Column(children: itemList);
+      },
+    );
+  }
+}
+
+class ReactiveLoginEmailModelFormFormGroupArrayBuilder<
+    ReactiveLoginEmailModelFormFormGroupArrayBuilderT> extends StatelessWidget {
+  const ReactiveLoginEmailModelFormFormGroupArrayBuilder({
+    Key? key,
+    this.extended,
+    this.getExtended,
+    this.builder,
+    required this.itemBuilder,
+  })  : assert(extended != null || getExtended != null,
+            "You have to specify `control` or `formControl`!"),
+        super(key: key);
+
+  final ExtendedControl<List<Map<String, Object?>?>,
+      List<ReactiveLoginEmailModelFormFormGroupArrayBuilderT>>? extended;
+
+  final ExtendedControl<List<Map<String, Object?>?>,
+          List<ReactiveLoginEmailModelFormFormGroupArrayBuilderT>>
+      Function(LoginEmailModelForm formModel)? getExtended;
+
+  final Widget Function(BuildContext context, List<Widget> itemList,
+      LoginEmailModelForm formModel)? builder;
+
+  final Widget Function(
+      BuildContext context,
+      int i,
+      ReactiveLoginEmailModelFormFormGroupArrayBuilderT? item,
+      LoginEmailModelForm formModel) itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final formModel = ReactiveLoginEmailModelForm.of(context);
+
+    if (formModel == null) {
+      throw FormControlParentNotFoundException(this);
+    }
+
+    final value = (extended ?? getExtended?.call(formModel))!;
+
+    return StreamBuilder<List<Map<String, Object?>?>?>(
+      stream: value.control.valueChanges,
+      builder: (context, snapshot) {
+        final itemList = (value.value() ??
+                <ReactiveLoginEmailModelFormFormGroupArrayBuilderT>[])
+            .asMap()
+            .map((i, item) => MapEntry(
+                  i,
+                  itemBuilder(
+                    context,
+                    i,
+                    item,
+                    formModel,
+                  ),
+                ))
+            .values
+            .toList();
+
+        return builder?.call(
+              context,
+              itemList,
+              formModel,
+            ) ??
+            Column(children: itemList);
+      },
+    );
+  }
+}
