@@ -24,6 +24,16 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   @override
   void initState() {
     super.initState();
+    // keepAlive providers 可能因热重载中断或上次流程异常，残留 AsyncLoading 状态。
+    // 用 Future(() {}) 延迟到 widget 树构建完毕后再 reset，
+    // 避免 Riverpod "Tried to modify a provider while the widget tree was building" 断言。
+    Future(() {
+      if (!mounted) return;
+      ref.read(authLoginGoogleCtrlProvider.notifier).reset();
+      ref.read(authLoginFacebookCtrlProvider.notifier).reset();
+      ref.read(authLoginAppleCtrlProvider.notifier).reset();
+    });
+
     if (kIsWeb && OauthSignInService.canShowGoogleButton) {
       _initGoogleWebSignIn();
     }

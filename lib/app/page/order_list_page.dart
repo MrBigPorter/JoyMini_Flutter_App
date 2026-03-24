@@ -204,6 +204,8 @@ class _OrderListPageState extends ConsumerState<OrderListPage>
 
   String _getTabName(String key) {
     switch (key) {
+      case 'all':
+        return 'order.tab.all'.tr();
       case 'paid':
         return 'order.tab.paid'.tr();
       case 'unpaid':

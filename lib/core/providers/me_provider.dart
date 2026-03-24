@@ -39,9 +39,9 @@ final orderCountProvider = FutureProvider((ref) async {
 
 final activeOrderTabProvider = StateProvider<TabItem>((ref) {
   return TabItem(
-    name: 'paid',
+    name: 'all',
     total: 0,
-    key: 'paid',
+    key: 'all',
   );
 });
 
@@ -58,6 +58,7 @@ final orderRefreshProvider = StateProvider<({String key, int id})>((ref){
 /// Used to display order tabs with counts
 class TabOrderStateNotifier extends StateNotifier<List<TabItem>> {
    TabOrderStateNotifier():super([
+       TabItem(name: 'all', key:'all', total: 0),
        TabItem(name: 'paid', key:'paid', total: 0),
        TabItem(name: 'unpaid', key:'unpaid',total: 0),
        TabItem(name: 'refunded',key:'refunded',total: 0),

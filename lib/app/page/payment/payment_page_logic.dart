@@ -5,33 +5,45 @@ part of 'payment_page.dart';
 // =========================================================================
 mixin PaymentPageLogic on ConsumerState<PaymentPage> {
   void initPaymentData() {
+    final treasureId = widget.params.treasureId;
+
+    // ① 同步写入 isGroupBuy 提示（只是写 Dart Map，不修改 Riverpod Provider）
+    //    purchaseProvider factory 会在首次创建时读取，确保第一帧价格就正确
+    //    这里不能直接调用 ref.read(...).setGroupMode()，因为 initState 属于
+    //    Riverpod 禁止修改 Provider 的生命周期（会报 "modifying during build" 错误）
+    if (treasureId != null) {
+      PurchaseInitConfig.setGroupMode(treasureId, widget.params.isRealGroupBuy);
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final isAuthenticated = ref.read(authProvider.select((state) => state.isAuthenticated));
-      if (!isAuthenticated) return;
 
-      ref.read(walletProvider.notifier).fetchBalance();
-
-      final treasureId = widget.params.treasureId;
       if (treasureId != null) {
-        ref.invalidate(productDetailProvider(treasureId));
-        ref.refresh(productRealtimeStatusProvider(treasureId));
-
         final action = ref.read(purchaseProvider(treasureId).notifier);
+        // setGroupMode 有同值 guard，若 factory 已正确初始化则为 no-op，不会触发多余 rebuild
         action.setGroupMode(widget.params.isRealGroupBuy);
 
         if (widget.params.entries != null) {
           final entries = int.tryParse(widget.params.entries!) ?? 1;
           action.resetEntries(entries);
         }
+      }
 
-        // If this is a flash sale checkout, fetch flash price and override purchase state
+      if (!isAuthenticated) return;
+
+      ref.read(walletProvider.notifier).fetchBalance();
+
+      if (treasureId != null) {
+        // ② 只刷新实时状态（不 invalidate productDetailProvider，避免骨架屏闪烁 + entries 归零）
+        ref.invalidate(productRealtimeStatusProvider(treasureId));
+
         final flashSaleProductId = widget.params.flashSaleProductId;
         if (flashSaleProductId != null && flashSaleProductId.isNotEmpty) {
           _initFlashSalePrice(treasureId, flashSaleProductId);
         }
 
-        //  Auto-select the best coupon on page enter
-        Future.delayed(const Duration(milliseconds: 100), () {
+        Future.delayed(const Duration(milliseconds: 300), () {
           if (mounted) _autoMatchBestCoupon(treasureId);
         });
       }
@@ -119,7 +131,7 @@ mixin BottomNavigationBarLogic on ConsumerState<_BottomNavigationBar> {
 
     if (!mounted) return;
     if (!result.ok) {
-      _handlePaymentError(result.error);
+      _handlePaymentError(result.error, message: result.message);
       return;
     }
 
@@ -145,7 +157,7 @@ mixin BottomNavigationBarLogic on ConsumerState<_BottomNavigationBar> {
     );
   }
 
-  void _handlePaymentError(PurchaseSubmitError? error) {
+  void _handlePaymentError(PurchaseSubmitError? error, {String? message}) {
     switch (error) {
       case PurchaseSubmitError.needLogin:
         appRouter.pushNamed('login');
@@ -162,8 +174,24 @@ mixin BottomNavigationBarLogic on ConsumerState<_BottomNavigationBar> {
           builder: (context, close) => InsufficientBalanceSheet(close: close),
         );
         break;
+      case PurchaseSubmitError.soldOut:
+        RadixToast.error('This product is sold out');
+        break;
+      case PurchaseSubmitError.productOffline:
+        RadixToast.error('This product is no longer available');
+        break;
+      case PurchaseSubmitError.preSaleNotStarted:
+        RadixToast.error(message ?? 'Sale has not started yet');
+        break;
+      case PurchaseSubmitError.salesEnded:
+        RadixToast.error(message ?? 'Sale has ended');
+        break;
+      case PurchaseSubmitError.purchaseLimitExceeded:
+        RadixToast.error('Purchase limit exceeded');
+        break;
       default:
-        RadixToast.error('Payment Failed');
+        // message 是从 DioException.message 提取的后端真实错误，优先展示
+        RadixToast.error(message ?? 'Payment Failed');
         break;
     }
   }

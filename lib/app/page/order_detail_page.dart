@@ -11,6 +11,7 @@ import 'package:flutter_app/components/share_sheet.dart';
 import 'package:flutter_app/components/skeleton.dart';
 import 'package:flutter_app/ui/modal/draggable/draggable_scrollable_scaffold.dart';
 import 'package:flutter_app/core/providers/order_provider.dart';
+import 'package:flutter_app/core/providers/lucky_draw_provider.dart';
 import 'package:flutter_app/core/models/index.dart';
 import 'package:flutter_app/features/share/models/share_data.dart';
 import 'package:flutter_app/features/share/services/share_service.dart';
@@ -169,9 +170,12 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
   Widget _buildDynamicBottomBar(BuildContext context, OrderDetailItem orderDetail, double height) {
     Widget? actionButton;
-    final isPaid = orderDetail.payStatus == 1 && orderDetail.orderStatus == 1;
     final isUnpaid = orderDetail.payStatus == 0;
     final isRefunded = orderDetail.refundStatus != 0;
+    final canViewGroup = orderDetail.payStatus == 1 &&
+        !orderDetail.isRefunded &&
+        !orderDetail.isCancelled &&
+        orderDetail.group?.groupId != null;
 
     if (isRefunded) {
       actionButton = null;
@@ -182,7 +186,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
         onPressed: () => RadixToast.success("order.detail.msg_pay".tr()),
         child: Text("order.detail.btn_pay".tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       );
-    } else if (isPaid) {
+    } else if (canViewGroup) {
       actionButton = Button(
         width: 200.w,
         height: 44.w,
@@ -338,9 +342,28 @@ class _ProductSection extends StatelessWidget {
   const _ProductSection({required this.orderDetail});
 
   (String, Color, Color) _getStatusStyle(BuildContext context) {
-    if (orderDetail.refundStatus != 0) return ("order.detail.status.refund".tr(), context.utilityError500, context.utilityError50);
-    if (orderDetail.payStatus == 1) return ("order.detail.status.paid".tr(), context.utilitySuccess500, context.utilitySuccess50);
-    return ("order.detail.status.pending".tr(), context.utilityWarning500, context.utilityWarning50);
+    if (orderDetail.refundStatus != 0) {
+      return ("order.detail.status.refund".tr(), context.utilityError500, context.utilityError50);
+    }
+
+    switch (orderDetail.orderStatusEnum) {
+      case OrderStatus.won:
+        return ('Winner', context.textPrimary900, context.bgBrandSecondary);
+      case OrderStatus.groupSuccess:
+        return ('Group Success', context.utilitySuccess500, context.utilitySuccess50);
+      case OrderStatus.ended:
+        return ('Draw Ended', context.textSecondary700, context.bgSecondary);
+      case OrderStatus.paid:
+        return ("order.detail.status.paid".tr(), context.utilitySuccess500, context.utilitySuccess50);
+      case OrderStatus.processing:
+        return ("order.detail.status.processing".tr(), context.utilityBrand500, context.utilityBrand50);
+      case OrderStatus.cancelled:
+        return ('Cancelled', context.textSecondary700, context.bgSecondary);
+      case OrderStatus.refunded:
+        return ("order.detail.status.refund".tr(), context.utilityError500, context.utilityError50);
+      case OrderStatus.pending:
+        return ("order.detail.status.pending".tr(), context.utilityWarning500, context.utilityWarning50);
+    }
   }
 
   @override
@@ -370,13 +393,14 @@ class _ProductSection extends StatelessWidget {
   }
 }
 
-class _OrderInfoSection extends StatelessWidget {
+class _OrderInfoSection extends ConsumerWidget {
   final OrderDetailItem orderDetail;
   const _OrderInfoSection({required this.orderDetail});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final paymentTimeStr = orderDetail.createdAt != null ? DateFormatHelper.formatFull(DateTime.fromMillisecondsSinceEpoch(orderDetail.createdAt!.toInt())) : '-';
+    final ticketCountAsync = ref.watch(luckyDrawUnusedTicketCountProvider);
 
     // 将金额安全解析为 double，用于判断“抵扣额是否大于0”，避免出现 "- 0.00" 的尴尬 UI
     final double couponAmt = double.tryParse(orderDetail.couponAmount.toString()) ?? 0.0;
@@ -401,6 +425,21 @@ class _OrderInfoSection extends StatelessWidget {
                 ],
               ),
             ),
+          if (orderDetail.showGroupSuccessSection) ...[
+            _OrderDrawResultCard(orderDetail: orderDetail),
+            SizedBox(height: 24.w),
+          ],
+          ticketCountAsync.when(
+            data: (count) {
+              if (count <= 0) return const SizedBox.shrink();
+              return Padding(
+                padding: EdgeInsets.only(bottom: 24.w),
+                child: _LuckyDrawEntryBanner(ticketCount: count),
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (error, stackTrace) => const SizedBox.shrink(),
+          ),
           Text("order.detail.summary".tr(), style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: context.textPrimary900)),
           SizedBox(height: 16.w),
           _OrderInfoRow(title: "order.detail.item_price".tr(), value: orderDetail.unitPrice),
@@ -479,6 +518,135 @@ class _OrderInfoSection extends StatelessWidget {
   }
 }
 
+class _LuckyDrawEntryBanner extends StatelessWidget {
+  final int ticketCount;
+
+  const _LuckyDrawEntryBanner({required this.ticketCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        gradient:  LinearGradient(
+          colors: [context.bgPrimary,context.bgBrandPrimary],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(12.w),
+        border: Border.all(color: const Color(0xFFFFC789)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36.w,
+            height: 36.w,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10.w),
+            ),
+            child: Icon(Icons.local_activity_rounded, color: const Color(0xFFFC7701), size: 20.w),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'You have $ticketCount Lucky Draw ticket${ticketCount > 1 ? 's' : ''}',
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF8A3D00),
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  'Try now to win coupons, coins, or cash',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: context.textBrandPrimary900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8.w),
+          Button(
+            width: 92.w,
+            height: 32.h,
+            onPressed: () => appRouter.push('/lucky-draw'),
+            child: const Text('Draw Now'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderDrawResultCard extends StatelessWidget {
+  final OrderDetailItem orderDetail;
+
+  const _OrderDrawResultCard({required this.orderDetail});
+
+  @override
+  Widget build(BuildContext context) {
+    final isWon = orderDetail.isWon;
+    final isEnded = orderDetail.isEnded;
+    final isGroupSuccess = orderDetail.isGroupSuccess;
+    final drawnAt = orderDetail.drawnAt;
+
+    final bgColor = context.bgPrimary;
+    final borderColor = context.borderPrimary;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12.w),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (isGroupSuccess)
+            _OrderInfoRow(
+              title: 'Group Status',
+              value: 'Success · Waiting for draw',
+              valueColor: context.utilitySuccess500,
+            ),
+          if (isWon)
+            _OrderInfoRow(
+              title: 'Draw Result',
+              value: 'Congratulations, you won',
+              valueColor: const Color(0xFFD97706),
+            ),
+          if (isEnded)
+            _OrderInfoRow(
+              title: 'Draw Result',
+              value: 'Better luck next time',
+              valueColor: context.textSecondary700,
+            ),
+          if (orderDetail.prizeAmount != null && isWon)
+            _OrderInfoRow(
+              title: 'Prize',
+              value: orderDetail.prizeAmount!,
+              valueColor: const Color(0xFFD97706),
+            ),
+          if (drawnAt != null)
+            _OrderInfoRow(
+              title: 'Draw Time',
+              value: DateFormatHelper.format(drawnAt, 'yyyy-MM-dd HH:mm'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OrderInfoRow extends StatelessWidget {
   final String title;
   final String value;
@@ -498,7 +666,7 @@ class _OrderInfoRow extends StatelessWidget {
       );
     }
     return Padding(
-      padding: EdgeInsets.only(bottom: 12.w),
+      padding: EdgeInsetsGeometry.symmetric(vertical: 4.w),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [Text(title, style: TextStyle(fontSize: isSmall ? 12.sp : 14.sp, color: context.textSecondary700)), Flexible(child: valWidget)],

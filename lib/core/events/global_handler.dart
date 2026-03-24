@@ -32,6 +32,7 @@ import '../../ui/chat/core/call_manager/callkit_service.dart';
 import '../../ui/modal/base/nav_hub.dart';
 import '../../ui/toast/radix_toast.dart';
 import '../constants/socket_events.dart';
+import '../providers/lucky_draw_provider.dart';
 import '../providers/socket_provider.dart';
 import '../services/customer_service/customer_service_helper.dart';
 import '../services/socket/session_manager.dart';
@@ -57,6 +58,7 @@ class _GlobalHandlerState extends ConsumerState<GlobalHandler> {
   StreamSubscription? _contactApplySub;
   StreamSubscription? _contactAcceptSub;
   StreamSubscription? _groupEventSub;
+  StreamSubscription? _luckyDrawSub;
 
   DateTime? _lastToastTime;
   String? _lastToastKey;

@@ -22,6 +22,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 // Coupon and Modal providers
 import 'package:flutter_app/core/providers/coupon_provider.dart';
+import 'package:flutter_app/core/providers/lucky_draw_provider.dart';
 import 'package:flutter_app/ui/modal/index.dart';
 
 

@@ -19,6 +19,7 @@ import 'package:flutter_app/ui/modal/sheet/radix_sheet.dart';
 import 'package:flutter_app/utils/date_helper.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 import 'package:flutter_app/core/providers/order_provider.dart';
+import 'package:flutter_app/core/providers/lucky_draw_provider.dart';
 import 'package:flutter_app/utils/media/remote_url_builder.dart';
 import 'package:flutter_app/core/services/customer_service/customer_service_helper.dart';
 import 'refund_request_sheet.dart';
@@ -53,22 +54,22 @@ class OrderItemContainer extends ConsumerWidget {
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: isWinning
-                  ? const LinearGradient(
+                  ?  LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFFFFBEB), Colors.white],
+                colors: [context.bgPrimary, context.bgPrimary.withAlpha(20)],
               )
                   : null,
               color: isWinning ? null : context.bgPrimary,
               borderRadius: BorderRadius.circular(16.w),
               border: isWinning
-                  ? Border.all(color: const Color(0xFFFFD700), width: 1.2)
+                  ? Border.all(color: context.bgBrandPrimary, width: 1.2)
                   : Border.all(color: context.borderSecondary, width: 0.5),
               boxShadow: [
                 BoxShadow(
                   color: isWinning
-                      ? const Color(0xFFFFD700).withOpacity(0.15)
-                      : context.fgPrimary900.withOpacity(0.04),
+                      ? context.bgBrandPrimary.withValues(alpha: 0.5)
+                      : context.fgPrimary900.withValues(alpha: 0.04),
                   blurRadius: 20.w,
                   offset: const Offset(0, 8),
                 ),

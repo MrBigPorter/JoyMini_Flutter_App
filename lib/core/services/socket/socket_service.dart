@@ -122,6 +122,7 @@ mixin SocketDispatcherMixin on _SocketBase {
         break;
       case SocketEvents.groupUpdate:
       case SocketEvents.walletChange:
+      case SocketEvents.luckyDrawTicketIssued:
         _onBusinessEvent(type, data);
         break;
       default:

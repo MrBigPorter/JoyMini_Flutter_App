@@ -3,6 +3,7 @@ enum FcmType {
   chat,        // 对应原 chat
   system,      // 对应原 system
   callInvite,  //  新增电话类型
+  luckyDraw,   // 抽奖券推送
   unknown      // 兜底类型
 }
 
@@ -43,6 +44,7 @@ class FcmPayload {
       case 'chat': return FcmType.chat;
       case 'system': return FcmType.system;
       case 'call_invite': return FcmType.callInvite;
+      case 'lucky_draw': return FcmType.luckyDraw;
       default: return FcmType.unknown;
     }
   }
