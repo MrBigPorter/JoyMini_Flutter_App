@@ -7,7 +7,7 @@
 ## 🎯 当前任务（每次对话从这里开始）
 
 **阶段**: Phase F1 — Flutter 商业链路闭环  
-**上次停留**: Lucky Draw UI 优化开始（2026-03-24）  
+**上次停留**: Lucky Wheel UX 优化完成（2026-03-25）  
 **已完成**:
 - [x] 客服分流参数化：`CustomerServiceHelper.startChat()` 支持 `support/business` 场景与可配置 `businessId`
 - [x] Lucky Draw API 接入：`my-tickets` / `draw` / `my-results`
@@ -31,8 +31,9 @@
 - [x] 无限滚动/加载更多：`luckyDrawTicketsProvider` + `luckyDrawResultsProvider` 支持分页（2026-03-24）
 - [x] 订单完成后"获得抽奖券"提示 Banner：在订单结果页展示，点击跳转抽奖页（2026-03-24）
 - [x] Socket 推送闭环：`lucky_draw_ticket_issued` 事件处理 → badge +1 + 通知卡片 + 跳转；`group_success` 兜底刷新；FCM `lucky_draw` 冷启动路由；Me 页菜单入口带红点 badge（2026-03-24）
+- [x] Lucky Wheel UX 优化：进入页说明卡 / 抽奖中状态分层 / 抽奖后结果动作 / 成功回传刷新 / 小屏自适应 / 最小 Provider+Widget 测试（2026-03-25）
 
-> 最后对齐时间：2026-03-24。完成一项就地打勾并更新时间。
+> 最后对齐时间：2026-03-25。完成一项就地打勾并更新时间。
 
 ---
 

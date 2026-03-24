@@ -628,6 +628,14 @@ class Api {
     return parsePageResponse(res, (e) => LuckyDrawTicket.fromJson(e));
   }
 
+  /// Query lucky draw ticket state by orderId for order detail/list pages.
+  static Future<LuckyDrawOrderTicketResponse> luckyDrawOrderTicketApi(
+    String orderId,
+  ) async {
+    final res = await Http.get('/api/v1/lucky-draw/order/$orderId/ticket');
+    return LuckyDrawOrderTicketResponse.fromJson(Map<String, dynamic>.from(res));
+  }
+
   /// Execute draw with a ticket
   static Future<LuckyDrawActionResult> luckyDrawExecuteApi(String ticketId) async {
     final res = await Http.post('/api/v1/lucky-draw/tickets/$ticketId/draw');

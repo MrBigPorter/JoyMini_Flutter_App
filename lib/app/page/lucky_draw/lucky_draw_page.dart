@@ -3,6 +3,7 @@ import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/core/models/lucky_draw.dart';
 import 'package:flutter_app/core/providers/lucky_draw_provider.dart';
+import 'package:flutter_app/core/providers/me_provider.dart';
 import 'package:flutter_app/theme/design_tokens.g.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -14,7 +15,9 @@ import 'lucky_draw_helpers.dart';
 const int _kPageSize = 20;
 
 class LuckyDrawPage extends ConsumerStatefulWidget {
-  const LuckyDrawPage({super.key});
+  const LuckyDrawPage({super.key, this.initialTab = 0});
+
+  final int initialTab;
 
   @override
   ConsumerState<LuckyDrawPage> createState() => _LuckyDrawPageState();
@@ -29,20 +32,22 @@ class _LuckyDrawPageState extends ConsumerState<LuckyDrawPage>
   int _resultsPage = 1;
 
   LuckyDrawTicketQuery get _ticketsQuery => LuckyDrawTicketQuery(
-        page: _ticketsPage,
-        pageSize: _kPageSize,
-        unusedOnly: true,
-      );
+    page: _ticketsPage,
+    pageSize: _kPageSize,
+    unusedOnly: true,
+  );
 
-  LuckyDrawTicketQuery get _resultsQuery => LuckyDrawTicketQuery(
-        page: _resultsPage,
-        pageSize: _kPageSize,
-      );
+  LuckyDrawTicketQuery get _resultsQuery =>
+      LuckyDrawTicketQuery(page: _resultsPage, pageSize: _kPageSize);
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 1),
+    );
     // 进入抽奖页时清除未读 badge
     Future.microtask(() {
       if (mounted) {
@@ -70,6 +75,25 @@ class _LuckyDrawPageState extends ConsumerState<LuckyDrawPage>
     }
   }
 
+  void _handleWheelCompleted(String action) {
+    if (!mounted) return;
+
+    setState(() {
+      _ticketsPage = 1;
+      _resultsPage = 1;
+    });
+
+    ref.invalidate(luckyDrawTicketsProvider(_ticketsQuery));
+    ref.invalidate(luckyDrawResultsProvider(_resultsQuery));
+    ref.invalidate(luckyDrawUnusedTicketCountProvider);
+    // 刷新订单列表，确保抽奖后按钮状态更新
+    ref.invalidate(orderRefreshProvider);
+
+    if (action == luckyDrawWheelReturnToResults) {
+      _tabController.animateTo(1);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BaseScaffold(
@@ -85,6 +109,10 @@ class _LuckyDrawPageState extends ConsumerState<LuckyDrawPage>
         children: [
           TabBar(
             controller: _tabController,
+            labelColor: context.textBrandPrimary900,
+            unselectedLabelColor: context.textPrimary900,
+            dividerColor: context.borderPrimary,
+            indicatorColor: context.textBrandPrimary900,
             tabs: const [
               Tab(text: 'My Tickets'),
               Tab(text: 'My Results'),
@@ -99,16 +127,12 @@ class _LuckyDrawPageState extends ConsumerState<LuckyDrawPage>
                   query: _ticketsQuery,
                   page: _ticketsPage,
                   onDraw: (ticketId) async {
-                    // Navigate to the wheel page and wait for it to pop.
-                    // It may return `true` if a draw was successfully completed.
-                    final result = await context.push<bool>(
+                    final result = await context.push<String>(
                       '/lucky-draw/wheel/$ticketId',
                     );
 
-                    // After returning from the wheel page, refresh the data
-                    // if the draw was performed.
-                    if (result == true) {
-                      _refreshCurrent();
+                    if (result != null) {
+                      _handleWheelCompleted(result);
                     }
                   },
                   onLoadMore: () => setState(() => _ticketsPage++),
@@ -158,10 +182,8 @@ class _TicketsTab extends ConsumerWidget {
 
     return asyncValue.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => _ErrorView(
-        message: 'Failed to load tickets',
-        onRetry: onRefresh,
-      ),
+      error: (error, _) =>
+          _ErrorView(message: 'Failed to load tickets', onRetry: onRefresh),
       data: (pageResult) {
         if (pageResult.list.isEmpty && page == 1) {
           return _EmptyView(
@@ -213,10 +235,8 @@ class _ResultsTab extends ConsumerWidget {
 
     return asyncValue.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => _ErrorView(
-        message: 'Failed to load results',
-        onRetry: onRefresh,
-      ),
+      error: (error, _) =>
+          _ErrorView(message: 'Failed to load results', onRetry: onRefresh),
       data: (pageResult) {
         if (pageResult.list.isEmpty && page == 1) {
           return _EmptyView(
@@ -259,8 +279,9 @@ class _TicketCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final expiringSoon = item.isExpiringSoon;
     final expired = item.isExpired;
-    final borderColor =
-        expiringSoon ? context.borderDisabled : context.borderPrimary;
+    final borderColor = expiringSoon
+        ? context.borderDisabled
+        : context.borderPrimary;
 
     return Container(
       decoration: BoxDecoration(
@@ -326,8 +347,8 @@ class _TicketCard extends StatelessWidget {
                           expired
                               ? 'Expired'
                               : expiringSoon
-                                  ? 'Expires soon · ${_formatTimestamp(item.expiredAt)}'
-                                  : 'Expires ${_formatTimestamp(item.expiredAt)}',
+                              ? 'Expires soon · ${_formatTimestamp(item.expiredAt)}'
+                              : 'Expires ${_formatTimestamp(item.expiredAt)}',
                           style: TextStyle(
                             fontSize: 11.sp,
                             color: expiringSoon
@@ -351,8 +372,7 @@ class _TicketCard extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: context.buttonPrimaryBg,
                 disabledBackgroundColor: context.bgDisabled,
-                padding:
-                    EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8.r),
                 ),
@@ -454,8 +474,7 @@ class _ResultCard extends StatelessWidget {
 
             // 奖品类型徽章
             Container(
-              padding:
-                  EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
               decoration: BoxDecoration(
                 color: type.bgColor(context),
                 borderRadius: BorderRadius.circular(6.r),
@@ -488,7 +507,7 @@ class LuckyDrawPrizeTypeBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: type.bgColor(context),
         borderRadius: BorderRadius.circular(6.r),
-        border: Border.all(color: type.color(context).withOpacity(0.3)),
+        border: Border.all(color: type.color(context).withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -550,11 +569,16 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded,
-                size: 48.sp, color: context.textErrorPrimary600),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 48.sp,
+              color: context.textErrorPrimary600,
+            ),
             SizedBox(height: 12.h),
-            Text(message,
-                style: TextStyle(fontSize: 14.sp, color: context.textTertiary600)),
+            Text(
+              message,
+              style: TextStyle(fontSize: 14.sp, color: context.textTertiary600),
+            ),
             SizedBox(height: 16.h),
             FilledButton.icon(
               onPressed: onRetry,
@@ -613,10 +637,7 @@ class _EmptyView extends StatelessWidget {
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13.sp,
-                color: context.textDisabled,
-              ),
+              style: TextStyle(fontSize: 13.sp, color: context.textDisabled),
             ),
           ],
         ),

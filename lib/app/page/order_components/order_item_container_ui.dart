@@ -10,31 +10,66 @@ class _OrderItemStatusHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final luckyCountAsync = ref.watch(luckyDrawUnusedTicketCountProvider);
-    final luckyDrawChip = luckyCountAsync.when(
-      data: (count) {
-        if (count <= 0) return const SizedBox.shrink();
+    final orderLuckyDrawAsync = ref.watch(luckyDrawOrderTicketProvider(item.orderId));
+    final luckyDrawChip = orderLuckyDrawAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+      data: (response) {
+        if (!response.hasTicket || response.ticket == null) {
+          return const SizedBox.shrink();
+        }
+
+        final ticket = response.ticket!;
+        final result = ticket.result;
+        final icon = result != null
+            ? result.prizeTypeEnum.icon
+            : Icons.local_activity_rounded;
+        final label = result != null
+            ? (result.prizeName ?? 'Drawn')
+            : ticket.isExpired
+                ? 'Draw Expired'
+                : 'Draw Ready';
+        final textColor = result != null
+            ? result.prizeTypeEnum.color(context)
+            : ticket.isExpired
+                ? context.textSecondary700
+                : const Color(0xFF8A3D00);
+        final bgColor = result != null
+            ? result.prizeTypeEnum.bgColor(context)
+            : context.bgPrimary;
+
         return GestureDetector(
-          onTap: () => appRouter.push('/lucky-draw'),
+          onTap: () {
+            if (result != null) {
+              openLuckyDrawResultsPage();
+              return;
+            }
+            appRouter.push(luckyDrawPageLocation());
+          },
           child: Container(
             margin: EdgeInsets.only(right: 8.w),
             padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.w),
             decoration: BoxDecoration(
-              color: context.bgPrimary,
+              color: bgColor,
               borderRadius: BorderRadius.circular(4.w),
-              border: Border.all(color:  context.borderPrimary),
+              border: Border.all(color: context.borderPrimary),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.local_activity_rounded, size: 11.w, color: const Color(0xFFFC7701)),
+                Icon(icon, size: 11.w, color: textColor),
                 SizedBox(width: 4.w),
-                Text(
-                  'Prize Draw x$count',
-                  style: TextStyle(
-                    fontSize: 10.sp,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF8A3D00),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: 100.w),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
                   ),
                 ),
               ],
@@ -42,8 +77,6 @@ class _OrderItemStatusHeader extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const SizedBox.shrink(),
-      error: (error, stackTrace) => const SizedBox.shrink(),
     );
     String statusText = '';
     Color statusColor = context.textBrandSecondary700;
@@ -138,14 +171,18 @@ class _OrderItemStatusHeader extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            item.createdAt != null
-                ? DateFormatHelper.format(item.createdAt, 'yyyy-MM-dd HH:mm')
-                : '',
-            style: TextStyle(
-              fontSize: 12.sp,
-              color: context.textTertiary600,
-              fontFamily: 'Monospace',
+          Flexible(
+            child: Text(
+              item.createdAt != null
+                  ? DateFormatHelper.format(item.createdAt, 'yyyy-MM-dd HH:mm')
+                  : '',
+              style: TextStyle(
+                fontSize: 12.sp,
+                color: context.textTertiary600,
+                fontFamily: 'Monospace',
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
          Row(
@@ -518,12 +555,11 @@ class _OrderItemRefundInfoState extends State<_OrderItemRefundInfo> {
 /// ---------------------------------------------------------
 /// Bottom Actions Bar
 /// ---------------------------------------------------------
-class _OrderItemActions extends StatelessWidget {
+class _OrderItemActions extends ConsumerWidget {
   final OrderItem item;
   final VoidCallback? onViewFriends;
   final VoidCallback? onViewRewardDetails;
   final VoidCallback? onTeamUp;
-  final VoidCallback? onClaimPrize;
   final VoidCallback? onRequestRefund;
 
   const _OrderItemActions({
@@ -531,12 +567,11 @@ class _OrderItemActions extends StatelessWidget {
     this.onViewFriends,
     this.onViewRewardDetails,
     this.onTeamUp,
-    this.onClaimPrize,
     this.onRequestRefund,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final canRefund = item.canRequestRefund;
     final showRewardDetails = item.orderStatus != 1 && item.orderStatus != 4;
 
@@ -544,6 +579,7 @@ class _OrderItemActions extends StatelessWidget {
     final bool isDeadOrder = item.orderStatusEnum == OrderStatus.cancelled ||
         item.orderStatusEnum == OrderStatus.refunded;
     final bool hasGroup = item.group != null;
+    final orderLuckyDrawAsync = ref.watch(luckyDrawOrderTicketProvider(item.orderId));
 
     //  Only show View Friends if it belongs to a group AND it's not a dead order
     final bool showViewFriends = hasGroup && !isDeadOrder;
@@ -594,19 +630,54 @@ class _OrderItemActions extends StatelessWidget {
           onPressed: onTeamUp,
           child: Text('common.team.up'.tr()),
         ),
-
-      if (item.isWon)
-        Button(
-          height: 36.h,
-          variant: ButtonVariant.primary,
-          //  REMOVED THE UNNECESSARY 'team-up.svg' LOGO/ICON HERE
-          onPressed: onClaimPrize,
-          child: Text(
-            'Claim Prize',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.sp),
-          ),
-        ),
     ];
+
+    orderLuckyDrawAsync.whenData((response) {
+      final ticket = response.ticket;
+      if (!response.hasTicket || ticket == null) {
+        return;
+      }
+
+      if (ticket.result != null) {
+        buttons.add(
+          Button(
+            height: 36.h,
+            variant: ButtonVariant.outline,
+            onPressed: () => openLuckyDrawResultsPage(),
+            child: Text(
+              ticket.result!.prizeName ?? 'Draw Result',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.sp),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (!ticket.isExpired && !ticket.isUsed) {
+        buttons.add(
+          Button(
+            height: 36.h,
+            variant: ButtonVariant.primary,
+            onPressed: () async {
+              final result = await openLuckyDrawWheelForOrder(
+                ref: ref,
+                orderId: item.orderId,
+                ticketId: ticket.ticketId,
+              );
+              if (result == luckyDrawWheelReturnToResults) {
+                await openLuckyDrawResultsPage();
+              }
+            },
+            child: Text(
+              'Draw Now',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.sp),
+            ),
+          ),
+        );
+      }
+    });
 
     return Container(
       width: double.infinity,

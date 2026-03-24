@@ -1,21 +1,30 @@
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/core/models/lucky_draw.dart';
+import 'package:flutter_app/utils/cache/cache_for_extension.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/page_request.dart';
 
-final luckyDrawTicketsProvider = FutureProvider
-    .family<PageResult<LuckyDrawTicket>, LuckyDrawTicketQuery>((ref, query) async {
-  return Api.luckyDrawMyTicketsApi(query);
-});
+typedef LuckyDrawExecute =
+    Future<LuckyDrawActionResult> Function(String ticketId);
+typedef LuckyDrawFetchOrderTicket =
+    Future<LuckyDrawOrderTicketResponse> Function(String orderId);
 
-final luckyDrawResultsProvider = FutureProvider
-    .family<PageResult<LuckyDrawResultItem>, LuckyDrawTicketQuery>((
-  ref,
-  query,
-) async {
-  return Api.luckyDrawMyResultsApi(query);
-});
+final luckyDrawTicketsProvider =
+    FutureProvider.family<PageResult<LuckyDrawTicket>, LuckyDrawTicketQuery>((
+      ref,
+      query,
+    ) async {
+      return Api.luckyDrawMyTicketsApi(query);
+    });
+
+final luckyDrawResultsProvider =
+    FutureProvider.family<
+      PageResult<LuckyDrawResultItem>,
+      LuckyDrawTicketQuery
+    >((ref, query) async {
+      return Api.luckyDrawMyResultsApi(query);
+    });
 
 /// 当前未使用抽奖券数量（用于订单页/个人中心提示）
 final luckyDrawUnusedTicketCountProvider = FutureProvider<int>((ref) async {
@@ -25,16 +34,29 @@ final luckyDrawUnusedTicketCountProvider = FutureProvider<int>((ref) async {
   return page.total;
 });
 
+final luckyDrawExecuteProvider = Provider<LuckyDrawExecute>((ref) {
+  return Api.luckyDrawExecuteApi;
+});
+
+final luckyDrawOrderTicketApiProvider = Provider<LuckyDrawFetchOrderTicket>((ref) {
+  return Api.luckyDrawOrderTicketApi;
+});
+
+final luckyDrawOrderTicketProvider =
+    FutureProvider.family<LuckyDrawOrderTicketResponse, String>((
+      ref,
+      orderId,
+    ) async {
+      ref.cacheFor(const Duration(seconds: 60));
+      return ref.watch(luckyDrawOrderTicketApiProvider)(orderId);
+    });
+
 class LuckyDrawActionState {
   final bool isLoading;
   final LuckyDrawActionResult? data;
   final String? error;
 
-  const LuckyDrawActionState({
-    this.isLoading = false,
-    this.data,
-    this.error,
-  });
+  const LuckyDrawActionState({this.isLoading = false, this.data, this.error});
 
   LuckyDrawActionState copyWith({
     bool? isLoading,
@@ -52,19 +74,17 @@ class LuckyDrawActionState {
 }
 
 class LuckyDrawActionNotifier extends StateNotifier<LuckyDrawActionState> {
-  LuckyDrawActionNotifier() : super(const LuckyDrawActionState());
+  LuckyDrawActionNotifier(this._execute) : super(const LuckyDrawActionState());
+
+  final LuckyDrawExecute _execute;
 
   Future<LuckyDrawActionResult?> draw(String ticketId) async {
     if (state.isLoading) return null;
 
-    state = state.copyWith(
-      isLoading: true,
-      clearError: true,
-      clearData: true,
-    );
+    state = state.copyWith(isLoading: true, clearError: true, clearData: true);
 
     try {
-      final result = await Api.luckyDrawExecuteApi(ticketId);
+      final result = await _execute(ticketId);
       state = state.copyWith(isLoading: false, data: result);
       return result;
     } catch (e) {
@@ -80,9 +100,8 @@ class LuckyDrawActionNotifier extends StateNotifier<LuckyDrawActionState> {
 
 final luckyDrawActionProvider =
     StateNotifierProvider<LuckyDrawActionNotifier, LuckyDrawActionState>((ref) {
-  return LuckyDrawActionNotifier();
-});
+      return LuckyDrawActionNotifier(ref.watch(luckyDrawExecuteProvider));
+    });
 
 /// 未使用抽奖券数量 badge（Socket 推送 +1，用户使用 -1）
 final luckyDrawUnreadCountProvider = StateProvider<int>((ref) => 0);
-
