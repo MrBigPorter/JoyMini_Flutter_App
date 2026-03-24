@@ -3,6 +3,8 @@
   "API_BASE_URL": "https://api.joyminis.com",
   "IMG_BASE_URL": "https://img.joyminis.com",
   "LOG_HTTP": false,
+  "GOOGLE_WEB_CLIENT_ID": "GOOGLE_CLIENT_ID_REDACTED",
+  "FACEBOOK_WEB_APP_ID": "1659905501858558",
   "APP_ID_SUFFIX": "",
   "APP_NAME_SUFFIX": ""
 }

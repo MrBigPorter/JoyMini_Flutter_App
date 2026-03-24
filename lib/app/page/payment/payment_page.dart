@@ -110,6 +110,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> with PaymentPageLogic
     final detail = ref.watch(productDetailProvider(params.treasureId!));
 
     return detail.when(
+      // 防止 provider re-fetch 时页面闪回骨架屏
+      skipLoadingOnRefresh: true,
       loading: () => const PaymentSkeleton(),
       error: (_, __) => const PaymentSkeleton(),
       data: (value) {
@@ -131,10 +133,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> with PaymentPageLogic
                         SizedBox(height: 8.w),
                         InfoSection(detail: value, treasureId: params.treasureId!),
                         SizedBox(height: 8.w),
-                        // Optimized Voucher Section (Icon removed)
                         CheckoutVoucherSection(treasureId: params.treasureId!),
                         SizedBox(height: 8.w),
-                        PaymentMethodSection(treasureId: params.treasureId!,),
+                        CoinsDiscountSection(treasureId: params.treasureId!),
+                        SizedBox(height: 8.w),
+                        PaymentMethodSection(treasureId: params.treasureId!),
                       ],
                     ),
                   ),

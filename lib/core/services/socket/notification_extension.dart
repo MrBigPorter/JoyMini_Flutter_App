@@ -10,6 +10,13 @@ mixin SocketNotificationMixin on _SocketBase, SocketDispatcherMixin {
       .where((e) => e['type'] == SocketEvents.groupUpdate)
       .map((e) => Map<String, dynamic>.from(e['data']));
 
+  /// 抽奖券到达推送流（`lucky_draw_ticket_issued`）
+  /// payload 字段: groupId?, ticketId, activityId, orderId, issuedAt
+  Stream<Map<String, dynamic>> get luckyDrawTicketIssuedStream =>
+      _businessEventController.stream
+          .where((e) => e['type'] == SocketEvents.luckyDrawTicketIssued)
+          .map((e) => Map<String, dynamic>.from(e['data']));
+
   @override
   void _onGroupNotification(String type, dynamic data) {
     final payload = data ?? {};

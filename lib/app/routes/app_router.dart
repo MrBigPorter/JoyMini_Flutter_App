@@ -42,6 +42,7 @@ import 'package:flutter_app/app/page/lucky_draw/lucky_draw_page.dart';
 import 'package:flutter_app/app/page/pwa_debug_page.dart';
 import 'package:flutter_app/app/page/product_detail_page.dart';
 import 'package:flutter_app/app/page/withdraw/withdraw_page.dart';
+import 'package:flutter_app/app/page/lucky_draw/lucky_draw_wheel_page.dart';
 import 'package:flutter_app/ui/chat/group/group_request_list/group_request_list_page.dart';
 import 'package:flutter_app/ui/chat/group/group_profile/group_profile_page.dart';
 import '../../ui/chat/group/group_search/group_search_page.dart';
@@ -377,6 +378,15 @@ class AppRouter {
           name: 'luckyDraw',
           path: '/lucky-draw',
           builder: (context, state) => const LuckyDrawPage(),
+        ),
+        GoRoute(
+          name: 'luckyDrawWheel',
+          path: '/lucky-draw/wheel/:ticketId',
+          parentNavigatorKey: NavHub.key,
+          builder: (context, state) {
+            final ticketId = state.pathParameters['ticketId']!;
+            return LuckyDrawWheelPage(ticketId: ticketId);
+          },
         ),
         GoRoute(
           name: 'flashSale',

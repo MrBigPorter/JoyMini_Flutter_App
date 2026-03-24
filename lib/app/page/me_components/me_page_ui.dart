@@ -389,8 +389,21 @@ class _MenuArea extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final luckyDrawBadge = ref.watch(luckyDrawUnreadCountProvider);
+
     // Defines the grid items and their respective actions
     final List<({String text, Widget icon, VoidCallback onTap})> menuItems = [
+      (
+        text: 'Lucky Draw',
+        icon: _buildBadgeIcon(
+          child: Icon(Icons.emoji_events_outlined, size: 26.w, color: context.fgSecondary700),
+          count: luckyDrawBadge,
+        ),
+        onTap: () {
+          ref.read(luckyDrawUnreadCountProvider.notifier).state = 0;
+          appRouter.push('/lucky-draw');
+        },
+      ),
       (
         text: 'common.withdraw'.tr(),
         icon: Icon(
@@ -554,4 +567,36 @@ class _MenuArea extends ConsumerWidget {
     height: 26.w,
     colorFilter: ColorFilter.mode(context.fgSecondary700, BlendMode.srcIn),
   );
+
+  /// Helper to overlay a red badge count on any icon widget
+  Widget _buildBadgeIcon({required Widget child, required int count}) {
+    if (count <= 0) return child;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          top: -6.h,
+          right: -8.w,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            constraints: BoxConstraints(minWidth: 16.w),
+            child: Text(
+              count > 99 ? '99+' : '$count',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 9.sp,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

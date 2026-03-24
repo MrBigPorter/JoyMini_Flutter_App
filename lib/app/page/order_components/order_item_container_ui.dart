@@ -3,30 +3,67 @@ part of 'order_item_container.dart';
 /// ---------------------------------------------------------
 /// Top Status Header - Enhanced with Refund Status
 /// ---------------------------------------------------------
-class _OrderItemStatusHeader extends StatelessWidget {
+class _OrderItemStatusHeader extends ConsumerWidget {
   final OrderItem item;
 
   const _OrderItemStatusHeader({required this.item});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final luckyCountAsync = ref.watch(luckyDrawUnusedTicketCountProvider);
+    final luckyDrawChip = luckyCountAsync.when(
+      data: (count) {
+        if (count <= 0) return const SizedBox.shrink();
+        return GestureDetector(
+          onTap: () => appRouter.push('/lucky-draw'),
+          child: Container(
+            margin: EdgeInsets.only(right: 8.w),
+            padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.w),
+            decoration: BoxDecoration(
+              color: context.bgPrimary,
+              borderRadius: BorderRadius.circular(4.w),
+              border: Border.all(color:  context.borderPrimary),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.local_activity_rounded, size: 11.w, color: const Color(0xFFFC7701)),
+                SizedBox(width: 4.w),
+                Text(
+                  'Prize Draw x$count',
+                  style: TextStyle(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF8A3D00),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+    );
     String statusText = '';
     Color statusColor = context.textBrandSecondary700;
-    Color statusBg = context.textBrandSecondary700.withOpacity(0.1);
+    Color statusBg = context.textBrandPrimary900;
 
     // 1. Priority check for Refund Status
     if (item.refundStatus == 1) {
       return _buildContainer(
         text: 'Refunding',
         textColor: const Color(0xFFD97706),
-        bgColor: const Color(0xFFFFFBEB),
+        bgColor:context.bgPrimary,
+        luckyDrawChip: luckyDrawChip,
         context: context,
       );
     } else if (item.refundStatus == 3) {
       return _buildContainer(
         text: 'Refund Rejected',
         textColor: context.utilityError500,
-        bgColor: context.utilityError500.withOpacity(0.1),
+        bgColor: context.utilityError500,
+        luckyDrawChip: luckyDrawChip,
         context: context,
       );
     }
@@ -35,13 +72,13 @@ class _OrderItemStatusHeader extends StatelessWidget {
     switch (item.orderStatusEnum) {
       case OrderStatus.won:
         statusText = 'Winner';
-        statusColor = const Color(0xFFD97706);
-        statusBg = const Color(0xFFFFFBEB);
+        statusColor = context.textBrandPrimary900;
+        statusBg = context.bgPrimary;
         break;
       case OrderStatus.refunded:
         statusText = 'Refunded';
         statusColor = context.utilityError500;
-        statusBg = context.utilityError500.withOpacity(0.1);
+        statusBg = context.utilityError500.withValues(alpha: 0.1);
         break;
       case OrderStatus.cancelled:
         statusText = 'Cancelled';
@@ -51,17 +88,22 @@ class _OrderItemStatusHeader extends StatelessWidget {
       case OrderStatus.groupSuccess:
         statusText = 'Group Success';
         statusColor = Colors.green;
-        statusBg = Colors.green.withOpacity(0.1);
+        statusBg = Colors.green.withValues(alpha: 0.1);
+        break;
+      case OrderStatus.ended:
+        statusText = 'Draw Ended';
+        statusColor = context.textSecondary700;
+        statusBg = context.bgSecondary;
         break;
       case OrderStatus.paid:
         statusText = 'Paid';
         statusColor = context.textBrandPrimary900;
-        statusBg = context.textBrandPrimary900.withOpacity(0.05);
+        statusBg = context.textBrandPrimary900.withValues(alpha: 0.05);
         break;
       case OrderStatus.processing:
         statusText = 'Processing';
         statusColor = context.textBrandPrimary900;
-        statusBg = context.textBrandPrimary900.withOpacity(0.05);
+        statusBg = context.textBrandPrimary900.withValues(alpha: 0.05);
         break;
       default:
         statusText = 'Pending';
@@ -72,6 +114,7 @@ class _OrderItemStatusHeader extends StatelessWidget {
         text: statusText,
         textColor: statusColor,
         bgColor: statusBg,
+        luckyDrawChip: luckyDrawChip,
         context: context
     );
   }
@@ -80,12 +123,13 @@ class _OrderItemStatusHeader extends StatelessWidget {
     required String text,
     required Color textColor,
     required Color bgColor,
+    required Widget luckyDrawChip,
     required BuildContext context,
   }) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.w),
       decoration: BoxDecoration(
-        color: context.bgSecondary.withOpacity(0.5),
+        color: context.bgSecondary.withValues(alpha: 0.5),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(16.w),
           topRight: Radius.circular(16.w),
@@ -106,6 +150,7 @@ class _OrderItemStatusHeader extends StatelessWidget {
           ),
          Row(
            children: [
+             luckyDrawChip,
              //  新增：轻量级客服小图标
              GestureDetector(
                onTap: () => CustomerServiceHelper.startChat(),
@@ -266,8 +311,10 @@ class _OrderItemGroupSuccess extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!item.showGroupSuccessSection) return const SizedBox.shrink();
 
-    final Color bgColor = item.isWon ? const Color(0xFFFFFBEB) : context.bgSecondary;
-    final Color borderColor = item.isWon ? const Color(0xFFFCD34D).withOpacity(0.5) : Colors.transparent;
+    final Color bgColor = item.isWon ? context.bgBrandPrimary.withValues(alpha: 0.8) : context.bgSecondary;
+    final Color borderColor = item.isWon ? context.bgBrandPrimary  : Colors.transparent;
+    final hasDrawTime = item.drawnAt != null;
+    final showDividerBetweenGroupAndResult = item.isGroupSuccess && (item.isWon || item.isEnded);
 
     return Container(
       margin: EdgeInsets.only(top: 16.w),
@@ -286,10 +333,10 @@ class _OrderItemGroupSuccess extends StatelessWidget {
               icon: Icons.group_add_rounded,
               valueColor: context.textBrandSecondary700,
             ),
-          if (item.isGroupSuccess && item.isWon)
+          if (showDividerBetweenGroupAndResult)
             Padding(
               padding: EdgeInsets.symmetric(vertical: 8.w),
-              child: Divider(height: 1, color: borderColor.withOpacity(0.5)),
+              child: Divider(height: 1, color: borderColor.withValues(alpha: 0.5)),
             ),
           if (item.isWon)
             _SuccessRow(
@@ -299,6 +346,22 @@ class _OrderItemGroupSuccess extends StatelessWidget {
               valueColor: const Color(0xFFD97706),
               isBold: true,
             ),
+          if (item.isEnded)
+            _SuccessRow(
+              label: 'Draw Result',
+              value: 'Better luck next time',
+              icon: Icons.info_outline_rounded,
+              valueColor: context.textSecondary700,
+            ),
+          if (hasDrawTime) ...[
+            SizedBox(height: 8.w),
+            _SuccessRow(
+              label: 'Draw Time',
+              value: DateFormatHelper.format(item.drawnAt, 'yyyy-MM-dd HH:mm'),
+              icon: Icons.schedule_rounded,
+              valueColor: context.textSecondary700,
+            ),
+          ],
         ],
       ),
     );
@@ -374,9 +437,9 @@ class _OrderItemRefundInfoState extends State<_OrderItemRefundInfo> {
 
     return Container(
       decoration: BoxDecoration(
-        color: context.bgSecondary.withOpacity(0.5),
+        color: context.bgSecondary.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12.w),
-        border: Border.all(color: context.borderSecondary.withOpacity(0.5)),
+        border: Border.all(color: context.borderSecondary.withValues(alpha: 0.5)),
       ),
       child: Column(
         children: [
@@ -416,7 +479,7 @@ class _OrderItemRefundInfoState extends State<_OrderItemRefundInfo> {
               padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 12.w),
               child: Column(
                 children: [
-                  Divider(height: 1, color: context.borderSecondary.withOpacity(0.5)),
+                  Divider(height: 1, color: context.borderSecondary.withValues(alpha: 0.5)),
                   SizedBox(height: 8.w),
                   _InfoRow(
                     label: 'Reason',
@@ -563,10 +626,9 @@ class _OrderItemActions extends StatelessWidget {
 /// Dashed Separator
 /// ---------------------------------------------------------
 class _DashedSeparator extends StatelessWidget {
-  final double height;
   final Color color;
 
-  const _DashedSeparator({required this.color, this.height = 1.0});
+  const _DashedSeparator({required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -574,7 +636,7 @@ class _DashedSeparator extends StatelessWidget {
       builder: (BuildContext context, BoxConstraints constraints) {
         final boxWidth = constraints.constrainWidth();
         const dashWidth = 5.0;
-        final dashHeight = height;
+        const dashHeight = 1.0;
         final dashCount = (boxWidth / (2 * dashWidth)).floor();
         return Flex(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -584,7 +646,7 @@ class _DashedSeparator extends StatelessWidget {
               width: dashWidth,
               height: dashHeight,
               child: DecoratedBox(
-                decoration: BoxDecoration(color: color.withOpacity(0.3)),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.3)),
               ),
             );
           }),
@@ -668,7 +730,7 @@ class OrderItemContainerSkeleton extends StatelessWidget {
               ],
             ),
             SizedBox(height: 16.h),
-            Container(height: 1, color: context.borderSecondary.withOpacity(0.3)),
+            Container(height: 1, color: context.borderSecondary.withValues(alpha: 0.3)),
             SizedBox(height: 16.h),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

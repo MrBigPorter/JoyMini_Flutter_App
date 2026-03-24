@@ -17,6 +17,14 @@ final luckyDrawResultsProvider = FutureProvider
   return Api.luckyDrawMyResultsApi(query);
 });
 
+/// 当前未使用抽奖券数量（用于订单页/个人中心提示）
+final luckyDrawUnusedTicketCountProvider = FutureProvider<int>((ref) async {
+  final page = await Api.luckyDrawMyTicketsApi(
+    const LuckyDrawTicketQuery(page: 1, pageSize: 1, unusedOnly: true),
+  );
+  return page.total;
+});
+
 class LuckyDrawActionState {
   final bool isLoading;
   final LuckyDrawActionResult? data;
@@ -74,4 +82,7 @@ final luckyDrawActionProvider =
     StateNotifierProvider<LuckyDrawActionNotifier, LuckyDrawActionState>((ref) {
   return LuckyDrawActionNotifier();
 });
+
+/// 未使用抽奖券数量 badge（Socket 推送 +1，用户使用 -1）
+final luckyDrawUnreadCountProvider = StateProvider<int>((ref) => 0);
 

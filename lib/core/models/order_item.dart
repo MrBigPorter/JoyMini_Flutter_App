@@ -198,6 +198,23 @@ class WalletTransaction {
   }
 }
 
+/// 对应后端 LotteryResultDto：每次开奖的中奖记录
+@JsonSerializable(checked: true)
+class LotteryResult {
+  final String winnerId;
+  final String winnerOrderId;
+
+  const LotteryResult({
+    required this.winnerId,
+    required this.winnerOrderId,
+  });
+
+  factory LotteryResult.fromJson(Map<String, dynamic> json) =>
+      _$LotteryResultFromJson(json);
+
+  Map<String, dynamic> toJson() => _$LotteryResultToJson(this);
+}
+
 @JsonSerializable(checked: true)
 class Group {
   final String groupId;
@@ -205,21 +222,37 @@ class Group {
   final int currentMembers;
   final int maxMembers;
 
+  /// 开奖时间戳（毫秒）。null = 尚未开奖
+  final num? drawnAt;
+
+  /// 开奖结果列表。为空表示尚未开奖
+  @JsonKey(defaultValue: [])
+  final List<LotteryResult> lotteryResults;
+
   Group({
     required this.groupId,
     required this.groupStatus,
     required this.currentMembers,
     required this.maxMembers,
+    this.drawnAt,
+    this.lotteryResults = const [],
   });
 
-  factory Group.fromJson(Map<String, dynamic> json) =>
-      _$GroupFromJson(json);
+  factory Group.fromJson(Map<String, dynamic> json) => _$GroupFromJson(json);
   Map<String, dynamic> toJson() => _$GroupToJson(this);
 
   @override
-  String toString() {
-    return toJson().toString();
-  }
+  String toString() => toJson().toString();
+
+  /// 该团已开奖
+  bool get isDrawn => drawnAt != null;
+
+  /// 该团是否成功成团
+  bool get isSuccess => groupStatus == 2;
+
+  /// 返回中奖订单 ID（没有则 null）
+  String? get winnerOrderId =>
+      lotteryResults.isNotEmpty ? lotteryResults.first.winnerOrderId : null;
 }
 
 @JsonSerializable(checked: true)
@@ -283,6 +316,9 @@ class OrderListParams {
     this.treasureId,
   });
 
+  factory OrderListParams.fromJson(Map<String, dynamic> json) =>
+      _$OrderListParamsFromJson(json);
+
   Map<String, dynamic> toJson() => _$OrderListParamsToJson(this);
 }
 
@@ -315,9 +351,13 @@ class TabItem {
 class OrderStatusConst {
   static const int pendingPayment = 1;    // 待支付
   static const int processingPayment = 2; // 支付中
-  static const int paid = 3;              // 已支付 (待发货/待开奖)
+  static const int paid = 3;              // 已支付 (待开奖)
   static const int canceled = 4;          // 已取消
   static const int refunded = 5;          // 已退款
+  static const int groupFormed = 6;       // 成团待开奖
+  static const int drawn = 7;             // 已开奖
+  static const int completed = 8;         // 已完成（奖品已发）
+  static const int drawClosed = 9;        // 开奖完结（非中奖关闭）
 }
 
 class PayStatusConst {
@@ -343,7 +383,7 @@ enum OrderStatus {
   won,           // 用户中奖 (高光状态)
   refunded,      // 已退款
   cancelled,     // 已取消
-  groupSuccess,  // 拼团成功
+  groupSuccess,  // 拼团成功（成团待开奖）
   ended,         // 已结束未中奖
 }
 
@@ -352,24 +392,44 @@ enum OrderStatus {
 // -----------------------------------------------------------------------------
 extension OrderItemExtension on OrderItem {
 
+  /// 通过 group.lotteryResults 判断本订单是否中奖（比 isWinner 字段更准确）
+  bool get didIWinByGroup =>
+      group?.lotteryResults.any((r) => r.winnerOrderId == orderId) ?? false;
+
+  /// 该团是否已开奖
+  bool get isGroupDrawn => group?.isDrawn ?? false;
+
+  /// 开奖时间（毫秒时间戳）
+  num? get drawnAt => group?.drawnAt;
+
+  /// 当前订单是否已进入开奖后的最终态
+  bool get isDrawResolved => isWon || isEnded;
+
   /// 智能状态解析
   OrderStatus get orderStatusEnum {
-    // 1. 优先判断中奖 (最高优先级)
-    if (isWinner) return OrderStatus.won;
-
-    // 2. 判断退款 (Order=5 或 Refund=2)
+    // 1. 优先判断退款（无论什么阶段退款都是最终态之一）
     if (orderStatus == OrderStatusConst.refunded ||
         refundStatus == RefundStatusConst.refunded) {
       return OrderStatus.refunded;
     }
 
-    // 3. 判断取消
+    // 2. 取消
     if (orderStatus == OrderStatusConst.canceled) {
       return OrderStatus.cancelled;
     }
 
-    // 4. 判断拼团 (假设 groupStatus: 2 是成功)
-    if (group?.groupStatus == 2) {
+    // 3. 已开奖状态（7 / 8 / 9）：用 lotteryResults + isWinner 双重判断
+    final isDrawnStatus = orderStatus == OrderStatusConst.drawn ||
+        orderStatus == OrderStatusConst.completed ||
+        orderStatus == OrderStatusConst.drawClosed;
+    if (isDrawnStatus || isGroupDrawn) {
+      if (didIWinByGroup || isWinner) return OrderStatus.won;
+      return OrderStatus.ended; // 已开奖但未中
+    }
+
+    // 4. 成团待开奖（6）
+    if (orderStatus == OrderStatusConst.groupFormed ||
+        group?.groupStatus == 2) {
       return OrderStatus.groupSuccess;
     }
 
@@ -380,7 +440,7 @@ extension OrderItemExtension on OrderItem {
       case OrderStatusConst.processingPayment:
         return OrderStatus.processing;
       case OrderStatusConst.paid:
-        return OrderStatus.paid; // 默认已支付状态
+        return OrderStatus.paid;
       default:
         return OrderStatus.pending;
     }
@@ -392,25 +452,27 @@ extension OrderItemExtension on OrderItem {
   bool get isRefunded => orderStatusEnum == OrderStatus.refunded;
   bool get isGroupSuccess => orderStatusEnum == OrderStatus.groupSuccess;
   bool get isCancelled => orderStatusEnum == OrderStatus.cancelled;
+  bool get isEnded => orderStatusEnum == OrderStatus.ended;
 
   // --- UI 逻辑 ---
-  bool get showGroupSuccessSection => isGroupSuccess || isWon;
+  bool get showGroupSuccessSection => isGroupSuccess || isWon || isEnded;
   bool get isPhysical => treasure.virtual == 1;
   bool get isVirtual => treasure.virtual == 2;
 
   /// --- 核心业务：能否申请退款？---
   /// 规则：
-  /// 1. 订单状态必须是 PAID (3)
+  /// 1. 订单状态必须是 PAID(3) 或 GROUP_FORMED(6)（开奖前都可退）
   /// 2. 支付状态必须是 PAID (1)
-  /// 3. 退款状态必须是 NO_REFUND (0) 或 REFUND_FAILED (3) (失败允许重试)
-  /// 4. 不是中奖订单 (isWinner == false)
+  /// 3. 退款状态必须是 NO_REFUND (0) 或 REFUND_FAILED (3)
+  /// 4. 不是中奖订单
   bool get canRequestRefund {
-    final isOrderPaid = orderStatus == OrderStatusConst.paid;
+    final isRefundableStatus = orderStatus == OrderStatusConst.paid ||
+        orderStatus == OrderStatusConst.groupFormed;
     final isPaySuccess = payStatus == PayStatusConst.paid;
     final isNoRefund = refundStatus == RefundStatusConst.noRefund ||
         refundStatus == RefundStatusConst.refundFailed;
 
-    return isOrderPaid && isPaySuccess && isNoRefund && !isWinner;
+    return isRefundableStatus && isPaySuccess && isNoRefund && !isWon;
   }
 }
 
