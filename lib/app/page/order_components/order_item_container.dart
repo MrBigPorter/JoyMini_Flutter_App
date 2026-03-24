@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_app/app/page/lucky_draw/lucky_draw_helpers.dart';
 import 'package:flutter_app/ui/img/app_image.dart';
 import 'package:flutter_app/ui/index.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -106,7 +107,6 @@ class OrderItemContainer extends ConsumerWidget {
                         onViewFriends: () => OrderItemLogic.handleViewFriends(item),
                         onViewRewardDetails: () => OrderItemLogic.handleViewRewardDetails(context, item),
                         onTeamUp: () => OrderItemLogic.handleTeamUp(item),
-                        onClaimPrize: () => OrderItemLogic.handleClaimPrize(item),
                       ),
                     ],
                   ),
@@ -125,7 +125,9 @@ class OrderItemContainer extends ConsumerWidget {
         .then(delay: 200.ms)
         .shimmer(
       duration: 1500.ms,
-      color: isWinning ? const Color(0xFFFFD700).withOpacity(0.4) : Colors.transparent,
+      color: isWinning
+          ? const Color(0xFFFFD700).withValues(alpha: 0.4)
+          : Colors.transparent,
       angle: 0.8,
     );
   }

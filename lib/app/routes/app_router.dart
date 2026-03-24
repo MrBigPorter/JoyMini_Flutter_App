@@ -191,7 +191,8 @@ class AppRouter {
           path: '/contact/profile/:userId',
           builder: (context, state) {
             final userId = state.pathParameters['userId']!;
-            final cachedUser = state.extra as ChatUser;
+            // 安全转换：extra 可能为 null（deep link / URL 直访），不能硬 cast
+            final cachedUser = state.extra is ChatUser ? state.extra as ChatUser : null;
 
             return ContactProfilePage(userId: userId, cachedUser: cachedUser);
           },
@@ -377,7 +378,12 @@ class AppRouter {
         GoRoute(
           name: 'luckyDraw',
           path: '/lucky-draw',
-          builder: (context, state) => const LuckyDrawPage(),
+          builder: (context, state) {
+            final initialTab = state.uri.queryParameters['tab'] == 'results'
+                ? 1
+                : 0;
+            return LuckyDrawPage(initialTab: initialTab);
+          },
         ),
         GoRoute(
           name: 'luckyDrawWheel',

@@ -1,26 +1,39 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 import 'package:flutter_app/core/models/lucky_draw.dart';
 import 'package:flutter_app/theme/design_tokens.g.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'lucky_draw_helpers.dart';
 
+enum LuckyDrawResultDialogAction { backToTickets, viewResults }
+
 /// 展示抽奖结果的弹窗，支持 4 种奖品类型各自的视觉风格。
 /// 用法：LuckyDrawResultDialog.show(context, result)
 class LuckyDrawResultDialog extends StatefulWidget {
-  const LuckyDrawResultDialog({super.key, required this.result});
+  const LuckyDrawResultDialog({
+    super.key,
+    required this.result,
+    this.showNextStepActions = false,
+  });
 
   final LuckyDrawActionResult result;
+  final bool showNextStepActions;
 
-  static Future<void> show(
+  static Future<LuckyDrawResultDialogAction?> show(
     BuildContext context,
-    LuckyDrawActionResult result,
-  ) {
-    return showDialog<void>(
+    LuckyDrawActionResult result, {
+    bool barrierDismissible = true,
+    bool showNextStepActions = false,
+  }) {
+    return showDialog<LuckyDrawResultDialogAction>(
       context: context,
-      barrierDismissible: true,
-      barrierColor: context.bgOverlay.withOpacity(0.7),
-      builder: (_) => LuckyDrawResultDialog(result: result),
+      barrierDismissible: barrierDismissible,
+      barrierColor: context.bgOverlay.withValues(alpha: 0.7),
+      builder: (_) => LuckyDrawResultDialog(
+        result: result,
+        showNextStepActions: showNextStepActions,
+      ),
     );
   }
 
@@ -41,10 +54,14 @@ class _LuckyDrawResultDialogState extends State<LuckyDrawResultDialog>
       vsync: this,
       duration: const Duration(milliseconds: 420),
     );
-    _scaleAnim = CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut)
-        .drive(Tween(begin: 0.6, end: 1.0));
-    _fadeAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn)
-        .drive(Tween(begin: 0.0, end: 1.0));
+    _scaleAnim = CurvedAnimation(
+      parent: _ctrl,
+      curve: Curves.elasticOut,
+    ).drive(Tween(begin: 0.6, end: 1.0));
+    _fadeAnim = CurvedAnimation(
+      parent: _ctrl,
+      curve: Curves.easeIn,
+    ).drive(Tween(begin: 0.0, end: 1.0));
     _ctrl.forward();
   }
 
@@ -70,7 +87,13 @@ class _LuckyDrawResultDialogState extends State<LuckyDrawResultDialog>
             result: widget.result,
             type: type,
             won: won,
-            onClose: () => Navigator.of(context).pop(),
+            showNextStepActions: widget.showNextStepActions,
+            onClose: () => Navigator.of(
+              context,
+            ).pop(LuckyDrawResultDialogAction.backToTickets),
+            onViewResults: () => Navigator.of(
+              context,
+            ).pop(LuckyDrawResultDialogAction.viewResults),
           ),
         ),
       ),
@@ -84,17 +107,98 @@ class _DialogCard extends StatelessWidget {
     required this.type,
     required this.won,
     required this.onClose,
+    required this.showNextStepActions,
+    required this.onViewResults,
   });
 
   final LuckyDrawActionResult result;
   final LuckyDrawPrizeType type;
   final bool won;
   final VoidCallback onClose;
+  final bool showNextStepActions;
+  final VoidCallback onViewResults;
 
   @override
   Widget build(BuildContext context) {
+    final dialogWidth = min(320.w, MediaQuery.of(context).size.width - 32.w);
+    final maxHeight = MediaQuery.of(context).size.height * 0.82;
+
+    final actionSection = showNextStepActions
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 48.h,
+                child: FilledButton(
+                  onPressed: onViewResults,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: type.color(context),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                  ),
+                  child: Text(
+                    'View My Results',
+                    style: TextStyle(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w600,
+                      color: context.textWhite,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 10.h),
+              SizedBox(
+                width: double.infinity,
+                height: 44.h,
+                child: OutlinedButton(
+                  onPressed: onClose,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: context.borderPrimary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                  ),
+                  child: Text(
+                    'Back to Tickets',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: context.textPrimary900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          )
+        : SizedBox(
+            width: double.infinity,
+            height: 48.h,
+            child: FilledButton(
+              onPressed: onClose,
+              style: FilledButton.styleFrom(
+                backgroundColor: won
+                    ? type.color(context)
+                    : context.textDisabled,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+              ),
+              child: Text(
+                won ? 'Got It' : 'Try Again Next Time',
+                style: TextStyle(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w600,
+                  color: context.textWhite,
+                ),
+              ),
+            ),
+          );
+
     return Container(
-      width: 320.w,
+      width: dialogWidth,
+      constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
         color: context.bgPrimary,
         borderRadius: BorderRadius.circular(20.r),
@@ -109,68 +213,55 @@ class _DialogCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ─── Header 色块 ───────────────────────────────────────────────
           _Header(type: type, won: won),
-
-          // ─── Body ─────────────────────────────────────────────────────
-          Padding(
-            padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 8.h),
-            child: Column(
-              children: [
-                // 奖品名称
-                Text(
-                  result.prizeName ?? type.label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20.sp,
-                    fontWeight: FontWeight.w700,
-                    color: type.color(context),
-                  ),
-                ),
-                if (result.rewardSummary != null &&
-                    result.rewardSummary!.isNotEmpty) ...[
-                  SizedBox(height: 6.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 8.h),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    result.rewardSummary!,
+                    result.prizeName ?? type.label,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 14.sp,
-                      color: context.textTertiary600,
+                      fontSize: min(20.sp, 20.0),
+                      fontWeight: FontWeight.w700,
+                      color: type.color(context),
                     ),
                   ),
+                  if (result.rewardSummary != null &&
+                      result.rewardSummary!.isNotEmpty) ...[
+                    SizedBox(height: 6.h),
+                    Text(
+                      result.rewardSummary!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: min(14.sp, 14.0),
+                        color: context.textTertiary600,
+                      ),
+                    ),
+                  ],
+                  SizedBox(height: 12.h),
+                  _HintText(type: type),
+                  SizedBox(height: 10.h),
+                  Text(
+                    showNextStepActions
+                        ? 'The result has been saved to My Results.'
+                        : 'You can check the latest reward details later in My Results.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: min(12.sp, 12.0),
+                      color: context.textDisabled,
+                    ),
+                  ),
+                  SizedBox(height: 20.h),
                 ],
-                SizedBox(height: 12.h),
-                // 奖品说明
-                _HintText(type: type),
-                SizedBox(height: 20.h),
-              ],
-            ),
-          ),
-
-          // ─── 按钮 ──────────────────────────────────────────────────────
-          Padding(
-            padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, 24.h),
-            child: SizedBox(
-              width: double.infinity,
-              height: 48.h,
-              child: FilledButton(
-                onPressed: onClose,
-                style: FilledButton.styleFrom(
-                  backgroundColor: won ? type.color(context) : context.textDisabled,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                  ),
-                ),
-                child: Text(
-                  won ? 'Claim Reward' : 'Try Again Next Time',
-                  style: TextStyle(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w600,
-                    color: context.textWhite,
-                  ),
-                ),
               ),
             ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, 24.h),
+            child: actionSection,
           ),
         ],
       ),
@@ -199,7 +290,7 @@ class _Header extends StatelessWidget {
             width: 72.w,
             height: 72.w,
             decoration: BoxDecoration(
-              color: type.color(context).withOpacity(0.15),
+              color: type.color(context).withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(type.icon, size: 36.sp, color: type.color(context)),
@@ -224,15 +315,12 @@ class _HintText extends StatelessWidget {
   final LuckyDrawPrizeType type;
 
   String get _hint => switch (type) {
-        LuckyDrawPrizeType.coupon =>
-          'Check your coupon in My Profile → Coupons.',
-        LuckyDrawPrizeType.coin =>
-          'Lucky Coins have been added to your wallet.',
-        LuckyDrawPrizeType.balance =>
-          'Balance has been credited to your account.',
-        LuckyDrawPrizeType.thanks =>
-          'Thank you for participating! Try again with another ticket.',
-      };
+    LuckyDrawPrizeType.coupon => 'Check your coupon in My Profile → Coupons.',
+    LuckyDrawPrizeType.coin => 'Lucky Coins have been added to your wallet.',
+    LuckyDrawPrizeType.balance => 'Balance has been credited to your account.',
+    LuckyDrawPrizeType.thanks =>
+      'Thank you for participating! Try again with another ticket.',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -245,16 +333,16 @@ class _HintText extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline_rounded,
-              size: 16.sp, color: type.color(context)),
+          Icon(
+            Icons.info_outline_rounded,
+            size: 16.sp,
+            color: type.color(context),
+          ),
           SizedBox(width: 6.w),
           Expanded(
             child: Text(
               _hint,
-              style: TextStyle(
-                fontSize: 12.sp,
-                color: context.textTertiary600,
-              ),
+              style: TextStyle(fontSize: 12.sp, color: context.textTertiary600),
             ),
           ),
         ],
@@ -262,5 +350,3 @@ class _HintText extends StatelessWidget {
     );
   }
 }
-
-
