@@ -26,15 +26,24 @@ class LuckyDrawResultDialog extends StatefulWidget {
     bool barrierDismissible = true,
     bool showNextStepActions = false,
   }) {
-    return showDialog<LuckyDrawResultDialogAction>(
-      context: context,
-      barrierDismissible: barrierDismissible,
-      barrierColor: context.bgOverlay.withValues(alpha: 0.7),
-      builder: (_) => LuckyDrawResultDialog(
-        result: result,
-        showNextStepActions: showNextStepActions,
-      ),
-    );
+    debugPrint('[LuckyDrawResultDialog] show called with result: ${result.toJson()}');
+    debugPrint('[LuckyDrawResultDialog] won: ${result.won}, prizeType: ${result.prizeType}');
+    
+    try {
+      return showDialog<LuckyDrawResultDialogAction>(
+        context: context,
+        barrierDismissible: barrierDismissible,
+        barrierColor: context.bgOverlay.withValues(alpha: 0.7),
+        builder: (_) => LuckyDrawResultDialog(
+          result: result,
+          showNextStepActions: showNextStepActions,
+        ),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[LuckyDrawResultDialog] Error showing dialog: $e');
+      debugPrint('[LuckyDrawResultDialog] Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   @override

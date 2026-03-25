@@ -113,25 +113,53 @@ class _LuckyDrawWheelPageState extends ConsumerState<LuckyDrawWheelPage>
   }
 
   Future<void> _handleAnimationEnd(LuckyDrawActionResult result) async {
-    if (!mounted || _didShowResultDialog) return;
+    debugPrint('[LuckyDrawWheel] _handleAnimationEnd called, mounted: $mounted, _didShowResultDialog: $_didShowResultDialog');
+    
+    if (!mounted || _didShowResultDialog) {
+      debugPrint('[LuckyDrawWheel] Early return: !mounted=${!mounted}, _didShowResultDialog=$_didShowResultDialog');
+      return;
+    }
 
     _didShowResultDialog = true;
     setState(() => _stage = _LuckyDrawWheelStage.completed);
 
-    final action = await LuckyDrawResultDialog.show(
-      context,
-      result,
-      barrierDismissible: false,
-      showNextStepActions: true,
-    );
+    try {
+      debugPrint('[LuckyDrawWheel] Showing LuckyDrawResultDialog with result: ${result.toJson()}');
+      
+      final action = await LuckyDrawResultDialog.show(
+        context,
+        result,
+        barrierDismissible: false,
+        showNextStepActions: true,
+      );
 
-    if (!mounted) return;
+      debugPrint('[LuckyDrawWheel] Dialog closed with action: $action');
 
-    Navigator.of(context).pop(
-      action == LuckyDrawResultDialogAction.viewResults
+      if (!mounted) {
+        debugPrint('[LuckyDrawWheel] Page not mounted after dialog, skipping navigation');
+        return;
+      }
+
+      // Always return a value, even if action is null
+      final returnValue = action == LuckyDrawResultDialogAction.viewResults
           ? luckyDrawWheelReturnToResults
-          : luckyDrawWheelReturnToTickets,
-    );
+          : luckyDrawWheelReturnToTickets;
+      
+      debugPrint('[LuckyDrawWheel] Navigating back with returnValue: $returnValue');
+      Navigator.of(context).pop(returnValue);
+    } catch (e, stackTrace) {
+      debugPrint('[LuckyDrawWheel] Error showing dialog: $e');
+      debugPrint('[LuckyDrawWheel] Stack trace: $stackTrace');
+      
+      // Show error toast to user
+      RadixToast.error('Failed to show result dialog: ${e.toString()}');
+      
+      // If there's an error showing the dialog, still return a value
+      if (mounted) {
+        debugPrint('[LuckyDrawWheel] Error fallback: navigating back to tickets');
+        Navigator.of(context).pop(luckyDrawWheelReturnToTickets);
+      }
+    }
   }
 
   @override
@@ -860,12 +888,16 @@ class _LuckyWheelState extends State<_LuckyWheel> {
   }
 
   void _onResult(LuckyDrawActionResult result) {
+    debugPrint('[LuckyWheel] _onResult called with result: ${result.toJson()}');
+    
     widget.wheelController.stop();
 
     final rawIndex = widget.prizes.indexOf(result.prizeTypeEnum);
     final prizeIndex = rawIndex >= 0
         ? rawIndex
         : _getFallbackPrizeIndex(result.prizeTypeEnum);
+
+    debugPrint('[LuckyWheel] Prize index: $prizeIndex (raw: $rawIndex)');
 
     final totalPrizes = widget.prizes.length;
     final anglePerPrize = 2 * pi / totalPrizes;
@@ -875,6 +907,8 @@ class _LuckyWheelState extends State<_LuckyWheel> {
     final currentRotation = _currentAngle % (2 * pi);
     final spins = 5 + _random.nextInt(3);
     final finalAngle = (spins * 2 * pi) - targetAngle - (pi / totalPrizes);
+
+    debugPrint('[LuckyWheel] Animation: currentRotation=$currentRotation, finalAngle=$finalAngle, spins=$spins');
 
     final landingAnimation =
         Tween<double>(begin: currentRotation, end: finalAngle).animate(
@@ -893,7 +927,9 @@ class _LuckyWheelState extends State<_LuckyWheel> {
     });
 
     landingAnimation.addStatusListener((status) {
+      debugPrint('[LuckyWheel] Animation status: $status');
       if (status == AnimationStatus.completed) {
+        debugPrint('[LuckyWheel] Animation completed, calling onAnimationEnd');
         widget.onAnimationEnd(result);
       }
     });
