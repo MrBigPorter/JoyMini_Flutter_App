@@ -335,7 +335,7 @@ class LuckyDrawActionResult {
       rewardType: json['rewardType']?.toString(),
       rewardRefId: json['rewardRefId']?.toString(),
       rewardSummary: json['rewardSummary']?.toString(),
-      won: json['won'] as bool?,
+      won: json['won'] as bool? ?? json['isWin'] as bool?,
       message: json['message']?.toString(),
     );
   }

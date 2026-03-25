@@ -44,7 +44,7 @@ extension LuckyDrawPrizeTypeX on LuckyDrawPrizeType {
   Color color(BuildContext context) => switch (this) {
     LuckyDrawPrizeType.coupon => context.textBrandPrimary900,
     LuckyDrawPrizeType.coin => context.textBrandPrimary900,
-    LuckyDrawPrizeType.balance => context.textSuccessPrimary600,
+    LuckyDrawPrizeType.balance => context.textPrimary900,
     LuckyDrawPrizeType.thanks => context.textDisabled,
   };
 

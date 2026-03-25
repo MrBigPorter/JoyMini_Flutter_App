@@ -32,6 +32,7 @@
 - [x] 订单完成后"获得抽奖券"提示 Banner：在订单结果页展示，点击跳转抽奖页（2026-03-24）
 - [x] Socket 推送闭环：`lucky_draw_ticket_issued` 事件处理 → badge +1 + 通知卡片 + 跳转；`group_success` 兜底刷新；FCM `lucky_draw` 冷启动路由；Me 页菜单入口带红点 badge（2026-03-24）
 - [x] Lucky Wheel UX 优化：进入页说明卡 / 抽奖中状态分层 / 抽奖后结果动作 / 成功回传刷新 / 小屏自适应 / 最小 Provider+Widget 测试（2026-03-25）
+- [x] 修复抽奖结果弹窗不显示问题：修复 `LuckyDrawActionResult.fromJson` 方法处理 `isWin` 字段，添加调试日志跟踪弹窗显示流程（2026-03-25）
 
 > 最后对齐时间：2026-03-25。完成一项就地打勾并更新时间。
 

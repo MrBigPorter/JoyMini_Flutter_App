@@ -131,9 +131,9 @@ class _LuckyDrawPageState extends ConsumerState<LuckyDrawPage>
                       '/lucky-draw/wheel/$ticketId',
                     );
 
-                    if (result != null) {
-                      _handleWheelCompleted(result);
-                    }
+                    // Always refresh API when returning from wheel page
+                    // to ensure ticket list and results are updated
+                    _handleWheelCompleted(result ?? luckyDrawWheelReturnToTickets);
                   },
                   onLoadMore: () => setState(() => _ticketsPage++),
                   onRefresh: () {
