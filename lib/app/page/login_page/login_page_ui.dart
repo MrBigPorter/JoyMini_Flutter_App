@@ -4,21 +4,17 @@ extension LoginPageUI on _LoginPageState {
   Widget buildUI(BuildContext context) {
     final sendEmail = ref.watch(sendEmailCodeCtrlProvider);
     final emailLogin = ref.watch(authLoginEmailCtrlProvider);
-    final googleOauth = ref.watch(authLoginGoogleCtrlProvider);
-    final facebookOauth = ref.watch(authLoginFacebookCtrlProvider);
-    final appleOauth = ref.watch(authLoginAppleCtrlProvider);
 
-    // 全局是否处于“忙碌”状态（包含了等待路由跳转的死区时间）
+    // 全局是否处于"忙碌"状态（包含了等待路由跳转的死区时间）
     final isPageBusy = _emailLoginInFlight ||
         _socialOauthInFlight ||
         _isSuccessRedirecting;
 
     // 独立控制不同按钮的 Loading，谁被点了谁就一直转圈
     final isEmailBtnLoading = emailLogin.isLoading || _emailLoginInFlight;
-    final isSocialBtnLoading = googleOauth.isLoading ||
-        facebookOauth.isLoading ||
-        appleOauth.isLoading ||
-        _socialOauthInFlight;
+    // 社交登录 loading 只依赖本页面的局部标志，避免 keepAlive provider
+    // 的历史 AsyncLoading 状态（热重载中断、上次登录残留）污染按钮状态
+    final isSocialBtnLoading = _socialOauthInFlight;
 
     final showGoogleButton = OauthSignInService.canShowGoogleButton || kIsWeb;
     final showFacebookButton = OauthSignInService.canShowFacebookButton || kIsWeb;

@@ -42,6 +42,7 @@ import 'package:flutter_app/app/page/lucky_draw/lucky_draw_page.dart';
 import 'package:flutter_app/app/page/pwa_debug_page.dart';
 import 'package:flutter_app/app/page/product_detail_page.dart';
 import 'package:flutter_app/app/page/withdraw/withdraw_page.dart';
+import 'package:flutter_app/app/page/lucky_draw/lucky_draw_wheel_page.dart';
 import 'package:flutter_app/ui/chat/group/group_request_list/group_request_list_page.dart';
 import 'package:flutter_app/ui/chat/group/group_profile/group_profile_page.dart';
 import '../../ui/chat/group/group_search/group_search_page.dart';
@@ -190,7 +191,8 @@ class AppRouter {
           path: '/contact/profile/:userId',
           builder: (context, state) {
             final userId = state.pathParameters['userId']!;
-            final cachedUser = state.extra as ChatUser;
+            // 安全转换：extra 可能为 null（deep link / URL 直访），不能硬 cast
+            final cachedUser = state.extra is ChatUser ? state.extra as ChatUser : null;
 
             return ContactProfilePage(userId: userId, cachedUser: cachedUser);
           },
@@ -376,7 +378,21 @@ class AppRouter {
         GoRoute(
           name: 'luckyDraw',
           path: '/lucky-draw',
-          builder: (context, state) => const LuckyDrawPage(),
+          builder: (context, state) {
+            final initialTab = state.uri.queryParameters['tab'] == 'results'
+                ? 1
+                : 0;
+            return LuckyDrawPage(initialTab: initialTab);
+          },
+        ),
+        GoRoute(
+          name: 'luckyDrawWheel',
+          path: '/lucky-draw/wheel/:ticketId',
+          parentNavigatorKey: NavHub.key,
+          builder: (context, state) {
+            final ticketId = state.pathParameters['ticketId']!;
+            return LuckyDrawWheelPage(ticketId: ticketId);
+          },
         ),
         GoRoute(
           name: 'flashSale',
