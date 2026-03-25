@@ -2,11 +2,9 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/core/models/lucky_draw.dart';
 import 'package:flutter_app/core/providers/lucky_draw_provider.dart';
-import 'package:flutter_app/theme/design_tokens.g.dart';
 import 'package:flutter_app/ui/toast/radix_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -26,7 +24,7 @@ class LuckyDrawWheelPage extends ConsumerStatefulWidget {
 }
 
 class _LuckyDrawWheelPageState extends ConsumerState<LuckyDrawWheelPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _wheelController;
   final _prizes = <LuckyDrawPrizeType>[
     LuckyDrawPrizeType.coin,
@@ -115,6 +113,7 @@ class _LuckyDrawWheelPageState extends ConsumerState<LuckyDrawWheelPage>
   Future<void> _handleAnimationEnd(LuckyDrawActionResult result) async {
     debugPrint('[LuckyDrawWheel] _handleAnimationEnd called, mounted: $mounted, _didShowResultDialog: $_didShowResultDialog');
     
+    // 防止重复调用
     if (!mounted || _didShowResultDialog) {
       debugPrint('[LuckyDrawWheel] Early return: !mounted=${!mounted}, _didShowResultDialog=$_didShowResultDialog');
       return;
@@ -140,13 +139,25 @@ class _LuckyDrawWheelPageState extends ConsumerState<LuckyDrawWheelPage>
         return;
       }
 
+      // 检查导航器是否可以被弹出
+      final navigator = Navigator.of(context);
+      if (!navigator.canPop()) {
+        debugPrint('[LuckyDrawWheel] Navigator cannot pop, returning directly');
+        return;
+      }
+
       // Always return a value, even if action is null
       final returnValue = action == LuckyDrawResultDialogAction.viewResults
           ? luckyDrawWheelReturnToResults
           : luckyDrawWheelReturnToTickets;
       
       debugPrint('[LuckyDrawWheel] Navigating back with returnValue: $returnValue');
-      Navigator.of(context).pop(returnValue);
+      
+      // 使用 maybePop() 替代 pop() 避免导航器状态错误
+      final didPop = await navigator.maybePop(returnValue);
+      if (!didPop) {
+        debugPrint('[LuckyDrawWheel] maybePop returned false, navigation may have been blocked');
+      }
     } catch (e, stackTrace) {
       debugPrint('[LuckyDrawWheel] Error showing dialog: $e');
       debugPrint('[LuckyDrawWheel] Stack trace: $stackTrace');
@@ -157,7 +168,18 @@ class _LuckyDrawWheelPageState extends ConsumerState<LuckyDrawWheelPage>
       // If there's an error showing the dialog, still return a value
       if (mounted) {
         debugPrint('[LuckyDrawWheel] Error fallback: navigating back to tickets');
-        Navigator.of(context).pop(luckyDrawWheelReturnToTickets);
+        try {
+          // 使用安全导航
+          final navigator = Navigator.of(context);
+          if (navigator.canPop()) {
+            await navigator.maybePop(luckyDrawWheelReturnToTickets);
+          } else {
+            debugPrint('[LuckyDrawWheel] Cannot pop in error fallback, returning directly');
+          }
+        } catch (e2) {
+          debugPrint('[LuckyDrawWheel] Error in fallback navigation: $e2');
+          // 最后手段：什么也不做，让用户手动返回
+        }
       }
     }
   }
@@ -215,7 +237,6 @@ class _LuckyDrawWheelPageState extends ConsumerState<LuckyDrawWheelPage>
                             child: _LuckyWheel(
                               wheelSize: wheelSize,
                               prizes: _prizes,
-                              wheelController: _wheelController,
                               resultStream: _resultStream.stream,
                               isAwaitingResult:
                                   _stage == _LuckyDrawWheelStage.requesting,
@@ -400,7 +421,7 @@ class _TicketSummaryCard extends StatelessWidget {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.14),
+                  color: accentColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(99.r),
                 ),
                 child: Row(
@@ -831,7 +852,6 @@ class _LuckyWheel extends StatefulWidget {
   const _LuckyWheel({
     required this.wheelSize,
     required this.prizes,
-    required this.wheelController,
     required this.resultStream,
     required this.isAwaitingResult,
     required this.canTapToStart,
@@ -842,7 +862,6 @@ class _LuckyWheel extends StatefulWidget {
 
   final double wheelSize;
   final List<LuckyDrawPrizeType> prizes;
-  final AnimationController wheelController;
   final Stream<LuckyDrawActionResult> resultStream;
   final bool isAwaitingResult;
   final bool canTapToStart;
@@ -854,20 +873,38 @@ class _LuckyWheel extends StatefulWidget {
   State<_LuckyWheel> createState() => _LuckyWheelState();
 }
 
-class _LuckyWheelState extends State<_LuckyWheel> {
+class _LuckyWheelState extends State<_LuckyWheel>
+    with TickerProviderStateMixin {
+  late final AnimationController _rotationController; // 用于等待时的旋转动画
   late final Animation<double> _rotationAnimation;
   StreamSubscription<LuckyDrawActionResult>? _resultSubscription;
   double _currentAngle = 0.0;
   final _random = Random();
+  
+    // 用于结果动画的控制器
+    AnimationController? _resultController;
+    
+    // 存储监听器引用以便后续移除
+    VoidCallback? _rotationAnimationListener;
 
   @override
   void initState() {
     super.initState();
-    _rotationAnimation =
-        Tween<double>(begin: 0, end: 2 * pi).animate(widget.wheelController)
-          ..addListener(() {
-            setState(() => _currentAngle = _rotationAnimation.value);
-          });
+    
+    // 创建旋转动画控制器，用于等待结果时的持续旋转
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+    
+    // 创建基础旋转动画并存储监听器引用
+    _rotationAnimation = Tween<double>(begin: 0, end: 2 * pi).animate(_rotationController);
+    
+    // 存储并添加角度更新监听器
+    _rotationAnimationListener = () {
+      setState(() => _currentAngle = _rotationAnimation.value);
+    };
+    _rotationAnimation.addListener(_rotationAnimationListener!);
 
     _resultSubscription = widget.resultStream.listen(_onResult);
   }
@@ -876,28 +913,54 @@ class _LuckyWheelState extends State<_LuckyWheel> {
   void didUpdateWidget(covariant _LuckyWheel oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    // 只在等待结果时播放旋转动画
     if (widget.isAwaitingResult && !oldWidget.isAwaitingResult) {
-      widget.wheelController
+      // 确保动画控制器处于正确状态
+      if (_rotationController.isAnimating) {
+        _rotationController.stop();
+      }
+      _rotationController
         ..duration = const Duration(milliseconds: 850)
         ..repeat();
     }
 
+    // 当不再等待结果时停止旋转动画
     if (!widget.isAwaitingResult && oldWidget.isAwaitingResult) {
-      widget.wheelController.stop();
+      _rotationController.stop();
     }
   }
 
   void _onResult(LuckyDrawActionResult result) {
     debugPrint('[LuckyWheel] _onResult called with result: ${result.toJson()}');
     
-    widget.wheelController.stop();
+    debugPrint('[LuckyWheel] Before stopping rotation: _currentAngle=$_currentAngle, _rotationController.isAnimating=${_rotationController.isAnimating}');
+    
+    // 停止旋转动画
+    if (_rotationController.isAnimating) {
+      _rotationController.stop();
+      debugPrint('[LuckyWheel] Rotation controller stopped');
+    }
+    
+    // 如果存在旧的动画控制器，释放它
+    if (_resultController != null) {
+      debugPrint('[LuckyWheel] Disposing old result controller');
+      _resultController!.stop();
+      _resultController!.dispose();
+      _resultController = null;
+    }
+    
+    // 移除旧的旋转动画监听器
+    if (_rotationAnimationListener != null) {
+      debugPrint('[LuckyWheel] Removing rotation animation listener');
+      _rotationAnimation.removeListener(_rotationAnimationListener!);
+    }
 
     final rawIndex = widget.prizes.indexOf(result.prizeTypeEnum);
     final prizeIndex = rawIndex >= 0
         ? rawIndex
         : _getFallbackPrizeIndex(result.prizeTypeEnum);
 
-    debugPrint('[LuckyWheel] Prize index: $prizeIndex (raw: $rawIndex)');
+    debugPrint('[LuckyWheel] Prize index: $prizeIndex (raw: $rawIndex), prizeType: ${result.prizeTypeEnum}');
 
     final totalPrizes = widget.prizes.length;
     final anglePerPrize = 2 * pi / totalPrizes;
@@ -905,33 +968,115 @@ class _LuckyWheelState extends State<_LuckyWheel> {
     final targetAngle = (prizeIndex * anglePerPrize) + randomOffset;
 
     final currentRotation = _currentAngle % (2 * pi);
-    final spins = 5 + _random.nextInt(3);
+    final spins = 8 + _random.nextInt(4); // 增加旋转圈数: 8-11圈
     final finalAngle = (spins * 2 * pi) - targetAngle - (pi / totalPrizes);
 
-    debugPrint('[LuckyWheel] Animation: currentRotation=$currentRotation, finalAngle=$finalAngle, spins=$spins');
+    debugPrint('[LuckyWheel] Animation params: currentRotation=$currentRotation, finalAngle=$finalAngle, spins=$spins, targetAngle=$targetAngle');
+    debugPrint('[LuckyWheel] Angle difference: ${finalAngle - currentRotation} radians');
 
-    final landingAnimation =
-        Tween<double>(begin: currentRotation, end: finalAngle).animate(
-          CurvedAnimation(
-            parent: widget.wheelController,
-            curve: Curves.easeOutCubic,
-          ),
-        );
-
-    widget.wheelController
-      ..duration = const Duration(seconds: 4)
-      ..forward(from: 0.0);
-
-    landingAnimation.addListener(() {
-      setState(() => _currentAngle = landingAnimation.value);
-    });
-
-    landingAnimation.addStatusListener((status) {
-      debugPrint('[LuckyWheel] Animation status: $status');
+    debugPrint('[LuckyWheel] Setting animation duration to 5.5 seconds');
+    
+    // 创建新的动画控制器
+    debugPrint('[LuckyWheel] Creating new result controller with vsync');
+    _resultController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 5500),
+    );
+    
+    debugPrint('[LuckyWheel] Result controller created: duration=${_resultController!.duration}');
+    
+    // 创建动画
+    final tween = Tween<double>(begin: currentRotation, end: finalAngle);
+    final animation = tween.animate(
+      CurvedAnimation(
+        parent: _resultController!,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    
+    debugPrint('[LuckyWheel] Animation created: begin=${tween.begin}, end=${tween.end}');
+    
+    // 添加动画值监听器
+    void animationValueListener() {
+      final value = animation.value;
+      debugPrint('[LuckyWheel] Animation value: $value');
+      setState(() {
+        debugPrint('[LuckyWheel] setState called with _currentAngle=$value');
+        _currentAngle = value;
+      });
+    }
+    
+    // 添加动画状态监听器
+    void animationStatusListener(AnimationStatus status) {
+      debugPrint('[LuckyWheel] Animation status changed: $status');
       if (status == AnimationStatus.completed) {
-        debugPrint('[LuckyWheel] Animation completed, calling onAnimationEnd');
+        debugPrint('[LuckyWheel] ✅ Animation completed, calling onAnimationEnd');
+        // 移除监听器避免重复调用
+        animation.removeListener(animationValueListener);
+        animation.removeStatusListener(animationStatusListener);
+        widget.onAnimationEnd(result);
+      } else if (status == AnimationStatus.dismissed) {
+        debugPrint('[LuckyWheel] Animation dismissed');
+      } else if (status == AnimationStatus.forward) {
+        debugPrint('[LuckyWheel] Animation forward');
+      } else if (status == AnimationStatus.reverse) {
+        debugPrint('[LuckyWheel] Animation reverse');
+      }
+    }
+    
+    debugPrint('[LuckyWheel] Adding animation listeners');
+    animation.addListener(animationValueListener);
+    animation.addStatusListener(animationStatusListener);
+    
+    debugPrint('[LuckyWheel] Starting animation from $currentRotation to $finalAngle');
+    debugPrint('[LuckyWheel] Before forward: _resultController.value=${_resultController!.value}, isAnimating=${_resultController!.isAnimating}');
+    
+    _resultController!.forward();
+    
+    debugPrint('[LuckyWheel] After forward: _resultController.value=${_resultController!.value}, isAnimating=${_resultController!.isAnimating}, isCompleted=${_resultController!.isCompleted}');
+
+    debugPrint('[LuckyWheel] Result controller state after forward: isAnimating=${_resultController!.isAnimating}, isCompleted=${_resultController!.isCompleted}');
+    
+    // 添加一个安全机制：如果动画在7秒内没有完成，强制触发完成
+    Future.delayed(const Duration(seconds: 7), () {
+      debugPrint('[LuckyWheel] ⏰ 7秒超时检查: isAnimating=${_resultController?.isAnimating ?? false}, isCompleted=${_resultController?.isCompleted ?? false}');
+      if (_resultController?.isAnimating == true) {
+        debugPrint('[LuckyWheel] ⚠️ Animation timeout (7 seconds), forcing completion');
+        _resultController?.stop();
+        // 移除监听器
+        try {
+          animation.removeListener(animationValueListener);
+        } catch (_) {}
+        try {
+          animation.removeStatusListener(animationStatusListener);
+        } catch (_) {}
+        widget.onAnimationEnd(result);
+      } else if (_resultController?.isCompleted != true) {
+        debugPrint('[LuckyWheel] ⚠️ Animation not running and not completed, forcing completion');
+        // 移除监听器
+        try {
+          animation.removeListener(animationValueListener);
+        } catch (_) {}
+        try {
+          animation.removeStatusListener(animationStatusListener);
+        } catch (_) {}
         widget.onAnimationEnd(result);
       }
+    });
+
+    // 添加一个定时器检查动画状态
+    Future.delayed(const Duration(milliseconds: 100), () {
+      debugPrint('[LuckyWheel] 100ms后检查动画状态: isAnimating=${_resultController?.isAnimating ?? false}, isCompleted=${_resultController?.isCompleted ?? false}, value=${animation.value}');
+    });
+    
+    Future.delayed(const Duration(seconds: 1), () {
+      debugPrint('[LuckyWheel] 1秒后检查动画状态: isAnimating=${_resultController?.isAnimating ?? false}, isCompleted=${_resultController?.isCompleted ?? false}, value=${animation.value}');
+      debugPrint('[LuckyWheel] 当前角度: $_currentAngle, 目标角度: $finalAngle');
+    });
+    
+    Future.delayed(const Duration(seconds: 3), () {
+      debugPrint('[LuckyWheel] 3秒后检查动画状态: isAnimating=${_resultController?.isAnimating ?? false}, isCompleted=${_resultController?.isCompleted ?? false}, value=${animation.value}');
+      debugPrint('[LuckyWheel] 当前角度: $_currentAngle, 目标角度: $finalAngle');
     });
   }
 
@@ -943,6 +1088,8 @@ class _LuckyWheelState extends State<_LuckyWheel> {
   @override
   void dispose() {
     _resultSubscription?.cancel();
+    _rotationController.dispose();
+    _resultController?.dispose();
     super.dispose();
   }
 
