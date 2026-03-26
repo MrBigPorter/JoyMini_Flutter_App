@@ -3,6 +3,7 @@ import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/skeleton.dart';
 import 'package:card_swiper/card_swiper.dart';
 import 'package:flutter_app/ui/img/app_image.dart';
+import 'package:flutter_app/ui/img/optimized_image.dart';
 import 'package:flutter_app/utils/helper.dart';
 
 import '../utils/media/remote_url_builder.dart';
@@ -192,7 +193,7 @@ class CustomDotPaginationBuilder extends SwiperPlugin {
 
 /// Image widget with placeholder and error handling
 /// if itemBuilder is provided, use it to build the widget
-/// otherwise, use CachedNetworkImage to load image from network
+/// otherwise, use OptimizedImage to load image with advanced caching
 /// with placeholder and error widget
 class ImageWidget<T> extends StatelessWidget {
   final dynamic item;
@@ -222,11 +223,13 @@ class ImageWidget<T> extends StatelessWidget {
       url = item?.bannerImgUrl;
     }
 
-    return AppCachedImage(
-      RemoteUrlBuilder.fitAbsoluteUrl(url),
+    // 使用优化的图片组件 - 直接传递原始 URL，让 OptimizedImage 内部处理 CDN 转换
+    // 注意：RemoteUrlBuilder.fitAbsoluteUrl 已经被 OptimizedImage 内部的 ResponsiveImageService 替代
+    return OptimizedImageFactory.banner(
+      url: url,
       width: width,
       height: height,
-      fit: BoxFit.cover,
+      borderRadius: BorderRadius.circular(8.0),
     );
   }
 }
