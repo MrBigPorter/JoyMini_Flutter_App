@@ -16,8 +16,8 @@ extension LoginPageUI on _LoginPageState {
     // 的历史 AsyncLoading 状态（热重载中断、上次登录残留）污染按钮状态
     final isSocialBtnLoading = _socialOauthInFlight;
 
-    final showGoogleButton = OauthSignInService.canShowGoogleButton || kIsWeb;
-    final showFacebookButton = OauthSignInService.canShowFacebookButton || kIsWeb;
+    final showGoogleButton = OauthSignInService.canShowGoogleButton;
+    final showFacebookButton = OauthSignInService.canShowFacebookButton;
 
     return BaseScaffold(
       body: LayoutBuilder(

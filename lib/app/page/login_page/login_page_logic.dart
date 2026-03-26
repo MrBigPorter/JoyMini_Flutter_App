@@ -41,23 +41,50 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   Future<void> _initGoogleWebSignIn() async {
     try {
+      debugPrint('[LoginPage] Google web sign-in initialization start');
       await OauthSignInService.initializeForWeb(trigger: 'login_page.initState');
+      debugPrint('[LoginPage] Google web sign-in initialization success');
+      
       _googleWebAuthSub?.cancel();
       _googleWebAuthSub = GoogleSignIn.instance.authenticationEvents.listen(
             (event) {
+          debugPrint('[LoginPage] Google web auth event received: ${event.runtimeType}');
           if (event is GoogleSignInAuthenticationEventSignIn) {
+            debugPrint('[LoginPage] Google web SignIn event | email=${event.user.email}');
             _processGoogleWebCredential(event.user);
+          } else if (event is GoogleSignInAuthenticationEventSignOut) {
+            debugPrint('[LoginPage] Google web SignOut event');
+          } else {
+            debugPrint('[LoginPage] Google web other event: ${event.runtimeType}');
           }
         },
         onError: (Object error) {
-          if (error is GoogleSignInException && error.code == GoogleSignInExceptionCode.canceled) return;
+          debugPrint('[LoginPage] Google web auth stream error: $error');
+          if (error is GoogleSignInException && error.code == GoogleSignInExceptionCode.canceled) {
+            debugPrint('[LoginPage] Google web auth cancelled');
+            return;
+          }
           _handleOauthError(error);
         },
         cancelOnError: false,
       );
-      if (mounted) setState(() => _googleWebReady = true);
-    } catch (e) {
+      debugPrint('[LoginPage] Google web auth listener established');
+      
+      if (mounted) {
+        setState(() {
+          _googleWebReady = true;
+          debugPrint('[LoginPage] Google web ready flag set to true');
+        });
+      }
+    } catch (e, s) {
       debugPrint('[LoginPage] Google web init error: $e');
+      debugPrint('[LoginPage] Google web init stack trace: $s');
+      if (mounted) {
+        setState(() {
+          _googleWebReady = false;
+          debugPrint('[LoginPage] Google web ready flag set to false due to error');
+        });
+      }
     }
   }
 
