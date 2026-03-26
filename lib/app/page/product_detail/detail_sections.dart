@@ -5,6 +5,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/ui/img/app_image.dart';
+import 'package:flutter_app/ui/img/optimized_image.dart';
+import 'package:flutter_app/utils/image/performance_monitor.dart';
 import 'package:flutter_countdown_timer/flutter_countdown_timer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -664,18 +666,9 @@ class _GroupSectionState extends ConsumerState<GroupSection> {
       ),
       child: Row(
         children: [
-          AppCachedImage(
-            item.creator.avatar ?? '',
-            width: 32.w,
-            height: 32.w,
-            radius: BorderRadius.circular(16.r),
-            fit: BoxFit.cover,
-            error: Icon(FontAwesomeIcons.user, size: 16.w, color: Colors.white),
-            placeholder: Icon(
-              FontAwesomeIcons.user,
-              size: 16.w,
-              color: Colors.white,
-            ),
+          OptimizedImageFactory.avatar(
+            url: item.creator.avatar ?? '',
+            size: 32.w,
           ),
           SizedBox(width: 8.w),
           Expanded(
