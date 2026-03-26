@@ -9,6 +9,7 @@ import 'package:flutter_app/app/page/page_404.dart';
 import 'package:flutter_app/app/page/payment/payment_page.dart';
 import 'package:flutter_app/app/page/product_group_page.dart';
 import 'package:flutter_app/app/page/setting_page.dart';
+import 'package:flutter_app/app/page/treasure_coins_page.dart';
 import 'package:flutter_app/app/routes/route_auth_config.dart';
 import 'package:flutter_app/app/routes/transitions.dart';
 import 'package:flutter_app/core/models/payment.dart';
@@ -461,6 +462,15 @@ class AppRouter {
           name: 'withdraw',
           path: '/me/wallet/withdraw',
           builder: (context, state) => WithdrawPage(),
+        ),
+        GoRoute(
+          name: 'treasureCoins',
+          path: '/me/wallet/coins',
+          pageBuilder: (ctx, state) => fxPage(
+            key: state.pageKey,
+            child: const TreasureCoinsPage(),
+            fx: RouteFx.slideUp,
+          ),
         ),
         GoRoute(
           name: 'debug-liveness',

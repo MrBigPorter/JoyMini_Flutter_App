@@ -303,8 +303,7 @@ class _WalletArea extends StatelessWidget {
                 title: 'common.treasureCoins'.tr(),
                 value: balance.coinBalance,
                 actionText: 'Details',
-                onTap: () =>
-                    RadixToast.info('Treasure Coins details coming soon!'),
+                onTap: () => appRouter.push('/me/wallet/coins'),
               ),
             ],
           ),
