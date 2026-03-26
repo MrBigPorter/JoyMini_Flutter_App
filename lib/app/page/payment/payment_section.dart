@@ -776,14 +776,7 @@ class CoinsDiscountSection extends ConsumerWidget {
             ),
             Switch(
               value: purchase.useDiscountCoins,
-              onChanged: coinsBalance > 0
-                  ? (v) => notifier.toggleUseDiscountCoins(v)
-                  : (v) {
-                      // 余额为 0 时显示提示
-                      RadixToast.info(
-                        'No coins available. Participate in Lucky Draw to earn coins!',
-                      );
-                    },
+              onChanged: (v) => notifier.toggleUseDiscountCoins(v),
               activeTrackColor: context.bgBrandSolid,
             ),
           ],
