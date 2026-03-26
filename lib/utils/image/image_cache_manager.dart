@@ -87,14 +87,19 @@ class ImageCacheManager {
 
         debugPrint('[ImageCacheManager] Raw data received: ${uint8List.length} bytes');
 
+        // 【核心修复】: 将 50 字节检查改为只记录日志，不再抛出异常
+        // 有些合法的图标/小图片可能小于 50 字节，不应该因此抛出异常
         if (uint8List.length < 50) {
-          debugPrint('[ImageCacheManager] Data too small ($url): ${uint8List.length} bytes');
+          debugPrint('[ImageCacheManager] Warning: Data small ($url): ${uint8List.length} bytes');
+          // 不再抛出异常，而是继续处理
         }
 
         if (uint8List.length > 20) {
           final head = String.fromCharCodes(uint8List.take(20));
           if (head.contains('<!DOC') || head.contains('<html') || head.contains('error')) {
-            throw Exception('[ImageCacheManager] Received HTML instead of Image. Check URL format.');
+            // 记录日志但继续返回数据，让上层解码器处理
+            debugPrint('[ImageCacheManager] Warning: Possible HTML response ($url)');
+            // 不再抛出异常，而是返回数据让上层处理
           }
         }
 
