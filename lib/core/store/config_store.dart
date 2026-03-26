@@ -1,32 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_app/core/store/hydrated_state_notifier.dart';
-import 'package:flutter_app/core/models/index.dart'; // 确保引入 SysConfig
+import 'package:flutter_app/core/models/dynamic_system_config.dart';
 import '../api/lucky_api.dart';
 
-class SysConfigNotifier extends HydratedStateNotifier<SysConfig> {
+class SystemConfigNotifier extends HydratedStateNotifier<DynamicSystemConfig> {
   // 设置默认值
-  SysConfigNotifier() : super(SysConfig(
-    kycAndPhoneVerification: '1',
-    webBaseUrl: '',
-    exChangeRate: 1.0,
-  ));
+  SystemConfigNotifier() : super(DynamicSystemConfig(configs: {
+    'kyc_and_phone_verification': '1',
+    'web_base_url': '',
+    'exchange_rate': '1.0',
+  }));
 
   @override
   String get storageKey => 'sys_config_storage';
 
   @override
-  SysConfig fromJson(Map<String, dynamic> json) => SysConfig.fromJson(json);
+  DynamicSystemConfig fromJson(Map<String, dynamic> json) => DynamicSystemConfig.fromJson(json);
 
   @override
-  Map<String, dynamic> toJson(SysConfig state) => state.toJson();
+  Map<String, dynamic> toJson(DynamicSystemConfig state) => state.toJson();
 
   /// 获取最新配置
   Future<void> fetchLatest() async {
-    final config = await Api.getSysConfig();
-    state = config;
+    try {
+      final config = await Api.getDynamicSystemConfig();
+      state = config;
+    } catch (_) {}
   }
 }
 
-final configProvider = StateNotifierProvider<SysConfigNotifier, SysConfig>((ref) {
-  return SysConfigNotifier();
+final configProvider = StateNotifierProvider<SystemConfigNotifier, DynamicSystemConfig>((ref) {
+  return SystemConfigNotifier();
 });

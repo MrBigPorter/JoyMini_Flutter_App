@@ -6,6 +6,7 @@ import 'package:flutter_app/core/store/auth/auth_provider.dart';
 import 'package:flutter_app/ui/chat/services/database/local_database_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/store/config_store.dart';
 import '../ui/chat/providers/contact_provider.dart';
 import '../ui/chat/providers/conversation_provider.dart';
 
@@ -17,6 +18,16 @@ Future<void> appStartup(AppStartupRef ref) async {
   // Since AuthNotifier initializes by reading the Token synchronously,
   // it has its state immediately upon startup.
   ref.watch(authProvider);
+
+  Future.microtask(() async {
+    try {
+      final notifier = ref.read(configProvider.notifier);
+      await notifier.fetchLatest();
+    } catch (e) {
+      // 静默失败，不影响用户体验
+    }
+  });
+
 
   final authState = ref.read(authProvider);
 
@@ -63,7 +74,7 @@ Future<void> appStartup(AppStartupRef ref) async {
       ref.read(conversationListProvider);
 
       await LocalDatabaseService.init(userId);
-      // 🔥 预读数据，存入内存
+      //  预读数据，存入内存
       ref.read(contactEntitiesProvider);
 
       debugPrint(" [AppStartup] Data pre-fetching started in background...");
