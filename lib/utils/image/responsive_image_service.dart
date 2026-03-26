@@ -25,9 +25,10 @@ class ResponsiveImageService {
   }) {
     if (originalUrl.isEmpty) return originalUrl;
 
-    // 如果URL已经包含CDN前缀，直接返回避免重复处理
-    if (originalUrl.contains(RemoteUrlBuilder.cdnPrefix)) {
-      debugPrint('[ResponsiveImageService] URL already contains CDN prefix, returning as-is: $originalUrl');
+    // 【核心修复】: 增强CDN前缀检测，支持多种可能的格式
+    // 检查URL是否已经包含CDN处理参数
+    if (_isAlreadyOptimized(originalUrl)) {
+      debugPrint('[ResponsiveImageService] URL already optimized, returning as-is: $originalUrl');
       return originalUrl;
     }
 
@@ -79,5 +80,34 @@ class ResponsiveImageService {
     debugPrint('  Quality: $quality, DPR: $dpr');*/
     
     return optimizedUrl;
+  }
+
+  /// 检查URL是否已经被优化处理过
+  bool _isAlreadyOptimized(String url) {
+    // 检查是否包含CDN前缀
+    if (url.contains(RemoteUrlBuilder.cdnPrefix)) {
+      return true;
+    }
+    
+    // 检查是否包含常见的CDN处理参数模式
+    final cdnPatterns = [
+      '/cdn-cgi/image/',
+      'cdn-cgi/image/',
+      'fit=cover',
+      'f=auto',
+      'quality=',
+      'width=',
+      'height='
+    ];
+    
+    int patternCount = 0;
+    for (final pattern in cdnPatterns) {
+      if (url.contains(pattern)) {
+        patternCount++;
+      }
+    }
+    
+    // 如果包含多个CDN处理参数，则认为已经优化过
+    return patternCount >= 2;
   }
 }
