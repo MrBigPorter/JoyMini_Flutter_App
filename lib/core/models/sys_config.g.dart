@@ -14,8 +14,8 @@ SysConfig _$SysConfigFromJson(Map<String, dynamic> json) => $checkedCreate(
           kycAndPhoneVerification:
               $checkedConvert('kycAndPhoneVerification', (v) => v as String),
           webBaseUrl: $checkedConvert('webBaseUrl', (v) => v as String),
-          exChangeRate:
-              $checkedConvert('exChangeRate', (v) => (v as num).toDouble()),
+          exchangeRate: $checkedConvert(
+              'exchangeRate', (v) => SysConfig._exchangeRateFromJson(v)),
         );
         return val;
       },
@@ -24,5 +24,5 @@ SysConfig _$SysConfigFromJson(Map<String, dynamic> json) => $checkedCreate(
 Map<String, dynamic> _$SysConfigToJson(SysConfig instance) => <String, dynamic>{
       'kycAndPhoneVerification': instance.kycAndPhoneVerification,
       'webBaseUrl': instance.webBaseUrl,
-      'exChangeRate': instance.exChangeRate,
+      'exchangeRate': SysConfig._exchangeRateToJson(instance.exchangeRate),
     };

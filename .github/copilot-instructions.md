@@ -202,6 +202,39 @@
 - 考虑添加更多 coins 获取途径（如签到、任务等）
 - 添加 coins 交易记录的完整历史页面
 
+**新迭代 — 分享功能配置化修复（已完成 2026-03-26）**:
+- [x] 分析分享桥接 URL 硬编码问题：`app_share_manager.dart` 中的 `_bridgeHost` 硬编码为 `"https://dev-api.joyminis.com/share.html"`（2026-03-26）
+- [x] 制定修复方案：使用动态系统配置 `webBaseUrl` 构建分享桥接 URL（2026-03-26）
+- [x] 实施修复：修改 `ShareManager.startShare` 方法，从 `configProvider` 获取 `webBaseUrl` 配置（2026-03-26）
+- [x] 修复未使用变量警告：修复 `cleanDesc` 变量未使用的问题，确保使用清洗后的文本（2026-03-26）
+- [x] 测试验证：运行 Flutter analyze 验证代码无编译错误（2026-03-26）
+
+**分享功能配置化修复完成总结**:
+✅ **根本问题识别**: 分享桥接 URL 硬编码，无法适应不同环境（开发/测试/生产）
+✅ **核心修复完成**: 
+   - 移除硬编码的 `_bridgeHost` 常量
+   - 使用 `webBaseUrl` 动态配置构建分享桥接 URL：`$webBaseUrl/share.html`
+   - 添加回退机制：如果 `webBaseUrl` 为空，使用默认开发环境 URL
+   - 修复 `cleanDesc` 变量未使用的问题，确保分享文本正确清洗 HTML 标签
+✅ **配置一致性**: 与其他分享功能保持一致，都使用 `webBaseUrl` 配置
+✅ **编译验证通过**: Flutter analyze 无编译错误，代码质量保持
+
+**修复效果**:
+- 分享功能现在支持多环境配置
+- 分享桥接 URL 可通过后端动态配置更改
+- 分享文本正确清洗 HTML 标签，提升用户体验
+- 代码更加健壮和可维护
+
+**详细修改**:
+- 文件: `lib/features/share/services/app_share_manager.dart`
+- 主要改动: 使用 `ProviderScope.containerOf(context).read(configProvider).webBaseUrl` 获取配置
+- 回退机制: 如果 `webBaseUrl` 为空，使用 `'https://dev-api.joyminis.com/share.html'` 作为默认值
+
+**下一步建议**:
+- 确保后端在所有环境的 `webBaseUrl` 配置下都提供 `/share.html` 页面
+- 监控生产环境分享功能是否正常工作
+- 考虑添加专门的 `share_bridge_url` 配置字段以获得更高灵活性
+
 **下一步 — Phase 3：全应用图片优化扩展（计划中）**:
 - [ ] 扩展优化组件到其他页面：个人中心、聊天页面、订单页面
 - [ ] 实现智能缓存清理：基于使用频率和存储空间的智能管理

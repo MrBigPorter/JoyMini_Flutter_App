@@ -39,7 +39,7 @@ class _TreasureCoinsPageState extends ConsumerState<TreasureCoinsPage> {
   Widget build(BuildContext context) {
     final balance = ref.watch(walletProvider);
     final coinsBalance = balance.coinBalance;
-    final exchangeRate = ref.read(configProvider).exChangeRate;
+    final exchangeRate = ref.watch(configProvider).exchangeRate;
     final coinsValue = coinsBalance / (exchangeRate > 0 ? exchangeRate : 100);
 
     return BaseScaffold(
