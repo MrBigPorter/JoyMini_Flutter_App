@@ -6,11 +6,10 @@ import 'package:flutter_app/components/render_countdown.dart';
 import 'package:flutter_app/components/skeleton.dart';
 import 'package:flutter_app/ui/bubble_progress.dart';
 import 'package:flutter_app/ui/button/index.dart';
-import 'package:flutter_app/ui/img/app_image.dart';
 import 'package:flutter_app/ui/img/optimized_image.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 import 'package:flutter_app/core/models/index.dart';
-import 'package:flutter_app/utils/media/remote_url_builder.dart';
+import 'package:flutter_app/utils/image/product_detail_preloader.dart';
 
 import '../utils/media/url_resolver.dart';
 
@@ -196,6 +195,13 @@ class ProductItem extends StatelessWidget {
                             ? context.textPrimary900
                             : context.textWhite,
                         onPressed: () {
+                          // 预取商品详情页图片
+                          ProductDetailPreloader().preloadProductDetailImages(
+                            context: context,
+                            product: data,
+                            groups: null, // 商品列表中没有groups信息，只预取封面图
+                          );
+                          
                           appRouter.pushNamed(
                             'productDetail',
                             pathParameters: {'id': data.treasureId ?? ''},
