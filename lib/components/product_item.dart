@@ -7,9 +7,12 @@ import 'package:flutter_app/components/skeleton.dart';
 import 'package:flutter_app/ui/bubble_progress.dart';
 import 'package:flutter_app/ui/button/index.dart';
 import 'package:flutter_app/ui/img/app_image.dart';
+import 'package:flutter_app/ui/img/optimized_image.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 import 'package:flutter_app/core/models/index.dart';
 import 'package:flutter_app/utils/media/remote_url_builder.dart';
+
+import '../utils/media/url_resolver.dart';
 
 //  矢量级商品卡片：完全脱离 flutter_screenutil 依赖！
 // 采用 166 x 365 绝对尺寸 + FittedBox 等比缩放
@@ -75,28 +78,14 @@ class ProductItem extends StatelessWidget {
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(8),
                     ),
-                    child: AppCachedImage(
-                      RemoteUrlBuilder.fitAbsoluteUrl(
-                        data.treasureCoverImg ?? '',
+                    child: OptimizedImageFactory.product(
+                      url: UrlResolver.resolveImage(
+                          context,
+                          data.treasureCoverImg,
+                          logicalWidth: 166
                       ),
-                      fit: BoxFit.cover,
-
-                      //  核心修复 1：骨架屏无缝接力！
-                      // 在图片下载的那几百毫秒里，继续显示骨架屏动画，消灭死白空隙！
-                      placeholder: Skeleton.react(
-                        width: 166,
-                        height: 166,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(8),
-                        ),
-                      ),
-
-                      //  核心修复 2：错误兜底
-                      // 如果图片 URL 挂了，显示一个灰色的破损图标，而不是整块白掉
-                      error: Container(
-                        color: Colors.grey[100],
-                        child: Icon(Icons.broken_image, color: Colors.grey[300], size: 40),
-                      ),
+                      width: 166,
+                      height: 166,
                     ),
                   ),
                   if (data.groupSize != null && data.groupSize! > 1)

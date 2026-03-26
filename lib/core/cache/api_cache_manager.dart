@@ -37,9 +37,16 @@ class ApiCacheManager {
       debugPrint(' [ApiCacheManager] Web SharedPreferences Cache Opened.');
     } else {
       //  手机端：继续使用高性能的 Hive
-      await Hive.initFlutter();
-      _box = await Hive.openBox(_boxName);
-      debugPrint(' [ApiCacheManager] Hive Cache Box Opened.');
+      try {
+        await Hive.initFlutter();
+        _box = await Hive.openBox(_boxName);
+        debugPrint(' [ApiCacheManager] Hive Cache Box Opened.');
+      } catch (e) {
+        // 如果 Hive 初始化失败，回退到 SharedPreferences
+        debugPrint(' [ApiCacheManager] Hive initialization failed: $e. Falling back to SharedPreferences.');
+        _prefs = await SharedPreferences.getInstance();
+        debugPrint(' [ApiCacheManager] Fallback to SharedPreferences Cache.');
+      }
     }
   }
 
@@ -51,10 +58,11 @@ class ApiCacheManager {
   }) async {
     try {
       final String jsonString = jsonEncode(buildCacheEnvelope(data, ttl: ttl));
-      if (kIsWeb) {
-        // Web 端加上前缀隔离，防止覆盖其他业务数据
+      if (_prefs != null) {
+        // Use SharedPreferences for web or fallback
         await _prefs?.setString('${_boxName}_$key', jsonString);
       } else {
+        // Use Hive for mobile
         await _box?.put(key, jsonString);
       }
     } catch (e) {
@@ -74,7 +82,7 @@ class ApiCacheManager {
     Duration legacyFallbackTtl = defaultTtl,
   }) {
     try {
-      final String? jsonString = kIsWeb
+      final String? jsonString = _prefs != null
           ? _prefs?.getString('${_boxName}_$key')
           : _box?.get(key);
 
@@ -133,7 +141,7 @@ class ApiCacheManager {
 
   /// 4. 清理特定缓存
   static Future<void> removeCache(String key) async {
-    if (kIsWeb) {
+    if (_prefs != null) {
       await _prefs?.remove('${_boxName}_$key');
     } else {
       await _box?.delete(key);
@@ -142,7 +150,7 @@ class ApiCacheManager {
 
   /// 5. 清空所有接口缓存 (退出登录时调用)
   static Future<void> clearAll() async {
-    if (kIsWeb) {
+    if (_prefs != null) {
       // Web 端：只清除 API 相关的 keys，绝不影响用户登录状态 (Token)
       final keys = _prefs?.getKeys() ?? {};
       for (String key in keys) {
