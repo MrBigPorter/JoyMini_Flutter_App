@@ -87,6 +87,7 @@ jobs:
             echo "IS_PROD=false" >> $GITHUB_ENV
             echo "IS_PR=true" >> $GITHUB_ENV
             echo "CF_BRANCH=pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+            echo "CF_PROJECT=joymini-web-test" >> $GITHUB_ENV  # [新增] PR 也部署到测试项目
           elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "ENV_TAG=[PROD]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
@@ -94,6 +95,7 @@ jobs:
             echo "IS_PROD=true" >> $GITHUB_ENV
             echo "IS_PR=false" >> $GITHUB_ENV
             echo "CF_BRANCH=main" >> $GITHUB_ENV
+            echo "CF_PROJECT=joymini-web" >> $GITHUB_ENV  # [新增] 正式版进正式项目
           else
             echo "ENV_TAG=[TEST]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
@@ -101,6 +103,7 @@ jobs:
             echo "IS_PROD=false" >> $GITHUB_ENV
             echo "IS_PR=false" >> $GITHUB_ENV
             echo "CF_BRANCH=test" >> $GITHUB_ENV
+            echo "CF_PROJECT=joymini-web-test" >> $GITHUB_ENV  # [新增] 测试版进测试项目
           fi
 
       # ================= Phase 3: Extract Metadata =================
