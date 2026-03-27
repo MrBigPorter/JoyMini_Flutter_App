@@ -96,11 +96,11 @@ android {
                 storeFile = project.file(stFile)
             }
         }
-       create("debug") {
-            storeFile = project.file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+       getByName("debug") {
+           storeFile = project.file("debug.keystore")
+           storePassword = "android"
+           keyAlias = "androiddebugkey"
+           keyPassword = "android"
        }
     }
 

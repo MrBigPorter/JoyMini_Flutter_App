@@ -121,7 +121,10 @@ jobs:
       - name: 🛠️ 4b. Prepare Flutter Environment via FVM
         run: |
           fvm install
+          # [新增] 强制关闭 Flutter 的版本检查，有时能绕过 Git 缺失的问题
           fvm flutter config --no-analytics
+          # 如果还是报错，尝试在 SDK 目录执行这个 (仅当必须绕过时使用)
+          git -C /Volumes/MySSD/fvm_cache/versions/3.41.4 init
           fvm flutter pub get
 
       # ================= Phase 5: Web Deployment =================
@@ -146,50 +149,39 @@ jobs:
           sed -i '' "s/com.porter.joyminis/com.porter.joyminis.test/g" ios/Runner.xcodeproj/project.pbxproj
           echo "✅ iOS Bundle ID changed to .test"
 
-      # ================= Phase 7: Android & iOS Config Restoration =================
+      # ================= Phase 7: Restore All Credentials =================
       - name: 🔐 7. Restore All Credentials (Environment Aware)
         if: github.event_name != 'pull_request'
         run: |
-          # 1. 还原安卓公共配置文件
+          # 1. 强制清理旧的残留配置，防止干扰
+          rm -f android/key.properties
+          rm -f android/app/*.jks
+          rm -f android/app/*.keystore
+
+          # 2. 还原公共配置文件
           echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
           echo "${{ secrets.LOCAL_PROPERTIES }}" > local.properties
 
-          # 2. 根据环境执行不同的“分发”逻辑
+          # 3. 分环境还原“玉玺”
           if [[ "${{ env.IS_PROD }}" == "true" ]]; then
-            echo "🚀 正在配置 [正式版] 环境..."
-          
-            # 还原 iOS 正式版配置 (它是执行命令，放在 cat 外面)
+            echo "🚀 正在部署 [正式版]..."
             echo '${{ secrets.IOS_G_SERVICES_PROD }}' > ios/Runner/GoogleService-Info.plist
-          
-            # 还原安卓正式版签名 (JKS)
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-          
-            # 生成安卓正式版属性文件 (只写 key-value 进去)
-            cat <<EOF > android/key.properties
-            storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
-            keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-            keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-            storeFile=upload-keystore.jks
-            EOF
+            # 逐行写入，避开 EOF 缩进坑
+            echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}" > android/key.properties
+            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
+            echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
+            echo "storeFile=upload-keystore.jks" >> android/key.properties
           else
-            echo "🧪 正在配置 [测试版] 环境..."
-          
-            # 还原 iOS 测试版配置
+            echo "🧪 正在部署 [测试版]..."
             echo '${{ secrets.IOS_G_SERVICES_TEST }}' > ios/Runner/GoogleService-Info.plist
-          
-            # 还原安卓测试版签名 (debug.keystore)
             echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
-          
-            # 生成安卓测试版属性文件
-            cat <<EOF > android/key.properties
-            storePassword=android
-            keyPassword=android
-            keyAlias=androiddebugkey
-            storeFile=debug.keystore
-            EOF
+            # 逐行写入测试版专用配置
+            echo "storePassword=android" > android/key.properties
+            echo "keyPassword=android" >> android/key.properties
+            echo "keyAlias=androiddebugkey" >> android/key.properties
+            echo "storeFile=debug.keystore" >> android/key.properties
           fi
-          
-          echo "✅ All configs restored for ${{ env.ENV_TAG }}"
 
       - name: 🐦 7a. Setup Shorebird
         if: github.event_name != 'pull_request'
