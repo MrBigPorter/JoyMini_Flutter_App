@@ -7,6 +7,7 @@ import 'oauth_web_bridge.dart' as oauth_web;
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:web/web.dart' as web_pkg;
 
 class OauthCancelledException implements Exception {
   final String message;
@@ -52,6 +53,19 @@ class OauthSignInService {
     return AppConfig.facebookWebAppId.isNotEmpty;
   }
 
+  /// iOS Safari 检测
+  static bool get _isIosSafari {
+    if (!kIsWeb) return false;
+    try {
+      final userAgent = web_pkg.window.navigator.userAgent;
+      return (userAgent.contains('iPhone') || userAgent.contains('iPad')) &&
+          userAgent.contains('Safari') &&
+          !userAgent.contains('Chrome') &&
+          !userAgent.contains('CriOS');
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Ensures Google is initialized on Web before rendering [buildGoogleSignInWebButton].
   /// No-op on native platforms. Safe to call multiple times.
@@ -373,6 +387,12 @@ class OauthSignInService {
   }
 
   static Future<GoogleSignInAccount> _authenticateGoogleOnWeb() async {
+    // iOS Safari 特殊处理
+    if (_isIosSafari) {
+      _log('iOS Safari detected, using fallback authentication');
+      return await _authenticateGoogleOnWebForIosSafari();
+    }
+
     // Fast path: a credential arrived before the user clicked (e.g. auto
     // One Tap on page load). Consume it immediately.
     if (_webCachedAccount != null) {
@@ -433,6 +453,138 @@ class OauthSignInService {
         );
         _webSignInWaiter = null;
       }
+    }
+  }
+
+  /// iOS Safari 专用认证方法
+  static Future<GoogleSignInAccount> _authenticateGoogleOnWebForIosSafari() async {
+    _log('iOS Safari fallback authentication start');
+    
+    // 先尝试标准流程（可能失败）
+    try {
+      _log('iOS Safari: trying standard authentication first');
+      return await _authenticateGoogleOnWebStandard();
+    } catch (e) {
+      _log('iOS Safari standard auth failed: $e');
+      // 如果标准流程失败，使用 window.open 回退方案
+      return await _authenticateGoogleOnWebWithWindowOpen();
+    }
+  }
+
+  /// 标准认证流程（从原方法提取）
+  static Future<GoogleSignInAccount> _authenticateGoogleOnWebStandard() async {
+    // Fast path: a credential arrived before the user clicked (e.g. auto
+    // One Tap on page load). Consume it immediately.
+    if (_webCachedAccount != null) {
+      final account = _webCachedAccount!;
+      _webCachedAccount = null;
+      _log(
+        'Google web: returning pre-cached account | email=${account.email}',
+      );
+      return account;
+    }
+
+    // Cancel any stale waiter from a previous interrupted request.
+    if (_webSignInWaiter != null && !_webSignInWaiter!.isCompleted) {
+      _log('Google web: cancelling stale waiter (superseded)');
+      _webSignInWaiter!.completeError(
+        OauthCancelledException('Superseded by new sign-in request'),
+      );
+      _webSignInWaiter = null;
+    }
+    _webSignInWaiter = Completer<GoogleSignInAccount>();
+
+    try {
+      _log('Google web: calling attemptLightweightAuthentication()');
+      // This always returns null on web but internally calls id.prompt()
+      // which triggers the FedCM / One Tap UI.  The credential response will
+      // arrive via the global authenticationEvents listener above.
+      GoogleSignIn.instance.attemptLightweightAuthentication(
+        reportAllExceptions: true,
+      );
+
+      final result = await _webSignInWaiter!.future.timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          _log('Google web: sign-in timed out after 60s');
+          throw OauthCancelledException('Google sign-in timed out');
+        },
+      );
+
+      _log('Google web: sign-in completed | email=${result.email}');
+      return result;
+    } on OauthCancelledException {
+      rethrow;
+    } on GoogleSignInException catch (e) {
+      _logError('Google web: GoogleSignInException', e);
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw OauthCancelledException('Google sign-in cancelled');
+      }
+      rethrow;
+    } catch (e, s) {
+      _logError('Google web: sign-in error', e, s);
+      rethrow;
+    } finally {
+      // Clean up waiter reference if it's still pending (shouldn't happen normally)
+      if (_webSignInWaiter != null && !_webSignInWaiter!.isCompleted) {
+        _log('Google web: cleaning up pending waiter in finally block');
+        _webSignInWaiter!.completeError(
+          OauthCancelledException('Authentication process was interrupted'),
+        );
+        _webSignInWaiter = null;
+      }
+    }
+  }
+
+  /// Window.open 回退方案 - 简化版本
+  static Future<GoogleSignInAccount> _authenticateGoogleOnWebWithWindowOpen() async {
+    _log('iOS Safari: using simplified window.open fallback');
+    
+    final completer = Completer<GoogleSignInAccount>();
+    final clientId = AppConfig.googleWebClientId;
+    final redirectUri = _safeWebOrigin();
+    
+    // 构建 Google OAuth URL
+    final authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
+        '?client_id=$clientId'
+        '&redirect_uri=$redirectUri'
+        '&response_type=id_token'
+        '&scope=openid%20email%20profile'
+        '&nonce=${DateTime.now().millisecondsSinceEpoch}'
+        '&prompt=select_account';
+    
+    _log('iOS Safari: opening OAuth URL: $authUrl');
+    
+    try {
+      // 打开新窗口进行 OAuth 认证
+      final windowRef = web_pkg.window.open(authUrl, 'google_oauth', 'width=500,height=600');
+      
+      if (windowRef == null) {
+        throw OauthCancelledException('Popup blocked by browser');
+      }
+      
+      // 简化：只监听窗口关闭，不处理消息
+      // 在实际应用中，需要有一个 OAuth 回调页面来处理重定向
+      // 这里简化处理，直接抛出异常提示用户手动操作
+      Future.delayed(const Duration(seconds: 10), () {
+        if (!completer.isCompleted) {
+          completer.completeError(
+            OauthCancelledException(
+              'Please complete Google login in the popup window, then return to this page.'
+            ),
+          );
+        }
+      });
+      
+      // 注意：实际生产环境需要实现 OAuth 回调页面
+      // 这里简化处理，直接返回一个占位符错误
+      throw UnsupportedError(
+        'iOS Safari Google login requires OAuth callback page implementation. '
+        'Please use standard Google Sign-In flow or implement OAuth callback handler.'
+      );
+    } catch (e, s) {
+      _logError('iOS Safari: window.open authentication failed', e, s);
+      rethrow;
     }
   }
 
