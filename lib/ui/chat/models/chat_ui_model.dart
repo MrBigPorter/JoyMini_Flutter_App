@@ -104,9 +104,9 @@ class ChatUiModel extends Equatable {
     'id': id,
     'seqId': seqId,
     'content': content,
-    'type': type.name,
+    'type': type.value, // Changed to use enum value
     'isMe': isMe,
-    'status': status.name,
+    'status': status.name, // Keep as name, usually not problematic
     'createdAt': createdAt,
     'senderAvatar': senderAvatar,
     'senderName': senderName,
@@ -115,7 +115,7 @@ class ChatUiModel extends Equatable {
     'localPath': localPath,
     'duration': duration,
     'isRecalled': isRecalled,
-    'meta': meta,
+    'meta': meta, // Ensure meta content is JSON-compatible
   };
 
   factory ChatUiModel.fromJson(Map<String, dynamic> json) {
@@ -123,10 +123,12 @@ class ChatUiModel extends Equatable {
       id: json['id'] as String,
       seqId: json['seqId'] as int?,
       content: json['content'] as String,
-      type: MessageType.values.firstWhere(
-            (e) => e.name == json['type'],
-        orElse: () => MessageType.text,
-      ),
+      type: json['type'] is int // Safely parse type as int or String
+          ? MessageType.fromValue(json['type'] as int)
+          : MessageType.values.firstWhere(
+              (e) => e.name == (json['type'] as String?),
+              orElse: () => MessageType.text,
+            ),
       isMe: json['isMe'] as bool,
       status: MessageStatus.values.firstWhere(
             (e) => e.name == json['status'],

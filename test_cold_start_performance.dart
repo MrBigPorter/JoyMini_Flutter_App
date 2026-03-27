@@ -130,7 +130,7 @@ class ColdStartPerformanceTester {
       _testResults['coldStartSimulation'] = {
         'status': 'PASSED',
         'operations': operationResults,
-        'totalDurationMs': operationResults.fold(0, (sum, op) => sum + op['durationMs']),
+        'totalDurationMs': operationResults.fold<int>(0, (sum, op) => sum + (op['durationMs'] as int)),
         'timestamp': DateTime.now().toIso8601String(),
       };
       
