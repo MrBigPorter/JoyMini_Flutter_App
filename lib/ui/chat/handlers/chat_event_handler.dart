@@ -38,11 +38,17 @@ class ChatEventHandler {
       );
 
   void init() {
+    debugPrint("💬 [ChatEventHandler] Initializing for conversation: $conversationId");
+    debugPrint("💬 [ChatEventHandler] Current user ID: $_currentUserId");
+    debugPrint("💬 [ChatEventHandler] Socket service available: ${_socketService != null}");
+    debugPrint("💬 [ChatEventHandler] Socket connected: ${_socketService?.isConnected}");
+    
     _setupSubscriptions();
     _setupReadReceiptDebounce();
     _setupJoinRoomLogic();
 
     Future.microtask(() => markAsRead());
+    debugPrint("💬 [ChatEventHandler] Initialization completed");
   }
 
   void dispose() {

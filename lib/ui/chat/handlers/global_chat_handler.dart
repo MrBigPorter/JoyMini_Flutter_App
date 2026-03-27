@@ -35,16 +35,23 @@ class GlobalChatHandler {
   GlobalChatHandler.empty() : _socketService = null, _currentUserId = "", _ref = null;
 
   GlobalChatHandler(this._socketService, this._currentUserId, this._ref) {
+    debugPrint("🌐 [GlobalChatHandler] Creating handler for user: $_currentUserId");
     _init();
   }
 
   void _init() {
-    if (_socketService == null) return;
+    if (_socketService == null) {
+      debugPrint("🌐 [GlobalChatHandler] SocketService is null, skipping initialization");
+      return;
+    }
 
-    debugPrint(" [GlobalHandler] Global message listener started...");
+    debugPrint("🌐 [GlobalChatHandler] Global message listener starting...");
+    debugPrint("🌐 [GlobalChatHandler] Socket connected: ${_socketService!.isConnected}");
+    debugPrint("🌐 [GlobalChatHandler] Socket instance: ${_socketService!.socket}");
 
     // Listen to the Socket message stream
-    _msgSub = _socketService.chatMessageStream.listen((data) async {
+    _msgSub = _socketService!.chatMessageStream.listen((data) async {
+      debugPrint("📨 [GlobalChatHandler] Received socket message: ${data.toString().substring(0, 100)}...");
       try {
         // 1. Prepare the box (Context)
         // Note: Using the ChatPipelineContext defined earlier
@@ -54,16 +61,25 @@ class GlobalChatHandler {
           currentUserId: _currentUserId,
         );
 
+        debugPrint("📨 [GlobalChatHandler] Executing pipeline...");
         // 2. Execute the pipeline
         await PipelineRunner.run(ctx, [
           ParseStep(),   // Step 1: Parse + Filter
           PersistStep(), // Step 2: Persist to database
         ]);
+        debugPrint("📨 [GlobalChatHandler] Pipeline execution completed");
 
-      } catch (e) {
-        debugPrint(" [GlobalHandler] Pipeline error: $e");
+      } catch (e, stackTrace) {
+        debugPrint("❌ [GlobalChatHandler] Pipeline error: $e");
+        debugPrint("❌ [GlobalChatHandler] Stack trace: $stackTrace");
       }
+    }, onError: (error) {
+      debugPrint("❌ [GlobalChatHandler] Stream error: $error");
+    }, onDone: () {
+      debugPrint("🌐 [GlobalChatHandler] Message stream closed");
     });
+
+    debugPrint("🌐 [GlobalChatHandler] Global message listener started successfully");
   }
 
   void dispose() {
