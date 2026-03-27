@@ -18,6 +18,7 @@ import '../../utils/upload/global_upload_service.dart';
 import '../models/fcm_notification.dart';
 import '../models/kyc.dart';
 import '../models/user_coupon.dart';
+import '../models/dynamic_system_config.dart';
 
 class Api {
   /// Home banner carousel - type 1: banner, 2: advertisement
@@ -177,10 +178,16 @@ class Api {
     return OrderCheckoutResponse.fromJson(res);
   }
 
-  /// System configuration
-  static Future<SysConfig> getSysConfig() async {
-    final res = await Http.get('/sysConfigGet.json');
-    return SysConfig.fromJson(res);
+
+  /// Dynamic system configuration - supports any key-value pairs from backend
+  static Future<DynamicSystemConfig> getDynamicSystemConfig() async {
+    final res = await Http.get('/api/v1/client/system-config');
+    final list = res['list'] as List;
+    final configs = <String, String>{};
+    for (final item in list) {
+      configs[item['key'] as String] = item['value'] as String;
+    }
+    return DynamicSystemConfig(configs: configs);
   }
 
   /// Product category tabs
@@ -626,6 +633,14 @@ class Api {
       query: query.toJson(),
     );
     return parsePageResponse(res, (e) => LuckyDrawTicket.fromJson(e));
+  }
+
+  /// Query lucky draw ticket state by orderId for order detail/list pages.
+  static Future<LuckyDrawOrderTicketResponse> luckyDrawOrderTicketApi(
+    String orderId,
+  ) async {
+    final res = await Http.get('/api/v1/lucky-draw/order/$orderId/ticket');
+    return LuckyDrawOrderTicketResponse.fromJson(Map<String, dynamic>.from(res));
   }
 
   /// Execute draw with a ticket

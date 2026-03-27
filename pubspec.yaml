@@ -100,6 +100,8 @@ dependencies:
   equatable: ^2.0.7
   dismissible_page: ^1.0.2
   flutter_blurhash: ^0.9.1
+  flutter_cache_manager: ^3.3.1
+  synchronized: ^3.1.0
 
   device_info_plus: ^12.3.0
   flutter_udid: ^4.1.1
@@ -136,7 +138,7 @@ dependencies:
   cross_file: ^0.3.5+1
   ffmpeg_kit_flutter_new: ^4.1.0
   google_sign_in: ^7.2.0
-  flutter_facebook_auth: ^6.0.4
+  flutter_facebook_auth: ^7.1.6
   sign_in_with_apple: ^7.0.1
   blurhash: ^1.2.0
   universal_html: ^2.3.0
@@ -160,6 +162,7 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   web: ^1.1.1
+  app_tracking_transparency: ^2.0.6+1
 
 
 dev_dependencies:

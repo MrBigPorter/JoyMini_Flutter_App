@@ -1,15 +1,13 @@
 import 'dart:async';
-import 'dart:js_interop';
-import 'dart:js_interop_unsafe';
 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_app/core/config/app_config.dart';
 import 'package:flutter_app/core/models/auth.dart';
+import 'oauth_web_bridge.dart' as oauth_web;
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-// Web-only: JS global used to distinguish hot-reload vs page-refresh
-import 'package:web/web.dart' as web_pkg;
 
 class OauthCancelledException implements Exception {
   final String message;
@@ -53,6 +51,48 @@ class OauthSignInService {
   static bool get canShowFacebookButton {
     if (!kIsWeb) return true;
     return AppConfig.facebookWebAppId.isNotEmpty;
+  }
+
+  /// 诊断方法：检查 OAuth 配置状态（生产环境调试用）
+  static Map<String, dynamic> getOauthDiagnostics() {
+    final diagnostics = <String, dynamic>{};
+    
+    if (kIsWeb) {
+      diagnostics['platform'] = 'web';
+      diagnostics['origin'] = _safeWebOrigin();
+      diagnostics['google'] = {
+        'clientIdConfigured': AppConfig.googleWebClientId.isNotEmpty,
+        'clientIdLength': AppConfig.googleWebClientId.length,
+        'clientIdPreview': AppConfig.googleWebClientId.isNotEmpty 
+            ? '${AppConfig.googleWebClientId.substring(0, 20)}...' 
+            : '',
+        'canShowButton': canShowGoogleButton,
+        'initialized': _googleInitialized,
+        'initKey': _googleInitKey,
+      };
+      diagnostics['facebook'] = {
+        'appIdConfigured': AppConfig.facebookWebAppId.isNotEmpty,
+        'appIdLength': AppConfig.facebookWebAppId.length,
+        'appIdPreview': AppConfig.facebookWebAppId.isNotEmpty
+            ? '${AppConfig.facebookWebAppId.substring(0, 10)}...'
+            : '',
+        'canShowButton': canShowFacebookButton,
+        'initialized': _facebookInitialized,
+        'sdkVersion': AppConfig.facebookWebSdkVersion,
+      };
+      diagnostics['webSpecific'] = {
+        'cachedAccount': _webCachedAccount != null,
+        'globalListenerActive': _webGlobalAuthSub != null,
+        'pendingWaiter': _webSignInWaiter != null && !_webSignInWaiter!.isCompleted,
+      };
+    } else {
+      diagnostics['platform'] = 'native';
+      diagnostics['google'] = {'canShowButton': true};
+      diagnostics['facebook'] = {'canShowButton': true};
+      diagnostics['apple'] = {'canShowButton': canShowAppleButton};
+    }
+    
+    return diagnostics;
   }
 
   /// Ensures Google is initialized on Web before rendering [buildGoogleSignInWebButton].
@@ -159,7 +199,24 @@ class OauthSignInService {
       await _ensureFacebookInitialized();
     }
 
-    final result = await FacebookAuth.instance.login();
+    //  新增：如果是 iOS，先弹授权框
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      // 延迟一下，确保 UI 渲染完毕再弹窗（苹果官方建议）
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final trackingStatus = await AppTrackingTransparency.requestTrackingAuthorization();
+      debugPrint('[FacebookAuth] ATT 授权状态: $trackingStatus');
+
+      // 注意：即使 trackingStatus 是 denied (拒绝)，我们依然继续往下走
+      // 只是如果拒绝了，Facebook 依然会给你发 JWT Token。
+    }
+
+    final result = await FacebookAuth.instance.login(
+      permissions: ['public_profile', 'email'],
+      loginBehavior: LoginBehavior.nativeWithFallback,
+      //  必须加上这一行，强制获取经典 Token
+      loginTracking: LoginTracking.enabled,
+    );
     if (result.status == LoginStatus.cancelled) {
       throw OauthCancelledException('Facebook sign-in cancelled');
     }
@@ -168,9 +225,16 @@ class OauthSignInService {
       throw StateError(result.message ?? 'Facebook sign-in failed');
     }
 
+    final accessToken = result.accessToken!;
+    final userId = switch (accessToken) {
+      ClassicToken token => token.userId,
+      LimitedToken token => token.userId,
+      _ => throw StateError('Unsupported Facebook access token type'),
+    };
+
     return FacebookOauthLoginParams(
-      accessToken: result.accessToken!.token,
-      userId: result.accessToken!.userId,
+      accessToken: accessToken.tokenString,
+      userId: userId,
       inviteCode: _normalizedInviteCode(inviteCode),
     );
   }
@@ -225,7 +289,7 @@ class OauthSignInService {
     // calling id.initialize() a second time (which corrupts the FedCM callback).
     // JS globals survive hot-reload (same JS context) but reset on page
     // refresh (new JS context) — so GSI is correctly re-initialized after F5.
-    if (kIsWeb && _jsGsiInitKey() == initKey) {
+    if (kIsWeb && oauth_web.getJsGsiInitKey() == initKey) {
       _googleInitialized = true;
       _googleInitKey = initKey;
       // Re-establish Dart-side listener in case it was lost.
@@ -250,7 +314,7 @@ class OauthSignInService {
         await GoogleSignIn.instance.initialize(
           clientId: AppConfig.googleWebClientId,
         );
-        _setJsGsiInitKey(initKey); // persist across hot-reloads (JS global)
+        oauth_web.setJsGsiInitKey(initKey); // persist across hot-reloads (JS global)
       } else {
         await GoogleSignIn.instance.initialize();
       }
@@ -283,38 +347,13 @@ class OauthSignInService {
     );
   }
 
-  static String _safeWebOrigin() {
-    if (!kIsWeb) return 'n/a';
-    try {
-      return web_pkg.window.location.origin;
-    } catch (_) {
-      return 'unknown';
-    }
-  }
+  static String _safeWebOrigin() => oauth_web.safeWebOrigin();
 
   // ─── JS window global helpers (web-only, survives hot-reload) ─────────────
   // JS globals live in the same JS context as the GSI library. They survive
   // Dart hot-reloads (no page navigation) but are destroyed on full page
   // refresh — exactly matching the GSI library lifecycle.
 
-  static String? _jsGsiInitKey() {
-    if (!kIsWeb) return null;
-    try {
-      final v = (web_pkg.window as JSObject)
-          .getProperty<JSAny?>('__gsiInitKey'.toJS);
-      return v != null ? (v as JSString).toDart : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static void _setJsGsiInitKey(String value) {
-    if (!kIsWeb) return;
-    try {
-      (web_pkg.window as JSObject)
-          .setProperty('__gsiInitKey'.toJS, value.toJS);
-    } catch (_) {}
-  }
 
   /// Establishes a long-lived subscription to [authenticationEvents] so that
   /// credentials delivered by FedCM *before* the user clicks the sign-in
@@ -404,6 +443,7 @@ class OauthSignInService {
       _webSignInWaiter!.completeError(
         OauthCancelledException('Superseded by new sign-in request'),
       );
+      _webSignInWaiter = null;
     }
     _webSignInWaiter = Completer<GoogleSignInAccount>();
 
@@ -417,9 +457,9 @@ class OauthSignInService {
       );
 
       final result = await _webSignInWaiter!.future.timeout(
-        const Duration(seconds: 120),
+        const Duration(seconds: 60), // 减少超时时间从120秒到60秒
         onTimeout: () {
-          _log('Google web: sign-in timed out after 120s');
+          _log('Google web: sign-in timed out after 60s');
           throw OauthCancelledException('Google sign-in timed out');
         },
       );
@@ -429,17 +469,21 @@ class OauthSignInService {
     } on OauthCancelledException {
       rethrow;
     } on GoogleSignInException catch (e) {
-      _log('Google web: GoogleSignInException code=${e.code}');
+      _logError('Google web: GoogleSignInException', e);
       if (e.code == GoogleSignInExceptionCode.canceled) {
         throw OauthCancelledException('Google sign-in cancelled');
       }
       rethrow;
-    } catch (e) {
-      _log('Google web: sign-in error: $e');
+    } catch (e, s) {
+      _logError('Google web: sign-in error', e, s);
       rethrow;
     } finally {
       // Clean up waiter reference if it's still pending (shouldn't happen normally)
       if (_webSignInWaiter != null && !_webSignInWaiter!.isCompleted) {
+        _log('Google web: cleaning up pending waiter in finally block');
+        _webSignInWaiter!.completeError(
+          OauthCancelledException('Authentication process was interrupted'),
+        );
         _webSignInWaiter = null;
       }
     }
@@ -450,6 +494,17 @@ class OauthSignInService {
     debugPrint('[OAuthSignInService] $message');
   }
 
+  static void _logError(String message, [Object? error, StackTrace? stack]) {
+    if (!kDebugMode) return;
+    debugPrint('[OAuthSignInService] ERROR: $message');
+    if (error != null) {
+      debugPrint('[OAuthSignInService] Error details: $error');
+      if (stack != null) {
+        debugPrint('[OAuthSignInService] Stack trace: $stack');
+      }
+    }
+  }
+
   static String _maskHead(String value, {int keep = 12}) {
     if (value.isEmpty) return '';
     if (value.length <= keep) return value;
@@ -458,12 +513,20 @@ class OauthSignInService {
 
   static Future<void> _ensureFacebookInitialized() async {
     if (_facebookInitialized) return;
-    await FacebookAuth.instance.webAndDesktopInitialize(
-      appId: AppConfig.facebookWebAppId,
-      cookie: true,
-      xfbml: true,
-      version: AppConfig.facebookWebSdkVersion,
-    );
-    _facebookInitialized = true;
+    try {
+      _log('Facebook web initialization start | appId=${_maskHead(AppConfig.facebookWebAppId)} | version=${AppConfig.facebookWebSdkVersion}');
+      await FacebookAuth.instance.webAndDesktopInitialize(
+        appId: AppConfig.facebookWebAppId,
+        cookie: true,
+        xfbml: true,
+        version: AppConfig.facebookWebSdkVersion,
+      );
+      _facebookInitialized = true;
+      _log('Facebook web initialization success');
+    } catch (e, s) {
+      _logError('Facebook web initialization failed', e, s);
+      _facebookInitialized = false;
+      rethrow;
+    }
   }
 }

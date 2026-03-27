@@ -83,6 +83,10 @@ abstract class SocketEvents {
   static const String groupUpdate = 'group_update';
   static const String walletChange = 'wallet_change';
 
+  // --- Lucky Draw ---
+  /// 后端发券成功后逐用户推送（团成功 or 单买）
+  static const String luckyDrawTicketIssued = 'lucky_draw_ticket_issued';
+
   /// Exception error
   static const String error = 'error';
 

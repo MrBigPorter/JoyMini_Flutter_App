@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_app/app/page/lucky_draw/lucky_draw_helpers.dart';
 import 'package:flutter_app/ui/img/app_image.dart';
 import 'package:flutter_app/ui/index.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +20,7 @@ import 'package:flutter_app/ui/modal/sheet/radix_sheet.dart';
 import 'package:flutter_app/utils/date_helper.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 import 'package:flutter_app/core/providers/order_provider.dart';
+import 'package:flutter_app/core/providers/lucky_draw_provider.dart';
 import 'package:flutter_app/utils/media/remote_url_builder.dart';
 import 'package:flutter_app/core/services/customer_service/customer_service_helper.dart';
 import 'refund_request_sheet.dart';
@@ -53,22 +55,22 @@ class OrderItemContainer extends ConsumerWidget {
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: isWinning
-                  ? const LinearGradient(
+                  ?  LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFFFFBEB), Colors.white],
+                colors: [context.bgPrimary, context.bgPrimary.withAlpha(20)],
               )
                   : null,
               color: isWinning ? null : context.bgPrimary,
               borderRadius: BorderRadius.circular(16.w),
               border: isWinning
-                  ? Border.all(color: const Color(0xFFFFD700), width: 1.2)
+                  ? Border.all(color: context.bgBrandPrimary, width: 1.2)
                   : Border.all(color: context.borderSecondary, width: 0.5),
               boxShadow: [
                 BoxShadow(
                   color: isWinning
-                      ? const Color(0xFFFFD700).withOpacity(0.15)
-                      : context.fgPrimary900.withOpacity(0.04),
+                      ? context.bgBrandPrimary.withValues(alpha: 0.5)
+                      : context.fgPrimary900.withValues(alpha: 0.04),
                   blurRadius: 20.w,
                   offset: const Offset(0, 8),
                 ),
@@ -105,7 +107,6 @@ class OrderItemContainer extends ConsumerWidget {
                         onViewFriends: () => OrderItemLogic.handleViewFriends(item),
                         onViewRewardDetails: () => OrderItemLogic.handleViewRewardDetails(context, item),
                         onTeamUp: () => OrderItemLogic.handleTeamUp(item),
-                        onClaimPrize: () => OrderItemLogic.handleClaimPrize(item),
                       ),
                     ],
                   ),
@@ -124,7 +125,9 @@ class OrderItemContainer extends ConsumerWidget {
         .then(delay: 200.ms)
         .shimmer(
       duration: 1500.ms,
-      color: isWinning ? const Color(0xFFFFD700).withOpacity(0.4) : Colors.transparent,
+      color: isWinning
+          ? const Color(0xFFFFD700).withValues(alpha: 0.4)
+          : Colors.transparent,
       angle: 0.8,
     );
   }

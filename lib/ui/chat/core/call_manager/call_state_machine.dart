@@ -279,6 +279,16 @@ class CallStateMachine extends StateNotifier<CallState>
 
     _isHangingUp = true;
 
+
+    //  1. 核心新增：计算通话时长和开始时间戳
+    int callDurationInSeconds = 0;
+    int startTimestamp = 0;
+    if (_callStartTime != null && state.status == CallStatus.connected) {
+      callDurationInSeconds = DateTime.now().difference(_callStartTime!).inSeconds;
+      startTimestamp = _callStartTime!.millisecondsSinceEpoch;
+    }
+    final mediaType = state.isVideoMode ? 'video' : 'audio';
+
     // Core Fix: Capture current sessionId before state is cleared
     final currentSessionId = state.sessionId;
 
@@ -290,6 +300,9 @@ class CallStateMachine extends StateNotifier<CallState>
         sessionId: currentSessionId,
         targetId: state.targetId ?? '',
         reason: 'hangup',
+        duration: callDurationInSeconds,
+        startedAt: startTimestamp,
+        mediaType: mediaType,
       );
       await CallArbitrator.instance.markSessionAsEnded(currentSessionId);
       await CallArbitrator.instance.lockGlobalCooldown();

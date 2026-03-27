@@ -119,6 +119,7 @@ class ChatBubble extends ConsumerWidget {
     } else {
       tipText = message.content;
     }
+    
 
     return Center(
       child: Container(

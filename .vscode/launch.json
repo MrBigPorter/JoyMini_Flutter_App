@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🚀 Dev模式",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define-from-file=lib/core/config/env/dev.json",
+        "--web-port=4000" 
+    ]
+    },
+    {
+      "name": "🧪 Test模式",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+     "args": [
+        "--dart-define-from-file=lib/core/config/env/test.json",
+         "--web-port=4000" 
+    ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+# Lucky Flutter App 核心规则索引
+
+# 1. 引导指令
+每次对话开始，请立即读取并严格遵守以下路径中的项目规范和任务进度：
+- 核心指令文件: .github/copilot-instructions.md
+
+# 2. 技术栈约束 (Phase F1)
+- 状态管理: 必须使用 Riverpod。
+- 路由系统: 必须使用 GoRouter。
+- 语言要求: 严禁出现韩文，仅限中英文回复与注释。
+
+# 3. 自动化任务
+- 任务追踪: 完成任务后，更新 .github/copilot-instructions.md 中的 [ ] 状态。
+- 生成代码: 修改模型后必须执行 build_runner。

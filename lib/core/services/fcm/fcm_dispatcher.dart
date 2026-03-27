@@ -5,6 +5,7 @@ import 'package:flutter_app/ui/chat/core/call_manager/call_dispatcher.dart';
 import 'fcm_ui_factory.dart';
 import 'handlers/chat_handler.dart';
 import 'handlers/group_handler.dart';
+import 'handlers/lucky_draw_handler.dart';
 
 class FcmDispatcher {
   // 记录最近处理的消息 ID，防止重复触发
@@ -13,6 +14,7 @@ class FcmDispatcher {
   // 注入具体的业务执行者
   final _groupHandler = GroupActionHandler();
   final _chatHandler = ChatActionHandler();
+  final _luckyDrawHandler = LuckyDrawActionHandler();
 
   // 架构点：分发入口，区分【前台展示】与【交互跳转】
   void dispatch(RemoteMessage message, {required bool isInteraction}) {
@@ -67,6 +69,9 @@ class FcmDispatcher {
         break;
       case FcmType.chat:
         _chatHandler.handle(payload);
+        break;
+      case FcmType.luckyDraw:
+        _luckyDrawHandler.handle(payload);
         break;
       case FcmType.system:
       // _systemHandler.handle(payload);

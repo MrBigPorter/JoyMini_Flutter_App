@@ -121,6 +121,7 @@ class LocalDatabaseService {
 
       // Execute defense strategy if record exists
       final dataToSave = _mergeMessageData(snapshot?.value, msg.toJson());
+      debugPrint("📦 [LocalDB] Data to save: $dataToSave"); // Add debug log
 
       await record.put(txn, dataToSave);
 
