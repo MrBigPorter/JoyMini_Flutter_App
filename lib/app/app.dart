@@ -58,7 +58,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
 
     return MaterialApp.router(
-      title: 'Lucky App',
+      title: 'JoyMini',
       routerConfig: router,
       themeMode: themeMode,
       theme: _buildTheme(false),
