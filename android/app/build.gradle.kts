@@ -32,6 +32,23 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+// 4. 读取 local.properties 里的 Facebook 配置 (新增)
+val localProperties = Properties()
+// 优先找 Flutter 根目录的 local.properties，找不到再找 android/ 目录下的
+var localPropertiesFile = rootProject.file("../local.properties")
+if (!localPropertiesFile.exists()) {
+    localPropertiesFile = rootProject.file("local.properties")
+}
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
+// 提取变量，如果文件里没配，默认给个 000000 防报错
+val fbAppId = localProperties.getProperty("facebook_app_id") ?: "000000"
+val fbClientToken = localProperties.getProperty("facebook_client_token") ?: "000000"
+val fbProtocolScheme = localProperties.getProperty("fb_login_protocol_scheme") ?: "fb000000"
+
+
 android {
     namespace = "com.porter.joyminis"
     compileSdk = 36  //  满足 webview 等插件的要求
@@ -51,13 +68,14 @@ android {
         // 动态拼接包名
         applicationId = "com.porter.joyminis$appIdSuffix"
 
-        // 动态修改 App 显示名称 (这里定义了 app_name，所以 strings.xml 中不应再定义)
+        // 动态修改 App 显示名称
         resValue("string", "app_name", "JoyMini$appNameSuffix")
 
-        // 添加 Facebook 相关资源定义
-        resValue("string", "facebook_app_id", "1659905501858558")
-        resValue("string", "facebook_client_token", "25c8efc795a1a00f31bec33241b2cfe2")
-        resValue("string", "fb_login_protocol_scheme", "fb1659905501858558")
+        //  动态注入 Facebook 相关资源定义 (不再明文写死)
+        resValue("string", "facebook_app_id", fbAppId)
+        resValue("string", "facebook_client_token", fbClientToken)
+        resValue("string", "fb_login_protocol_scheme", fbProtocolScheme)
+
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -78,6 +96,12 @@ android {
                 storeFile = project.file(stFile)
             }
         }
+       create("debug") {
+            storeFile = project.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+       }
     }
 
     buildTypes {
@@ -89,6 +113,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        //  新增：让所有测试运行都使用刚才定义的固定签名
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
