@@ -35,9 +35,9 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     // register this widget as an observer to app lifecycle events
     WidgetsBinding.instance.addObserver(this);
     
-    // 延迟执行首页图片预加载
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _preloadHomeImages();
+    // 立即执行首页图片预加载（优化冷启动体验）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAndPreloadImages();
     });
   }
 
@@ -62,6 +62,41 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
       ref.read(homeTreasuresProvider.notifier).forceRefresh(),
       ref.read(homeGroupBuyingProvider.notifier).forceRefresh(),
     ]);
+  }
+
+  /// 初始化并预加载图片
+  /// 1. 初始化图片优化系统
+  /// 2. 预加载静态关键图片
+  /// 3. 预加载首页动态图片
+  Future<void> _initializeAndPreloadImages() async {
+    try {
+      // 1. 初始化图片优化系统
+      final imageOptimization = ImageOptimizationInit();
+      
+      // 确保核心组件已初始化
+      if (!imageOptimization.isCoreInitialized) {
+        debugPrint('[HomePage] Initializing image optimization core...');
+        await imageOptimization.initializeCore();
+      }
+      
+      // 完整初始化（需要context）
+      if (!imageOptimization.isInitialized) {
+        debugPrint('[HomePage] Initializing image optimization full...');
+        await imageOptimization.initialize(context);
+      }
+      
+      // 2. 预加载静态关键图片（冷启动优化）
+      debugPrint('[HomePage] Preloading static images for cold start...');
+      await imageOptimization.preloadStaticImages(context);
+      
+      // 3. 预加载首页动态图片
+      debugPrint('[HomePage] Preloading home page dynamic images...');
+      await _preloadHomeImages();
+      
+      debugPrint('[HomePage] All image preloading completed');
+    } catch (e) {
+      debugPrint('[HomePage] Image initialization and preloading failed: $e');
+    }
   }
 
   /// 预加载首页关键图片
