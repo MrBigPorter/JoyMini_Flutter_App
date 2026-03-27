@@ -99,65 +99,6 @@ extension LoginPageUI on _LoginPageState {
 
                           SizedBox(height: 48.h),
 
-                          // ─── 诊断信息（仅开发模式显示） ───
-                            Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.all(16.w),
-                              decoration: BoxDecoration(
-                                color: context.bgSuccessSolid,
-                                borderRadius: BorderRadius.circular(12.w),
-                                border: Border.all(color: context.borderSecondary, width: 1),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(Icons.bug_report_rounded, size: 20.sp, color: context.textTertiary600),
-                                      SizedBox(width: 8.w),
-                                      Text(
-                                        'OAuth 诊断信息 (仅开发模式)',
-                                        style: TextStyle(
-                                          fontSize: context.textSm,
-                                          fontWeight: FontWeight.w600,
-                                          color: context.textPrimary900,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 12.h),
-                                  Builder(
-                                    builder: (context) {
-                                      final diagnostics = OauthSignInService.getOauthDiagnostics();
-                                      final google = diagnostics['google'] as Map<String, dynamic>;
-                                      final facebook = diagnostics['facebook'] as Map<String, dynamic>;
-                                      
-                                      return Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          _buildDiagnosticRow('Google 状态', google['initialized'] ? '✅ 已初始化' : '❌ 未初始化'),
-                                          _buildDiagnosticRow('Google Client ID', google['clientIdConfigured'] ? '✅ 已配置' : '❌ 未配置'),
-                                          _buildDiagnosticRow('Facebook 状态', facebook['initialized'] ? '✅ 已初始化' : '❌ 未初始化'),
-                                          _buildDiagnosticRow('Facebook App ID', facebook['appIdConfigured'] ? '✅ 已配置' : '❌ 未配置'),
-                                          _buildDiagnosticRow('Google Web Ready', _googleWebReady ? '✅ 就绪' : '❌ 未就绪'),
-                                          SizedBox(height: 8.h),
-                                          if (!google['initialized'] || !facebook['initialized'])
-                                            Text(
-                                              '💡 提示：查看浏览器控制台获取详细诊断信息',
-                                              style: TextStyle(
-                                                fontSize: context.textXs,
-                                                color: context.textTertiary600,
-                                              ),
-                                            ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: 24.h),
-
                           // ─── 表单区域 ───
                           ReactiveFormConfig(
                             validationMessages: kGlobalValidationMessages,
@@ -314,7 +255,7 @@ extension LoginPageUI on _LoginPageState {
                                     SizedBox(height: 16.h),
                                   ],
 
-                                  if (OauthSignInService.canShowAppleButton) ...[
+                                 /* if (OauthSignInService.canShowAppleButton) ...[
                                     Button(
                                       width: double.infinity,
                                       height: 48.h,
@@ -324,7 +265,7 @@ extension LoginPageUI on _LoginPageState {
                                       leading: const Icon(Icons.apple_rounded),
                                       child: Text('login.oauth.apple'.tr()),
                                     ),
-                                  ],
+                                  ],*/
                                 ],
                               ),
                             ),
