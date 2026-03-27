@@ -17,6 +17,7 @@ import 'package:flutter_app/theme/leading_tokens.dart';
 import 'package:flutter_app/ui/button/button.dart';
 import 'package:flutter_app/ui/button/variant.dart';
 import 'package:flutter_app/ui/modal/sheet/radix_sheet.dart';
+import 'package:flutter_app/ui/toast/radix_toast.dart';
 import 'package:flutter_app/utils/date_helper.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 
@@ -226,7 +227,7 @@ class ProductSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 核心修复 2：监听动态价格，而不是写死的基础价
-    final purchaseState = ref.watch(purchaseProvider(detail.treasureId ?? ''));
+    final purchaseState = ref.watch(purchaseProvider(detail.treasureId));
     final isFlashSale = purchaseState.isFlashSale;
     final originalAmount = detail.unitAmount ?? 0.0;
 
@@ -296,7 +297,10 @@ class ProductSection extends ConsumerWidget {
                   children: [
                     if (isFlashSale)
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.w),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 6.w,
+                          vertical: 2.w,
+                        ),
                         margin: EdgeInsets.only(bottom: 4.w),
                         decoration: BoxDecoration(
                           color: Colors.red,
@@ -308,7 +312,11 @@ class ProductSection extends ConsumerWidget {
                             Icon(Icons.bolt, color: Colors.white, size: 10.w),
                             Text(
                               'Flash',
-                              style: TextStyle(color: Colors.white, fontSize: 9.sp, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -316,12 +324,15 @@ class ProductSection extends ConsumerWidget {
                     Text(
                       FormatHelper.formatCurrency(purchaseState.unitAmount),
                       style: TextStyle(
-                        color: isFlashSale ? Colors.red : context.textPrimary900,
+                        color: isFlashSale
+                            ? Colors.red
+                            : context.textPrimary900,
                         fontSize: context.textXs,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    if (isFlashSale && originalAmount > purchaseState.unitAmount)
+                    if (isFlashSale &&
+                        originalAmount > purchaseState.unitAmount)
                       Text(
                         FormatHelper.formatCurrency(originalAmount),
                         style: TextStyle(
@@ -335,7 +346,7 @@ class ProductSection extends ConsumerWidget {
                 ),
               ],
             ),
-            QuantityControl(treasureId: detail.treasureId ?? ''),
+            QuantityControl(treasureId: detail.treasureId),
           ],
         ),
       ),
@@ -373,9 +384,10 @@ class QuantityControlState extends ConsumerState<QuantityControl> {
 
   @override
   Widget build(BuildContext context) {
-    final entries = ref.watch(
-      purchaseProvider(widget.treasureId).select((s) => s.entries),
-    );
+    final purchase = ref.watch(purchaseProvider(widget.treasureId));
+    final entries = purchase.entries;
+    final canDec = purchase.canDecrement;
+    final canInc = purchase.canIncrement;
     final action = ref.read(purchaseProvider(widget.treasureId).notifier);
 
     // Sync provider state to text controller only when not focused to prevent cursor jumping
@@ -400,16 +412,22 @@ class QuantityControlState extends ConsumerState<QuantityControl> {
           ),
           child: Row(
             children: [
+              // ─── 减号按钮：entries == min 时显示灰色 disabled 态 ───
               Button(
                 variant: ButtonVariant.text,
                 width: 44.w,
                 height: 38.w,
-                onPressed: () => action.dec(
-                  (v) => _textEditingController.text = v.toString(),
-                ),
+                onPressed: canDec
+                    ? () => action.dec(
+                        (v) => _textEditingController.text = v.toString(),
+                      )
+                    : null,
+                // null → Button 自动进入 disabled 态
                 child: Icon(
                   CupertinoIcons.minus,
-                  color: context.textPrimary900,
+                  color: canDec
+                      ? context.textPrimary900
+                      : context.textSecondary700.withValues(alpha: 0.4),
                   size: 16.w,
                 ),
               ),
@@ -445,16 +463,21 @@ class QuantityControlState extends ConsumerState<QuantityControl> {
                   onChanged: (v) => action.setEntriesFromText(v),
                 ),
               ),
+              // ─── 加号按钮：entries == max 时显示灰色 disabled 态 ───
               Button(
                 variant: ButtonVariant.text,
                 width: 44.w,
                 height: 38.w,
-                onPressed: () => action.inc(
-                  (v) => _textEditingController.text = v.toString(),
-                ),
+                onPressed: canInc
+                    ? () => action.inc(
+                        (v) => _textEditingController.text = v.toString(),
+                      )
+                    : null,
                 child: Icon(
                   CupertinoIcons.add,
-                  color: context.textPrimary900,
+                  color: canInc
+                      ? context.textPrimary900
+                      : context.textSecondary700.withValues(alpha: 0.4),
                   size: 16.w,
                 ),
               ),
@@ -675,6 +698,86 @@ class VoucherSection extends ConsumerWidget {
             Text(
               '${'common.balance'.tr()}: ${FormatHelper.formatCompactDecimal(coinsBalance)} ${'common.coins'.tr()}',
               style: TextStyle(color: context.textQuaternary500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Treasure Coins 抵扣开关区块（独立于优惠券，用户可自由开关）
+class CoinsDiscountSection extends ConsumerWidget {
+  final String treasureId;
+
+  const CoinsDiscountSection({super.key, required this.treasureId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final purchase = ref.watch(purchaseProvider(treasureId));
+    final notifier = ref.read(purchaseProvider(treasureId).notifier);
+    final coinsBalance = ref.watch(walletProvider.select((s) => s.coinBalance));
+    final canUse = notifier.coinsCanUse;
+    final deductAmount = notifier.coinAmount;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        decoration: BoxDecoration(
+          color: context.bgPrimary,
+          borderRadius: BorderRadius.circular(context.radiusXl),
+        ),
+        child: Row(
+          children: [
+            // 金币图标
+            Container(
+              width: 32.w,
+              height: 32.w,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Icon(
+                Icons.monetization_on_rounded,
+                color: Colors.amber.shade700,
+                size: 18.w,
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'common.treasureCoins'.tr(),
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: context.textPrimary900,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    purchase.useDiscountCoins && deductAmount > 0
+                        ? '${FormatHelper.formatCompactDecimal(canUse)} coins = -${FormatHelper.formatCurrency(deductAmount)}'
+                        : '${'common.balance'.tr()}: ${FormatHelper.formatCompactDecimal(coinsBalance)} ${'common.coins'.tr()}',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: purchase.useDiscountCoins && deductAmount > 0
+                          ? Colors.orange.shade700
+                          : context.textSecondary700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: purchase.useDiscountCoins,
+              onChanged: (v) => notifier.toggleUseDiscountCoins(v),
+              activeTrackColor: context.bgBrandSolid,
             ),
           ],
         ),

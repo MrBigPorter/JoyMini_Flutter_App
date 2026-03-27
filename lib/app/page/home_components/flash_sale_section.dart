@@ -5,7 +5,7 @@ import 'package:flutter_app/app/routes/app_router.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/core/models/flash_sale.dart';
 import 'package:flutter_app/core/providers/flash_sale_provider.dart';
-import 'package:flutter_app/ui/img/app_image.dart';
+import 'package:flutter_app/ui/img/optimized_image.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -279,9 +279,11 @@ class _MiniProductCard extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.vertical(top: Radius.circular(10.r)),
-                    child: AppCachedImage(
-                      item.product.treasureCoverImg,
-                      fit: BoxFit.cover,
+                    child: OptimizedImageFactory.product(
+                      url: item.product.treasureCoverImg ?? '',
+                      width: 115.w,
+                      height: 115.w, // 正方形图片
+                      borderRadius:  BorderRadius.vertical(top: Radius.circular(10.r)),
                     ),
                   ),
                   if (isUnavailable)
@@ -360,4 +362,3 @@ class _MiniProductCard extends StatelessWidget {
     );
   }
 }
-

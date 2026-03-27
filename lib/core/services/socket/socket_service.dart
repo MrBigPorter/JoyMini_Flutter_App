@@ -122,6 +122,7 @@ mixin SocketDispatcherMixin on _SocketBase {
         break;
       case SocketEvents.groupUpdate:
       case SocketEvents.walletChange:
+      case SocketEvents.luckyDrawTicketIssued:
         _onBusinessEvent(type, data);
         break;
       default:
@@ -174,77 +175,198 @@ class SocketService extends _SocketBase
     required String token,
     TokenRefreshCallback? onTokenRefresh,
   }) async {
-    if (_isInitializing) return;
+    debugPrint('🔌 [SocketService] init() called with token: ${token.substring(0, 10)}...');
+    
+    // 检查是否已经在初始化中
+    if (_isInitializing) {
+      debugPrint('🔌 [SocketService] Already initializing, skipping duplicate call');
+      return;
+    }
+    
     _tokenRefresher =
         onTokenRefresh ?? onTokenRefreshRequest ?? _defaultTokenRefresher;
     _isInitializing = true;
 
     try {
+      debugPrint('🔌 [SocketService] Validating token...');
       final validToken = await _ensureValidToken(token);
-      if (validToken == null) return;
+      if (validToken == null) {
+        debugPrint('🔌 [SocketService] Token validation failed, aborting init');
+        _isInitializing = false;
+        return;
+      }
+      debugPrint('🔌 [SocketService] Token validated: ${validToken.substring(0, 10)}...');
 
-      //  核心修复：直接查自己的账本！安全、高效、绝对不会类型报错！
+      // 检查是否已经使用相同的Token连接
       if (_socket != null && _socket!.connected && _currentToken == validToken) {
-        debugPrint(" [Socket] Token 未变且已连接，忽略重复 Init");
+        debugPrint("🔌 [SocketService] Already connected with same token, skipping");
+        _isInitializing = false;
         return;
       }
 
-      disconnect();
+      // 检查是否有旧的连接需要断开
+      if (_socket != null) {
+        debugPrint('🔌 [SocketService] Disconnecting previous socket...');
+        try {
+          _socket!.disconnect();
+          _socket!.dispose();
+        } catch (e) {
+          debugPrint('🔌 [SocketService] Error disconnecting old socket: $e');
+        }
+        _socket = null;
+      }
 
-      // 更新账本
+      // 更新当前Token
       _currentToken = validToken;
 
+      final socketUrl = '${AppConfig.apiBaseUrl}/events';
+      debugPrint('🔌 [SocketService] Connecting to: $socketUrl');
+      
+      // 创建新的Socket连接
       _socket = IO.io(
-        '${AppConfig.apiBaseUrl}/events',
+        socketUrl,
         IO.OptionBuilder()
-            .setTransports(['websocket'])
+            .setTransports(['websocket', 'polling']) // 添加polling作为备选
             .disableAutoConnect()
-            // 修复：强制 Map 类型并确保值被正确处理
             .setQuery(<String, dynamic>{'token': validToken.toString()})
-            .setReconnectionAttempts(5)
+            .setReconnectionAttempts(10) // 增加重连尝试次数
+            .setReconnectionDelay(1000) // 重连延迟1秒
+            .setReconnectionDelayMax(5000) // 最大重连延迟5秒
+            .setTimeout(20000) // 连接超时20秒
             .setAuth(<String, dynamic>{'token': validToken})
             .build(),
       );
 
+      // 设置事件监听器
       _socket!.onConnect((_) {
-        debugPrint(' [Socket] Connected');
+        debugPrint('✅ [SocketService] Connected successfully to server');
         triggerSync();
       });
-      _socket!.onDisconnect((r) => debugPrint(' [Socket] Disconnected: $r'));
-      _socket!.on(SocketEvents.dispatch, (data) => _handleDispatch(data));
+      
+      _socket!.onDisconnect((reason) {
+        debugPrint('❌ [SocketService] Disconnected from server: $reason');
+        _currentToken = null; // 断开时清除Token
+      });
+      
+      _socket!.onConnectError((data) {
+        debugPrint('⚠️ [SocketService] Connection error: $data');
+      });
+      
+      _socket!.onError((data) {
+        debugPrint('⚠️ [SocketService] Socket error: $data');
+      });
+      
+      _socket!.onReconnect((attempt) {
+        debugPrint('🔄 [SocketService] Reconnecting (attempt $attempt)...');
+      });
+      
+      _socket!.onReconnectAttempt((attempt) {
+        debugPrint('🔄 [SocketService] Reconnection attempt $attempt');
+      });
+      
+      _socket!.onReconnectError((error) {
+        debugPrint('❌ [SocketService] Reconnection error: $error');
+      });
+      
+      _socket!.onReconnectFailed((_) {
+        debugPrint('❌ [SocketService] Reconnection failed after all attempts');
+      });
+      
+      _socket!.on(SocketEvents.dispatch, (data) {
+        debugPrint('📨 [SocketService] Received dispatch event');
+        _handleDispatch(data);
+      });
+      
+      debugPrint('🔌 [SocketService] Starting connection...');
       _socket!.connect();
-    } finally {
+      
+      // 添加连接超时检查
+      Future.delayed(const Duration(seconds: 10), () {
+        if (_socket != null && !_socket!.connected && !_socket!.disconnected) {
+          debugPrint('⏰ [SocketService] Connection timeout after 10 seconds');
+          // 可以在这里触发重连或显示错误
+        }
+      });
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ [SocketService] init() failed: $e');
+      debugPrint('❌ [SocketService] Stack trace: $stackTrace');
+      // 确保在异常情况下也重置初始化状态
       _isInitializing = false;
+      rethrow;
+    } finally {
+      // 注意：这里不能重置_isInitializing，因为连接过程是异步的
+      // 我们会在连接成功或失败的事件中处理状态重置
+      debugPrint('🔌 [SocketService] init() setup completed');
     }
   }
 
   Future<String?> _ensureValidToken(String token) async {
-    if (token.isEmpty) return null;
+    debugPrint('🔑 [SocketService] Validating token: ${token.substring(0, 10)}...');
+    if (token.isEmpty) {
+      debugPrint('🔑 [SocketService] Token is empty');
+      return null;
+    }
 
-    //  核心修改：把 JwtDecoder 包裹在 try-catch 中
-    // 无论是格式错、类型错、还是过期，统统视为“Token不可用”
+    // 检查Token格式和过期状态
     bool isInvalid = false;
+    String? validationError;
+    
     try {
-      if (JwtDecoder.isExpired(token)) {
+      // 首先检查Token格式（基本的JWT格式检查）
+      final parts = token.split('.');
+      if (parts.length != 3) {
+        validationError = 'Invalid JWT format';
+        isInvalid = true;
+      } else if (JwtDecoder.isExpired(token)) {
+        validationError = 'Token expired';
         isInvalid = true;
       }
     } catch (e) {
-      debugPrint("[Socket] Token 解析异常 (可能是旧缓存格式错误): $e");
-      // 只要解析报错，就认为它是坏的，必须刷新
+      debugPrint("🔑 [SocketService] Token parsing error: $e");
+      validationError = 'Token parsing error: $e';
       isInvalid = true;
     }
 
     if (isInvalid) {
-      debugPrint(" [Socket] Token 无效或过期，尝试刷新...");
-      return await _tokenRefresher?.call();
+      debugPrint("🔑 [SocketService] Token invalid ($validationError), attempting refresh...");
+      try {
+        final refreshedToken = await _tokenRefresher?.call();
+        if (refreshedToken != null && refreshedToken.isNotEmpty) {
+          debugPrint("🔑 [SocketService] Token refresh successful: ${refreshedToken.substring(0, 10)}...");
+          return refreshedToken;
+        } else {
+          debugPrint("🔑 [SocketService] Token refresh failed or returned empty token");
+          return null;
+        }
+      } catch (e, stackTrace) {
+        debugPrint("🔑 [SocketService] Token refresh error: $e");
+        debugPrint("🔑 [SocketService] Stack trace: $stackTrace");
+        return null;
+      }
     }
 
+    debugPrint('🔑 [SocketService] Token is valid');
     return token;
   }
 
   Future<String?> _defaultTokenRefresher() async {
-    final success = await Http.tryRefreshToken(Http.rawDio);
-    return success ? await Http.getToken() : null;
+    debugPrint('🔄 [SocketService] Default token refresher called');
+    try {
+      final success = await Http.tryRefreshToken(Http.rawDio);
+      if (success) {
+        final newToken = await Http.getToken();
+        debugPrint('🔄 [SocketService] Token refresh successful: ${newToken?.substring(0, 10)}...');
+        return newToken;
+      } else {
+        debugPrint('🔄 [SocketService] Token refresh failed');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('🔄 [SocketService] Token refresh error: $e');
+      debugPrint('🔄 [SocketService] Stack trace: $stackTrace');
+      return null;
+    }
   }
 
   void disconnect() {

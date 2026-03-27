@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_app/core/models/kyc.dart';
 import 'package:flutter_app/core/models/payment.dart';
 import 'package:flutter_app/core/providers/address_provider.dart';
@@ -13,6 +15,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/time/server_time_helper.dart';
 
 import 'package:flutter_app/core/providers/coupon_provider.dart';
+
+// ==========================================
+// 0. 初始化提示存储（非 Riverpod，initState 安全写入）
+// ==========================================
+/// Payment 页面在 initState 中同步写入 isGroupBuy，purchaseProvider factory 读取，
+/// 确保 Provider 首次创建时就使用正确的 isGroupBuy，避免首帧价格闪烁。
+/// 这只是一个普通 Dart Map，不触发 Riverpod 的 build 阶段检查。
+class PurchaseInitConfig {
+  PurchaseInitConfig._();
+  static final Map<String, bool> _groupMode = {};
+  static void setGroupMode(String id, bool isGroup) => _groupMode[id] = isGroup;
+  static bool getGroupMode(String id) => _groupMode[id] ?? true;
+}
 
 // ==========================================
 // 1. State 改造：使用 Getter 派生价格，杜绝数据不同步
@@ -70,13 +85,28 @@ class PurchaseState {
   //  核心修复 2：小计自动使用上面算出的绝对正确单价
   double get subtotal => unitAmount * entries;
 
+  /// UI 用：- 按钮是否可点击（entries > min 时才能减）
+  bool get canDecrement => entries > _minEntriesAllowed;
+
+  /// UI 用：+ 按钮是否可点击（entries < max 时才能加）
+  bool get canIncrement => entries < _maxEntriesAllowed;
+
   int get _maxEntriesAllowed {
+    if (!isStockLoaded) {
+      // 库存未确认（哨兵 999）：不用 stockLeft 作为 max，避免显示或允许输入 999
+      // 如果 maxPerBuyQuantity 已从 detail 加载则使用，否则用合理默认值 99
+      return maxPerBuyQuantity > 0 ? maxPerBuyQuantity : 99;
+    }
     if (stockLeft <= 0) return 0;
     final maxByLimit = maxPerBuyQuantity <= 0 ? stockLeft : maxPerBuyQuantity;
     return math.max(1, math.min(stockLeft, maxByLimit));
   }
 
   int get _minEntriesAllowed {
+    if (!isStockLoaded) {
+      // 库存未确认时：最小值为 1，不强制 minBuyQuantity（等数据加载后 _clampEntries 自动修正）
+      return 1;
+    }
     if (stockLeft <= 0) return 0;
     final minByConfig = minBuyQuantity <= 0 ? 1 : minBuyQuantity;
     return math.min(minByConfig, stockLeft);
@@ -86,6 +116,10 @@ class PurchaseState {
     if (!useDiscountCoins) return 0;
     return maxUnitCoins * entries;
   }
+
+  /// true = productRealtimeStatusProvider 已加载，stockLeft 是真实值
+  /// false = 仍是哨兵值 999（未确认），前端不应据此判断售罄
+  bool get isStockLoaded => stockLeft < 999;
 
   PurchaseState copyWith({
     int? entries,
@@ -154,8 +188,9 @@ class PurchaseNotifier extends StateNotifier<PurchaseState> {
 
   //  核心修复 3：切模式时，只需要改 isGroupBuy 标识，不用再手动算价了！
   void setGroupMode(bool isGroup) {
+    if (state.isGroupBuy == isGroup) return; // 同值无需更新，避免多余 rebuild
     state = state.copyWith(isGroupBuy: isGroup);
-    _clampEntries(); // 切模式后检查数量是否合法
+    _clampEntries();
   }
 
   /// Override price for flash sale: sets both group/solo prices to flash price,
@@ -171,39 +206,39 @@ class PurchaseNotifier extends StateNotifier<PurchaseState> {
   }
 
   void _listenToProductUpdates() {
-    // 监听实时状态
+    // ── 实时状态（权威来源：库存 + 上架状态）──────────────────────────────
+    // ⚠️ 注意：productRealtimeStatusProvider.price 是「商品市场价」（如 8500），
+    //         不是「彩票单价」（如 58）。彩票单价只来自 productDetailProvider.unitAmount。
+    //         所以这里 ** 绝对不能 ** 更新 baseGroupPrice / baseSoloPrice！
     ref.listen(productRealtimeStatusProvider(treasureId), (prev, next) {
       next.whenData((status) {
-        final newStock = status.stock;
-        final newState = status.state;
-        final newGroupPrice = status.price;
-
-        //  加上 1.5 倍兜底
-        final newSoloPrice = status.soloPrice ?? (newGroupPrice * 1.5);
-
         state = state.copyWith(
-          stockLeft: newStock,
-          baseGroupPrice: newGroupPrice,
-          baseSoloPrice: newSoloPrice,
-          productState: newState,
+          stockLeft: status.stock,
+          productState: status.state,
+          // 价格字段意图保留：保持 Flash Sale override 不变
         );
         _clampEntries();
       });
     });
 
-    // 监听商品详情
+    // ── 商品详情（价格权威来源：unitAmount = 拼团彩票单价，soloAmount = 单买彩票单价）
     ref.listen(productDetailProvider(treasureId), (prev, next) {
       next.whenData((detail) {
+        if (state.isFlashSale) return; // Flash sale override 期间禁止被详情覆盖
         final newGroupPrice = detail.unitAmount ?? 0.0;
         final newSoloPrice = detail.soloAmount ?? (newGroupPrice * 1.5);
 
         state = state.copyWith(
+          // 只在当前值为 0（未初始化）时才写入，避免重复 re-fetch 时覆盖已正确的值
           baseGroupPrice: state.baseGroupPrice > 0 ? state.baseGroupPrice : newGroupPrice,
           baseSoloPrice: state.baseSoloPrice > 0 ? state.baseSoloPrice : newSoloPrice,
           maxPerBuyQuantity: JsonNumConverter.toInt(detail.maxPerBuyQuantity ?? 0),
           minBuyQuantity: detail.minBuyQuantity ?? 1,
         );
-        _clampEntries();
+        // 只有实时库存已确认（非哨兵值 999）时才 clamp，避免用旧 stock=0 把 entries 清零
+        if (state.stockLeft < 999) {
+          _clampEntries();
+        }
       });
     });
   }
@@ -225,7 +260,7 @@ class PurchaseNotifier extends StateNotifier<PurchaseState> {
   // Getters
   double get _balanceCoins => ref.read(walletProvider).coinBalance;
   double get _realBalance => ref.read(walletProvider).realBalance;
-  double get _exchangeRate => ref.read(configProvider).exChangeRate;
+  double get _exchangeRate => ref.read(configProvider).exchangeRate;
   bool get _isAuthenticated => ref.read(authProvider).isAuthenticated;
 
   double get coinsCanUse {
@@ -264,7 +299,11 @@ class PurchaseNotifier extends StateNotifier<PurchaseState> {
     if (state.isSubmitting) return PurchaseSubmitResult.error(PurchaseSubmitError.unknown);
 
     if (!_isAuthenticated) return PurchaseSubmitResult.error(PurchaseSubmitError.needLogin);
-    if (state.stockLeft <= 0) return PurchaseSubmitResult.error(PurchaseSubmitError.soldOut);
+    // ✅ 只有库存已从实时状态确认（非哨兵 999）才做前端售罄拦截
+    //    若库存未加载，放行让后端校验，避免误判 soldOut → "Payment Failed"
+    if (state.isStockLoaded && state.stockLeft <= 0) {
+      return PurchaseSubmitResult.error(PurchaseSubmitError.soldOut);
+    }
     if (state.productState != 1) return PurchaseSubmitResult.error(PurchaseSubmitError.productOffline);
 
     final now = ServerTimeHelper.nowMilliseconds;
@@ -315,7 +354,13 @@ class PurchaseNotifier extends StateNotifier<PurchaseState> {
 
       return PurchaseSubmitResult.ok(orderCheckoutResult);
     } catch (e) {
-      return PurchaseSubmitResult.error(PurchaseSubmitError.unknown, message: e.toString());
+      // 提取后端返回的真实错误信息（DioException.message 由 UnifiedInterceptor 注入）
+      String msg = 'Payment Failed';
+      if (e is DioException && (e.message?.isNotEmpty ?? false)) {
+        msg = e.message!;
+      }
+      debugPrint('[Purchase] submitOrder error: $e');
+      return PurchaseSubmitResult.error(PurchaseSubmitError.unknown, message: msg);
     } finally {
       if (mounted) state = state.copyWith(isSubmitting: false);
     }
@@ -357,27 +402,36 @@ final purchaseProvider = StateNotifierProvider.family
   final detail = ref.read(productDetailProvider(id)).valueOrNull;
   final status = ref.read(productRealtimeStatusProvider(id)).valueOrNull;
 
-  final stockLeft = status?.stock ?? ((detail?.seqShelvesQuantity ?? 0) - (detail?.seqBuyQuantity ?? 0));
+  // ✅ 价格只来自商品详情（productDetailProvider.unitAmount = 彩票单价 58）
+  //    绝不使用 status.price（它是商品市场价 8500，不是彩票票价）
+  final groupPrice = detail?.unitAmount ?? 0.0;
+  final soloPrice = detail?.soloAmount ?? (groupPrice * 1.5);
+
+  // ✅ 库存只来自实时状态。detail 的 seqShelvesQuantity/seqBuyQuantity 通常为 0
+  //    （API 不返回或字段含义不同），用它们会误判"已售罄"，导致 Payment Failed
+  //    未加载时用哨兵值 999，submitOrder 检测到 999 时跳过前端校验，由后端兜底
+  final int? confirmedStock = status?.stock;
+
   final productState = status?.state ?? (detail?.state ?? 1);
   final minBuy = detail?.minBuyQuantity ?? 1;
 
-  final groupPrice = status?.price ?? (detail?.unitAmount ?? 0.0);
-
-  //  核心修复 4：初始化时也必须带上 1.5 倍兜底！
-  final soloPrice = status?.soloPrice ?? (detail?.soloAmount ?? (groupPrice * 1.5));
+  // ✅ 默认 1 份，不使用 minBuyQuantity 作为初始值
+  // 理由：minBuyQuantity 是"最少购买"约束，不是"默认显示"值
+  //       若用 minBuy 初始化，当 minBuyQuantity=50 时用户一进来就看到 50，体验差
+  // 正确做法：始终从 1 开始，实时状态加载后 _clampEntries 会自动修正到 [min, max] 范围
+  // 若 URL 携带 entries 参数，addPostFrameCallback 里的 resetEntries() 会覆盖此初始值
+  const initialEntries = 1;
 
   final initialState = PurchaseState(
-    entries: stockLeft > 0 ? minBuy : 0,
-
+    entries: initialEntries,
     baseGroupPrice: groupPrice,
     baseSoloPrice: soloPrice,
-    isGroupBuy: true, // 初始先设为默认，反正会被逻辑层立即 setGroupMode 改掉
-
+    isGroupBuy: PurchaseInitConfig.getGroupMode(id),
     maxUnitCoins: JsonNumConverter.toDouble(detail?.maxUnitCoins),
     maxPerBuyQuantity: JsonNumConverter.toInt(detail?.maxPerBuyQuantity ?? 0),
     minBuyQuantity: minBuy,
-    stockLeft: stockLeft,
-    useDiscountCoins: true,
+    stockLeft: confirmedStock ?? 999, // 999 = 哨兵，表示"库存未确认"
+    useDiscountCoins: false,
     isSubmitting: false,
     salesStartAt: detail?.salesStartAt,
     salesEndAt: detail?.salesEndAt,

@@ -28,6 +28,12 @@ abstract class PwaHelper {
     PwaHelperPlatform.instance.applyUpdate();
   }
 
+  /// Triggers a service worker update check.
+  static Future<void> checkForUpdate() {
+    if (!kIsWeb) return Future.value();
+    return PwaHelperPlatform.instance.checkForUpdate();
+  }
+
   /// True when running in standalone (installed PWA) mode.
   static bool get isInstalledPwa {
     if (!kIsWeb) return false;
@@ -46,10 +52,6 @@ class PwaHelperPlatform {
   Future<bool> promptInstall() async => false;
   bool get updateAvailable => false;
   void applyUpdate() {}
+  Future<void> checkForUpdate() async {}
   bool get isInstalledPwa => false;
 }
-
-
-
-
-

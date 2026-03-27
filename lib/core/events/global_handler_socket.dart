@@ -125,11 +125,16 @@ extension GlobalHandlerSocketExtension on _GlobalHandlerState {
             if (event.data?['extra'] != null) {
               final metadata = (event.data!['extra'] as Map).cast<String, dynamic>();
               final targetId = metadata['senderId']?.toString();
+              final conversationId = metadata['conversationId']?.toString();
+              final mediaType = metadata['mediaType']?.toString() ?? 'audio';
               if (targetId != null) {
                 ref.read(socketServiceProvider).socket?.emit(SocketEvents.callEnd, {
                   'sessionId': sessionId,
                   'targetId': targetId,
-                  'reason': 'decline'
+                  'reason': 'rejected',
+                  'duration': 0, // 拒接时长必定为 0
+                  'mediaType': mediaType,
+                  if (conversationId != null) 'conversationId': conversationId,
                 });
               }
             }
@@ -241,6 +246,9 @@ extension GlobalHandlerSocketExtension on _GlobalHandlerState {
       if (!mounted) return;
       if (notification.isSuccess) {
         _showSuccessToast(notification.title, notification.message);
+        // group_success 时也刷新抽奖券列表（兜底：防止 lucky_draw_ticket_issued 丢失）
+        ref.invalidate(luckyDrawTicketsProvider);
+        ref.invalidate(luckyDrawUnusedTicketCountProvider);
       } else {
         _showErrorToast(notification.title, notification.message);
       }
@@ -250,6 +258,39 @@ extension GlobalHandlerSocketExtension on _GlobalHandlerState {
       if (!mounted) return;
       _processGroupUpdate(data);
     });
+
+    _luckyDrawSub = service.luckyDrawTicketIssuedStream.listen((data) {
+      if (!mounted) return;
+      _showLuckyDrawTicketNotification(data);
+    });
+  }
+
+  void _showLuckyDrawTicketNotification(Map<String, dynamic> data) {
+    // badge +1
+    ref.read(luckyDrawUnreadCountProvider.notifier).update((n) => n + 1);
+    // 刷新抽奖券列表（使所有 family 实例失效）
+    ref.invalidate(luckyDrawTicketsProvider);
+    ref.invalidate(luckyDrawUnusedTicketCountProvider);
+
+    BotToast.showCustomNotification(
+      duration: const Duration(seconds: 5),
+      toastBuilder: (cancelFunc) {
+        return _buildModernNotificationCard(
+          context: context,
+          title: '🎉 Lucky Draw Ticket',
+          message: 'You got a new draw ticket! Tap to try your luck.',
+          leading: CircleAvatar(
+            radius: 18.r,
+            backgroundColor: const Color(0xFFFFF3CD),
+            child: Text('🎟️', style: TextStyle(fontSize: 18.sp)),
+          ),
+          onTap: () {
+            cancelFunc();
+            appRouter.pushNamed('luckyDraw');
+          },
+        );
+      },
+    );
   }
 
   void _processGroupUpdate(Map<String, dynamic> data) {
@@ -267,6 +308,7 @@ extension GlobalHandlerSocketExtension on _GlobalHandlerState {
     _contactApplySub?.cancel();
     _contactAcceptSub?.cancel();
     _groupEventSub?.cancel();
+    _luckyDrawSub?.cancel();
     _cachedSocketService?.socket?.off(SocketEvents.callInvite);
     _cachedSocketService?.socket?.off(SocketEvents.callEnd);
   }

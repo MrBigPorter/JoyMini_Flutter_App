@@ -232,6 +232,25 @@ Map<String, dynamic> _$WalletTransactionToJson(WalletTransaction instance) =>
       'createdAt': instance.createdAt,
     };
 
+LotteryResult _$LotteryResultFromJson(Map<String, dynamic> json) =>
+    $checkedCreate(
+      'LotteryResult',
+      json,
+      ($checkedConvert) {
+        final val = LotteryResult(
+          winnerId: $checkedConvert('winnerId', (v) => v as String),
+          winnerOrderId: $checkedConvert('winnerOrderId', (v) => v as String),
+        );
+        return val;
+      },
+    );
+
+Map<String, dynamic> _$LotteryResultToJson(LotteryResult instance) =>
+    <String, dynamic>{
+      'winnerId': instance.winnerId,
+      'winnerOrderId': instance.winnerOrderId,
+    };
+
 Group _$GroupFromJson(Map<String, dynamic> json) => $checkedCreate(
       'Group',
       json,
@@ -243,6 +262,15 @@ Group _$GroupFromJson(Map<String, dynamic> json) => $checkedCreate(
           currentMembers:
               $checkedConvert('currentMembers', (v) => (v as num).toInt()),
           maxMembers: $checkedConvert('maxMembers', (v) => (v as num).toInt()),
+          drawnAt: $checkedConvert('drawnAt', (v) => v as num?),
+          lotteryResults: $checkedConvert(
+              'lotteryResults',
+              (v) =>
+                  (v as List<dynamic>?)
+                      ?.map((e) =>
+                          LotteryResult.fromJson(e as Map<String, dynamic>))
+                      .toList() ??
+                  []),
         );
         return val;
       },
@@ -253,6 +281,8 @@ Map<String, dynamic> _$GroupToJson(Group instance) => <String, dynamic>{
       'groupStatus': instance.groupStatus,
       'currentMembers': instance.currentMembers,
       'maxMembers': instance.maxMembers,
+      'drawnAt': instance.drawnAt,
+      'lotteryResults': instance.lotteryResults,
     };
 
 TicketItem _$TicketItemFromJson(Map<String, dynamic> json) => $checkedCreate(

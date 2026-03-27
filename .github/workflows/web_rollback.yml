@@ -1,0 +1,159 @@
+name: "↩️ JoyMini Web Rollback"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "🎯 选择回滚环境"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - test
+          - prod
+      target_ref:
+        description: "要重新部署的 Git ref（tag / branch / commit SHA）"
+        required: true
+        type: string
+      project_name:
+        description: "Cloudflare Pages 项目名（默认 joymini-web）"
+        required: false
+        default: "joymini-web"
+        type: string
+      reason:
+        description: "回滚原因（可选）"
+        required: false
+        default: ""
+        type: string
+      confirm:
+        description: "输入 ROLLBACK_WEB 确认只回滚 H5"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: web-rollback-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  preflight-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish self-hosted runner reminder
+        run: |
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## 🖥️ Self-hosted Runner Reminder
+
+          This web rollback workflow continues on your local Mac self-hosted runner.
+
+          If the next job stays in **Queued**, start the runner first:
+
+          ```bash
+          cd /Volumes/MySSD/github-runner
+          ./run.sh
+          ```
+
+          Wait until the terminal shows **Connected to GitHub**.
+
+          Current rollback details:
+          - Environment: `${{ github.event.inputs.environment }}`
+          - Target Ref: `${{ github.event.inputs.target_ref }}`
+          - Cloudflare Project: `${{ github.event.inputs.project_name }}`
+          EOF
+
+          echo "Reminder published: start the local self-hosted runner and wait for 'Connected to GitHub' if the next job is queued."
+
+  rollback-web:
+    needs: preflight-reminder
+    runs-on: self-hosted
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: 1. Validate Rollback Confirmation
+        run: |
+          if [[ "${{ github.event.inputs.confirm }}" != "ROLLBACK_WEB" ]]; then
+            echo "❌ Confirmation text mismatch. Please type ROLLBACK_WEB exactly."
+            exit 1
+          fi
+
+      - name: 2. Checkout Target Ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.target_ref }}
+          fetch-depth: 0
+          clean: false
+
+      - name: 3. Determine Web Rollback Environment
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "prod" ]]; then
+            echo "ENV_TAG=[PROD]" >> "$GITHUB_ENV"
+            echo "ENV_FILE=lib/core/config/env/prod.json" >> "$GITHUB_ENV"
+            echo "CF_BRANCH=main" >> "$GITHUB_ENV"
+          else
+            echo "ENV_TAG=[TEST]" >> "$GITHUB_ENV"
+            echo "ENV_FILE=lib/core/config/env/test.json" >> "$GITHUB_ENV"
+            echo "CF_BRANCH=test" >> "$GITHUB_ENV"
+          fi
+
+      - name: 4. Extract Rollback Metadata
+        run: |
+          APP_VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //g')
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      - name: 5. Expose Local FVM to Runner
+        run: |
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: 6. Prepare Flutter Environment via FVM
+        run: |
+          fvm install
+          fvm flutter config --no-analytics
+          fvm flutter pub get
+
+      - name: 7. Build Web (Rollback)
+        run: |
+          fvm flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }}
+
+      - name: 8. Redeploy Web to Cloudflare Pages
+        id: cf_deploy
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          projectName: ${{ github.event.inputs.project_name }}
+          directory: build/web
+          branch: ${{ env.CF_BRANCH }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 9. Publish Rollback Summary
+        if: always()
+        run: |
+          REASON="${{ github.event.inputs.reason }}"
+          if [[ -z "$REASON" ]]; then
+            REASON="n/a"
+          fi
+
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## ↩️ JoyMini Web Rollback
+
+          - Environment: ${{ github.event.inputs.environment }}
+          - Cloudflare Project: ${{ github.event.inputs.project_name }}
+          - Target Ref: `${{ github.event.inputs.target_ref }}`
+          - Resolved Commit: `${{ env.SHORT_SHA }}`
+          - App Version: `${{ env.APP_VERSION }}`
+          - Reason: $REASON
+          - Scope: Web / H5 only (Android, iOS, Firebase, Shorebird are not touched)
+          EOF
+
+      - name: 10. Smart Cleanup
+        if: always()
+        run: |
+          rm -rf build/web
+          git checkout -- .
+          echo "✅ Web rollback cleanup complete."

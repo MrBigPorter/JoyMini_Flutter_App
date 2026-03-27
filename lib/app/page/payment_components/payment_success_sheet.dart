@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_app/app/routes/app_router.dart';
 import 'package:flutter_app/common.dart';
@@ -76,6 +77,19 @@ class PaymentSuccessSheet extends ConsumerWidget {
               .fadeIn(duration: 500.ms, delay: 400.ms)
               .slideY(begin: 0.2, end: 0),
 
+          // ─── 抽奖券 Banner ────────────────────────────────────────────
+          if (purchaseResponse.lotteryTickets.isNotEmpty)
+            _LuckyDrawTicketBanner(
+              ticketCount: purchaseResponse.lotteryTickets.length,
+              onTap: () {
+                onClose?.call();
+                appRouter.go('/lucky-draw');
+              },
+            )
+                .animate()
+                .fadeIn(duration: 500.ms, delay: 550.ms)
+                .slideY(begin: 0.15, end: 0),
+
           // 3. 分享卡片 (这是电商转化的关键)
           // 重点：加上 groupId 邀请好友参与
           Padding(
@@ -126,3 +140,90 @@ class PaymentSuccessSheet extends ConsumerWidget {
     );
   }
 }
+
+// ─── Lucky Draw Ticket Banner ─────────────────────────────────────────────────
+class _LuckyDrawTicketBanner extends StatelessWidget {
+  const _LuckyDrawTicketBanner({
+    required this.ticketCount,
+    required this.onTap,
+  });
+
+  final int ticketCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(0, 16.h, 0, 0),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xfffc7701), Color(0xffe04f16)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+          child: Row(
+            children: [
+              // 票券图标
+              Container(
+                width: 40.w,
+                height: 40.w,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.confirmation_number_rounded,
+                  size: 20.sp,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 12.w),
+
+              // 文案
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ticketCount > 1
+                          ? '🎉 You got $ticketCount Lucky Draw tickets!'
+                          : '🎉 You got a Lucky Draw ticket!',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      'Tap to use your ticket now →',
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 箭头
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20.sp,
+                color: Colors.white.withValues(alpha: 0.8),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

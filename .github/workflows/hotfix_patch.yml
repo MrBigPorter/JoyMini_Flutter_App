@@ -14,7 +14,34 @@ on:
           - prod
 
 jobs:
+  preflight-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish self-hosted runner reminder
+        run: |
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## 🖥️ Self-hosted Runner Reminder
+
+          This hotfix workflow runs on your local Mac self-hosted runner.
+
+          If the next job stays in **Queued**, start the runner first:
+
+          ```bash
+          cd /Volumes/MySSD/github-runner
+          ./run.sh
+          ```
+
+          Wait until the terminal shows **Connected to GitHub**.
+
+          Current trigger details:
+          - Target Environment: `${{ github.event.inputs.environment }}`
+          - Triggered By: `${{ github.actor }}`
+          EOF
+
+          echo "Reminder published: start the local self-hosted runner and wait for 'Connected to GitHub' if the next job is queued."
+
   shorebird-patch:
+    needs: preflight-reminder
     runs-on: self-hosted # Utilizing your local MacBook Air Runner
     steps:
       # ================= Step 1: Initialization =================

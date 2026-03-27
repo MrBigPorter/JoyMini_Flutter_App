@@ -13,6 +13,7 @@ import 'package:flutter_app/core/providers/index.dart';
 
 import '../../../features/share/models/share_content.dart';
 import '../../../features/share/services/app_share_manager.dart';
+import '../../../utils/media/url_resolver.dart';
 
 // ==============================================================================
 // 1. 主区域组件: GroupBuyingSection 
@@ -267,8 +268,13 @@ class GroupBuyingCard extends ConsumerWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12.r),
-        child: AppCachedImage(
-          RemoteUrlBuilder.fitAbsoluteUrl(item.treasureCoverImg ?? ''),
+        child:AppCachedImage(
+          // 【核心修复】：统一使用 UrlResolver 加上 166 宽度！
+          UrlResolver.resolveImage(
+              context,
+              item.treasureCoverImg,
+              logicalWidth: 166
+          ),
           width: 90.w,
           height: 110.w,
           fit: BoxFit.cover,
