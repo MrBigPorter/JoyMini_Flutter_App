@@ -109,6 +109,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
       final banners = ref.read(homeBannerProvider);
       final treasures = ref.read(homeTreasuresProvider);
       final hotGroups = ref.read(homeGroupBuyingProvider);
+      final flashSaleSessions = ref.read(flashSaleActiveSessionsProvider);
 
       List<String> imageUrls = [];
 
@@ -161,10 +162,34 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
         }
       });
 
+      // 4. 收集Flash Sale图片（逻辑宽度 115）
+      flashSaleSessions.whenData((sessionList) {
+        if (sessionList.isNotEmpty) {
+          // 只预加载第一个活跃session的图片
+          final firstSession = sessionList.first;
+          final products = ref.read(flashSaleSessionProductsProvider(firstSession.id));
+          
+          products.whenData((productData) {
+            for (var productItem in productData.list) {
+              if (productItem.product.treasureCoverImg != null && 
+                  productItem.product.treasureCoverImg!.isNotEmpty) {
+                // Flash Sale卡片宽度115，高度115（正方形）
+                final optimizedUrl = ImageOptimizationInit().generateResponsiveUrl(
+                  originalUrl: productItem.product.treasureCoverImg!,
+                  width: 115,
+                  height: 115,
+                );
+                imageUrls.add(optimizedUrl);
+              }
+            }
+          });
+        }
+      });
+
       // 去重并预加载
       if (imageUrls.isNotEmpty) {
         final uniqueUrls = imageUrls.toSet().toList();
-        debugPrint('[HomePage] Preloading ${uniqueUrls.length} images for home page');
+        debugPrint('[HomePage] Preloading ${uniqueUrls.length} images for home page (including Flash Sale)');
 
         final criticalUrls = uniqueUrls.take(10).toList();
         await preloader.preloadUrls(criticalUrls, context); // 此时传进去的就是带有 cdn-cgi 的最终地址了
