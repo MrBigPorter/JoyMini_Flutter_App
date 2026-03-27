@@ -59,11 +59,17 @@ class SignalingManager {
     required String sessionId,
     required String targetId,
     required String reason,
+    int? duration,
+    int? startedAt,
+    String? mediaType,
   }) {
     _socketService.socket?.emit(SocketEvents.callEnd, {
       'sessionId': sessionId,
       'targetId': targetId,
       'reason': reason,
+      if (duration != null) 'duration': duration,
+      if (startedAt != null) 'startedAt': startedAt,
+      if (mediaType != null) 'mediaType': mediaType,
     });
   }
 
