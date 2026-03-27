@@ -53,6 +53,48 @@ class OauthSignInService {
     return AppConfig.facebookWebAppId.isNotEmpty;
   }
 
+  /// 诊断方法：检查 OAuth 配置状态（生产环境调试用）
+  static Map<String, dynamic> getOauthDiagnostics() {
+    final diagnostics = <String, dynamic>{};
+    
+    if (kIsWeb) {
+      diagnostics['platform'] = 'web';
+      diagnostics['origin'] = _safeWebOrigin();
+      diagnostics['google'] = {
+        'clientIdConfigured': AppConfig.googleWebClientId.isNotEmpty,
+        'clientIdLength': AppConfig.googleWebClientId.length,
+        'clientIdPreview': AppConfig.googleWebClientId.isNotEmpty 
+            ? '${AppConfig.googleWebClientId.substring(0, 20)}...' 
+            : '',
+        'canShowButton': canShowGoogleButton,
+        'initialized': _googleInitialized,
+        'initKey': _googleInitKey,
+      };
+      diagnostics['facebook'] = {
+        'appIdConfigured': AppConfig.facebookWebAppId.isNotEmpty,
+        'appIdLength': AppConfig.facebookWebAppId.length,
+        'appIdPreview': AppConfig.facebookWebAppId.isNotEmpty
+            ? '${AppConfig.facebookWebAppId.substring(0, 10)}...'
+            : '',
+        'canShowButton': canShowFacebookButton,
+        'initialized': _facebookInitialized,
+        'sdkVersion': AppConfig.facebookWebSdkVersion,
+      };
+      diagnostics['webSpecific'] = {
+        'cachedAccount': _webCachedAccount != null,
+        'globalListenerActive': _webGlobalAuthSub != null,
+        'pendingWaiter': _webSignInWaiter != null && !_webSignInWaiter!.isCompleted,
+      };
+    } else {
+      diagnostics['platform'] = 'native';
+      diagnostics['google'] = {'canShowButton': true};
+      diagnostics['facebook'] = {'canShowButton': true};
+      diagnostics['apple'] = {'canShowButton': canShowAppleButton};
+    }
+    
+    return diagnostics;
+  }
+
   /// Ensures Google is initialized on Web before rendering [buildGoogleSignInWebButton].
   /// No-op on native platforms. Safe to call multiple times.
   static Future<void> initializeForWeb({String trigger = 'unknown'}) async {

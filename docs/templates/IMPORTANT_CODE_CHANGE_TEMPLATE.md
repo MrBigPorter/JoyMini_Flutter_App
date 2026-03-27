@@ -1,355 +1,319 @@
-# 重要代码修改沟通模板
+---
 
-> **重要**：所有重要代码修改必须使用本模板进行沟通。这是AI协作开发规范的一部分。
+# Important Code Change Communication Template
 
-## 📋 模板使用说明
+> **Important**: All significant code changes must use this template for communication. This is a core part of the AI Collaboration Development Specification.
 
-### 使用场景：
-- 架构级设计变更
-- 核心业务逻辑修改（支付、订单、用户数据）
-- 重大性能优化
-- 安全相关修改
-- 第三方服务集成
-- 代码结构重大重构
+## 📋 Template Usage Instructions
 
-### 使用流程：
-1. **复制模板**：复制本模板内容到沟通中
-2. **填写内容**：根据实际情况填写每个部分
-3. **用户确认**：每个阶段完成后等待用户确认
-4. **记录确认**：记录用户的确认和反馈
+### Use Cases:
+* Architecture-level design changes.
+* Core business logic modifications (Payment, Orders, User Data).
+* Major performance optimizations.
+* Security-related modifications.
+* Third-party service integrations.
+* Significant code refactoring.
 
-### 注意事项：
-- 必须按顺序完成每个阶段
-- 必须获得用户明确确认后才能进入下一阶段
-- 必须记录所有沟通和确认结果
+### Usage Workflow:
+1.  **Copy Template**: Copy this template content into the communication.
+2.  **Fill in Content**: Fill in each section based on the actual situation.
+3.  **User Confirmation**: Wait for user confirmation after completing each phase.
+4.  **Record Confirmation**: Record the user's confirmation and feedback.
+
+### Notes:
+* Each phase must be completed in order.
+* Explicit user confirmation is required before proceeding to the next phase.
+* All communication and confirmation results must be recorded.
 
 ---
 
-## 🔍 重要代码修改沟通
+## 🔍 Important Code Change Communication
 
-### 修改基本信息
-- **修改类型**：[请选择：架构/核心业务/性能/安全/第三方集成/重大重构]
-- **涉及文件**：[列出主要涉及的文件]
-- **预计工作量**：[估计所需时间，如：2-4小时]
-- **优先级**：[请选择：高/中/低]
-- **沟通时间**：`YYYY-MM-DD HH:MM`
-- **沟通ID**：`[自动生成或手动填写]`
-
----
-
-## 阶段1：问题陈述（需要用户确认 ✅）
-
-### 1.1 问题描述
-[详细描述当前存在的问题，包括：]
-- 问题的具体表现是什么？
-- 这个问题什么时候出现的？
-- 在什么情况下会出现这个问题？
-
-### 1.2 影响范围
-[描述问题的影响范围：]
-- 影响了哪些功能模块？
-- 影响了多少用户？
-- 对业务有什么具体影响？
-
-### 1.3 数据支持
-[提供支持问题的数据或证据：]
-- 是否有错误日志？
-- 是否有性能监控数据？
-- 是否有用户反馈？
-- 是否有测试报告？
-
-### 1.4 修改目标
-[明确希望通过修改达到的目标：]
-- 主要目标是什么？
-- 次要目标是什么？
-- 成功标准是什么？
-
-### 1.5 用户确认
-- [ ] 用户已理解问题描述
-- [ ] 用户已确认影响范围
-- [ ] 用户已认可修改目标
-- [ ] 用户同意进入下一阶段
-
-**用户确认记录**：
-```
-[记录用户的确认反馈，如：
-- 用户确认理解问题
-- 用户同意修改目标
-- 用户要求补充：...]
-```
+### Basic Modification Information
+* **Modification Type**: [Select: Architecture / Core Business / Performance / Security / Third-party Integration / Major Refactoring].
+* **Involved Files**: [List the primary files involved].
+* **Estimated Workload**: [Estimate time required, e.g., 2-4 hours].
+* **Priority**: [Select: High / Medium / Low].
+* **Communication Time**: `YYYY-MM-DD HH:MM`.
+* **Communication ID**: `[Auto-generated or manually filled]`.
 
 ---
 
-## 阶段2：方案设计（需要用户确认 ✅）
+## Phase 1: Problem Statement (User Confirmation Required ✅)
 
-### 2.1 技术方案
-[描述计划采用的技术方案：]
-- 总体架构设计是什么？
-- 核心技术选型是什么？
-- 为什么选择这个方案？
+### 1.1 Problem Description
+[Detail the current problem, including:]
+* What is the specific manifestation of the problem?
+* When did this problem appear?
+* Under what circumstances does this problem occur?
 
-### 2.2 实现思路
-[描述具体的实现方法：]
-- 主要实现步骤是什么？
-- 关键技术点有哪些？
-- 如何保证实现质量？
+### 1.2 Impact Scope
+[Describe the scope of the problem's impact:]
+* Which functional modules are affected?
+* How many users are affected?
+* What is the specific impact on the business?
 
-### 2.3 备选方案
-[提供备选方案供用户选择：]
-- 方案A：[描述方案A]
-  - 优点：[列出优点]
-  - 缺点：[列出缺点]
-  - 推荐度：[高/中/低]
+### 1.3 Supporting Data
+[Provide data or evidence supporting the problem:]
+* Are there error logs?
+* Is there performance monitoring data?
+* Is there user feedback?
+* Are there test reports?
 
-- 方案B：[描述方案B]
-  - 优点：[列出优点]
-  - 缺点：[列出缺点]
-  - 推荐度：[高/中/低]
+### 1.4 Modification Goals
+[Clarify the goals to be achieved through the modification:]
+* What is the primary goal?
+* What are the secondary goals?
+* What are the success criteria?
 
-### 2.4 实施计划
-[制定详细的实施计划：]
-- 阶段1：[描述第一阶段工作]
-- 阶段2：[描述第二阶段工作]
-- 阶段3：[描述第三阶段工作]
-- 时间安排：[估计每个阶段的时间]
+### 1.5 User Confirmation
+* [ ] User understands the problem description.
+* [ ] User confirms the impact scope.
+* [ ] User approves the modification goals.
+* [ ] User agrees to proceed to the next phase.
 
-### 2.5 用户确认
-- [ ] 用户已理解技术方案
-- [ ] 用户已确认实现思路
-- [ ] 用户已选择实施方案
-- [ ] 用户同意进入下一阶段
-
-**用户确认记录**：
+**User Confirmation Record**:
 ```
-[记录用户的确认反馈，如：
-- 用户选择方案A
-- 用户要求调整实施计划
-- 用户确认时间安排]
+[Record user confirmation feedback, e.g.:
+- User confirms understanding of the problem
+- User agrees with the modification goals
+- User requests additions: ...]
 ```
 
 ---
 
-## 阶段3：风险评估（需要用户确认 ✅）
+## Phase 2: Solution Design (User Confirmation Required ✅)
 
-### 3.1 技术风险
-[识别可能的技术风险：]
-- 风险1：[描述风险]
-  - 概率：[高/中/低]
-  - 影响：[高/中/低]
-  - 应对措施：[描述应对措施]
+### 2.1 Technical Solution
+[Describe the planned technical solution:]
+* What is the overall architectural design?
+* What are the core technology selections?
+* Why was this solution chosen?
 
-- 风险2：[描述风险]
-  - 概率：[高/中/低]
-  - 影响：[高/中/低]
-  - 应对措施：[描述应对措施]
+### 2.2 Implementation Logic
+[Describe specific implementation methods:]
+* What are the main implementation steps?
+* What are the key technical points?
+* How will implementation quality be guaranteed?
 
-### 3.2 兼容性风险
-[评估对其他模块的影响：]
-- 影响模块1：[描述影响]
-- 影响模块2：[描述影响]
-- 兼容性测试计划：[描述测试计划]
+### 2.3 Alternative Options
+[Provide alternative options for the user to choose from:]
+* Option A: [Description of Option A]
+  * Pros: [List pros]
+  * Cons: [List cons]
+  * Recommendation: [High / Medium / Low]
+* Option B: [Description of Option B]
+  * Pros: [List pros]
+  * Cons: [List cons]
+  * Recommendation: [High / Medium / Low]
 
-### 3.3 性能风险
-[评估对性能的影响：]
-- 预期性能影响：[描述影响]
-- 性能测试计划：[描述测试计划]
-- 性能监控方案：[描述监控方案]
+### 2.4 Implementation Plan
+[Develop a detailed implementation plan:]
+* Stage 1: [Describe the first stage of work]
+* Stage 2: [Describe the second stage of work]
+* Stage 3: [Describe the third stage of work]
+* Schedule: [Estimate time for each stage]
 
-### 3.4 回滚方案
-[制定问题回滚方案：]
-- 回滚条件：[什么情况下需要回滚]
-- 回滚步骤：[详细的回滚步骤]
-- 回滚验证：[如何验证回滚成功]
+### 2.5 User Confirmation
+* [ ] User understands the technical solution.
+* [ ] User confirms the implementation logic.
+* [ ] User has chosen an implementation option.
+* [ ] User agrees to proceed to the next phase.
 
-### 3.5 用户确认
-- [ ] 用户已理解技术风险
-- [ ] 用户已确认兼容性风险
-- [ ] 用户已认可回滚方案
-- [ ] 用户同意进入下一阶段
-
-**用户确认记录**：
+**User Confirmation Record**:
 ```
-[记录用户的确认反馈，如：
-- 用户认可风险评估
-- 用户要求加强性能监控
-- 用户确认回滚方案]
-```
-
----
-
-## 阶段4：实施授权（需要用户明确同意 ✅）
-
-### 4.1 最终方案总结
-[汇总所有阶段的确认结果：]
-- 问题陈述：[总结问题]
-- 技术方案：[总结方案]
-- 风险评估：[总结风险]
-- 实施计划：[总结计划]
-
-### 4.2 成功标准
-[明确如何判断修改成功：]
-- 功能标准：[功能上的成功标准]
-- 性能标准：[性能上的成功标准]
-- 质量标准：[质量上的成功标准]
-
-### 4.3 沟通计划
-[制定实施过程中的沟通计划：]
-- 报告频率：[如：每30分钟报告一次]
-- 报告内容：[报告需要包含的内容]
-- 紧急沟通：[紧急情况下的沟通方式]
-
-### 4.4 实施授权
-**重要**：需要用户明确的"同意实施"确认
-
-- [ ] 用户已理解最终方案
-- [ ] 用户已确认成功标准
-- [ ] 用户已同意沟通计划
-- [ ] **用户明确同意开始实施**
-
-### 4.5 授权记录
-```
-**授权信息**：
-- 授权时间：YYYY-MM-DD HH:MM
-- 授权人：[用户名称/ID]
-- 授权条件：[任何附加条件]
-- 授权有效期：[如有]
-
-**用户明确同意语句**：
-[记录用户明确的同意语句，如：
-"我同意按照上述方案开始实施"
-"同意开始实施，请按计划进行"
-"授权开始实施，有问题及时沟通"]
+[Record user confirmation feedback, e.g.:
+- User chooses Option A
+- User requests adjustments to the implementation plan
+- User confirms the schedule]
 ```
 
 ---
 
-## 阶段5：实施阶段
+## Phase 3: Risk Assessment (User Confirmation Required ✅)
 
-### 5.1 实施前检查
-[实施前必须完成的检查：]
-- [ ] 已完成所有阶段的用户确认
-- [ ] 已查阅 `docs/FLUTTER_COMMANDS_CHEATSHEET.md`
-- [ ] 已准备好开发环境
-- [ ] 已制定详细的实施步骤
+### 3.1 Technical Risks
+[Identify potential technical risks:]
+* Risk 1: [Describe risk]
+  * Probability: [High / Medium / Low]
+  * Impact: [High / Medium / Low]
+  * Mitigation: [Describe mitigation measure]
+* Risk 2: [Describe risk]
+  * Probability: [High / Medium / Low]
+  * Impact: [High / Medium / Low]
+  * Mitigation: [Describe mitigation measure]
 
-### 5.2 实施进度报告
-[按照沟通计划定期报告进度]
+### 3.2 Compatibility Risks
+[Assess the impact on other modules:]
+* Impacted Module 1: [Describe impact]
+* Impacted Module 2: [Describe impact]
+* Compatibility Test Plan: [Describe test plan]
 
-#### 报告时间：`YYYY-MM-DD HH:MM`
-**当前进度**：[描述当前进度]
-**已完成工作**：[列出已完成的工作]
-**遇到的问题**：[描述遇到的问题和解决方案]
-**下一步计划**：[描述下一步计划]
-**预计完成时间**：[更新预计完成时间]
+### 3.3 Performance Risks
+[Assess the impact on performance:]
+* Expected Performance Impact: [Describe impact]
+* Performance Test Plan: [Describe test plan]
+* Performance Monitoring Plan: [Describe monitoring plan]
 
-### 5.3 命令执行记录
-[记录所有执行的命令]
+### 3.4 Rollback Plan
+[Develop a rollback plan for issues:]
+* Rollback Conditions: [Under what circumstances is a rollback necessary]
+* Rollback Steps: [Detailed rollback steps]
+* Rollback Verification: [How to verify a successful rollback]
 
-#### 命令1：[命令名称]
-**命令**: `[完整命令]`
-**目的**: [执行目的]
-**预期**: [预期结果]
-**实际**: [实际结果]
-**问题**: [遇到的问题和解决方案]
+### 3.5 User Confirmation
+* [ ] User understands technical risks.
+* [ ] User confirms compatibility risks.
+* [ ] User approves the rollback plan.
+* [ ] User agrees to proceed to the next phase.
 
-#### 命令2：[命令名称]
-**命令**: `[完整命令]`
-**目的**: [执行目的]
-**预期**: [预期结果]
-**实际**: [实际结果]
-**问题**: [遇到的问题和解决方案]
-
----
-
-## 阶段6：完成总结
-
-### 6.1 实施结果
-[总结实施结果：]
-- **实际完成的工作**：[列出实际完成的工作]
-- **与计划的差异**：[描述与计划的差异]
-- **遇到的问题**：[总结实施过程中遇到的问题]
-
-### 6.2 效果验证
-[验证修改效果：]
-- **功能验证**：[功能是否按预期工作]
-- **性能验证**：[性能是否达到预期]
-- **兼容性验证**：[是否影响其他模块]
-
-### 6.3 经验总结
-[总结实施经验：]
-- **成功经验**：[哪些做法是成功的]
-- **改进点**：[哪些地方可以改进]
-- **建议**：[对类似修改的建议]
-
-### 6.4 文档更新
-[记录需要更新的文档：]
-- [ ] 更新 `.github/copilot-instructions.md`
-- [ ] 更新相关技术文档
-- [ ] 更新命令速查表
-- [ ] 记录本次实施经验
-
-### 6.5 用户验收
-**需要用户最终验收确认**
-
-- [ ] 用户已查看实施结果
-- [ ] 用户已验证修改效果
-- [ ] 用户已认可实施质量
-- [ ] **用户确认验收完成**
-
-**验收记录**：
+**User Confirmation Record**:
 ```
-[记录用户的验收反馈，如：
-"验收通过，修改效果符合预期"
-"确认完成，感谢工作"
-"验收完成，可以关闭本次任务"]
+[Record user confirmation feedback, e.g.:
+- User approves the risk assessment
+- User requests enhanced performance monitoring
+- User confirms the rollback plan]
 ```
 
 ---
 
-## 📊 沟通记录总结
+## Phase 4: Implementation Authorization (Explicit Consent Required ✅)
 
-### 沟通时间线
-- **开始时间**: `YYYY-MM-DD HH:MM`
-- **问题陈述确认**: `YYYY-MM-DD HH:MM`
-- **方案设计确认**: `YYYY-MM-DD HH:MM`
-- **风险评估确认**: `YYYY-MM-DD HH:MM`
-- **实施授权时间**: `YYYY-MM-DD HH:MM`
-- **完成时间**: `YYYY-MM-DD HH:MM`
-- **验收时间**: `YYYY-MM-DD HH:MM`
+### 4.1 Final Solution Summary
+[Summarize confirmation results from all phases:]
+* Problem Statement: [Summarize problem]
+* Technical Solution: [Summarize solution]
+* Risk Assessment: [Summarize risks]
+* Implementation Plan: [Summarize plan]
 
-### 沟通效率指标
-- **总沟通时间**: [计算总时间]
-- **各阶段时间**: [列出各阶段时间]
-- **确认等待时间**: [用户确认的等待时间]
-- **实施时间**: [实际实施时间]
+### 4.2 Success Criteria
+[Clarify how to determine if the modification was successful:]
+* Functional Criteria: [Functional success criteria]
+* Performance Criteria: [Performance success criteria]
+* Quality Criteria: [Quality success criteria]
 
-### 质量评估
-- **沟通完整性**: [评估沟通是否完整]
-- **确认明确性**: [评估确认是否明确]
-- **实施符合度**: [评估实施是否符合方案]
-- **用户满意度**: [评估用户满意度]
+### 4.3 Communication Plan
+[Develop a communication plan for the implementation process:]
+* Reporting Frequency: [e.g., Report every 30 minutes]
+* Reporting Content: [What the report needs to include]
+* Emergency Communication: [Communication method for emergencies]
+
+### 4.4 Implementation Authorization
+**Important**: Requires the user's explicit "Consent to Implement" confirmation
+
+* [ ] User understands the final solution.
+* [ ] User confirms success criteria.
+* [ ] User agrees to the communication plan.
+* [ ] **User explicitly agrees to start implementation**.
+
+### 4.5 Authorization Record
+```
+**Authorization Information**:
+- Authorization Time: YYYY-MM-DD HH:MM
+- Authorizer: [User Name/ID]
+- Authorization Conditions: [Any additional conditions]
+- Authorization Validity: [If applicable]
+
+**User Explicit Consent Statement**:
+[Record the user's explicit consent statement, e.g.:
+"I agree to start implementation according to the above plan"
+"Agree to start implementation, please proceed as planned"
+"Authorize start of implementation, communicate promptly if there are issues"]
+```
 
 ---
 
-## 🔄 模板改进建议
+## Phase 5: Implementation Phase
 
-### 本次使用反馈
-[记录本次使用模板的反馈：]
-- **模板优点**：[哪些部分工作良好]
-- **改进建议**：[哪些部分需要改进]
-- **缺失内容**：[发现缺失的内容]
+### 5.1 Pre-Implementation Check
+[Checks that must be completed before implementation:]
+* [ ] Completed user confirmation for all phases.
+* [ ] Reviewed `docs/FLUTTER_COMMANDS_CHEATSHEET.md`.
+* [ ] Development environment is ready.
+* [ ] Detailed implementation steps have been developed.
 
-### 模板更新建议
-[提出模板更新建议：]
-1. [建议1]
-2. [建议2]
-3. [建议3]
+### 5.2 Implementation Progress Report
+[Report progress regularly according to the communication plan]
+
+#### Report Time: `YYYY-MM-DD HH:MM`
+**Current Progress**: [Describe current progress]
+**Completed Work**: [List completed work]
+**Issues Encountered**: [Describe issues encountered and solutions]
+**Next Steps**: [Describe the next steps]
+**Estimated Completion Time**: [Update ETA]
+
+### 5.3 Command Execution Log
+[Record all executed commands]
+
+#### Command 1: [Command Name]
+**Command**: `[Complete command]`
+**Purpose**: [Purpose of execution]
+**Expected**: [Expected result]
+**Actual**: [Actual result]
+**Issue**: [Encountered problems and solutions]
 
 ---
 
-**模板版本**: v1.0.0  
-**创建时间**: 2026-03-26  
-**最后更新**: 2026-03-26  
-**使用状态**: ✅ 生效中
+## Phase 6: Completion Summary
 
-> **重要提醒**：本模板是AI协作开发规范的核心部分，必须严格遵守使用。
+### 6.1 Implementation Results
+[Summarize implementation results:]
+* **Actually Completed Work**: [List work actually completed]
+* **Difference from Plan**: [Describe the difference from the plan]
+* **Issues Encountered**: [Summarize issues encountered during implementation]
+
+### 6.2 Effect Verification
+[Verify modification effect:]
+* **Functional Verification**: [Whether the function works as expected]
+* **Performance Verification**: [Whether performance meets expectations]
+* **Compatibility Verification**: [Whether other modules are affected]
+
+### 6.3 Lessons Learned
+[Summarize implementation experience:]
+* **Successes**: [Which practices were successful]
+* **Improvement Points**: [Areas for improvement]
+* **Suggestions**: [Suggestions for similar modifications]
+
+### 6.4 Document Updates
+[Record documents needing updates:]
+* [ ] Update `.github/copilot-instructions.md`.
+* [ ] Update relevant technical documents.
+* [ ] Update Command Cheatsheet.
+* [ ] Record this implementation experience.
+
+### 6.5 User Acceptance
+**Final user acceptance confirmation required**
+
+* [ ] User viewed implementation results.
+* [ ] User verified modification effect.
+* [ ] User approved implementation quality.
+* [ ] **User confirms acceptance is complete**.
+
+**Acceptance Record**:
+```
+[Record user acceptance feedback, e.g.:
+"Acceptance passed, modification effect meets expectations"
+"Confirmed complete, thank you for the work"
+"Acceptance complete, this task can be closed"]
+```
+
+---
+
+## 📊 Communication Record Summary
+
+### Communication Timeline
+* **Start Time**: `YYYY-MM-DD HH:MM`.
+* **Problem Statement Confirmed**: `YYYY-MM-DD HH:MM`.
+* **Solution Design Confirmed**: `YYYY-MM-DD HH:MM`.
+* **Risk Assessment Confirmed**: `YYYY-MM-DD HH:MM`.
+* **Implementation Authorization Time**: `YYYY-MM-DD HH:MM`.
+* **Completion Time**: `YYYY-MM-DD HH:MM`.
+* **Acceptance Time**: `YYYY-MM-DD HH:MM`.
+
+---
+
+**Template Version**: v1.0.0  
+**Creation Date**: 2026-03-26  
+**Last Updated**: 2026-03-26  
+**Usage Status**: ✅ Active
+

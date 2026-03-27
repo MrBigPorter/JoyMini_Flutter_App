@@ -37,6 +37,15 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     if (kIsWeb && OauthSignInService.canShowGoogleButton) {
       _initGoogleWebSignIn();
     }
+
+    // 生产环境诊断：输出 OAuth 配置状态到控制台
+    if (kIsWeb) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          _logOauthDiagnostics();
+        }
+      });
+    }
   }
 
   Future<void> _initGoogleWebSignIn() async {
@@ -264,6 +273,79 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');
       RadixToast.error(message);
+    }
+  }
+
+  void _logOauthDiagnostics() {
+    if (!kDebugMode) return;
+    
+    try {
+      final diagnostics = OauthSignInService.getOauthDiagnostics();
+      
+      debugPrint('╔══════════════════════════════════════════════════════════╗');
+      debugPrint('║                 OAUTH 诊断报告 (生产环境)                ║');
+      debugPrint('╠══════════════════════════════════════════════════════════╣');
+      debugPrint('║ 平台: ${diagnostics['platform']}');
+      debugPrint('║ 当前域名: ${diagnostics['origin']}');
+      debugPrint('╠══════════════════════════════════════════════════════════╣');
+      
+      final google = diagnostics['google'] as Map<String, dynamic>;
+      debugPrint('║ GOOGLE 配置状态:');
+      debugPrint('║   • Client ID 已配置: ${google['clientIdConfigured']}');
+      debugPrint('║   • Client ID 长度: ${google['clientIdLength']}');
+      debugPrint('║   • Client ID 预览: ${google['clientIdPreview']}');
+      debugPrint('║   • 按钮可显示: ${google['canShowButton']}');
+      debugPrint('║   • 已初始化: ${google['initialized']}');
+      debugPrint('║   • 初始化 Key: ${google['initKey']}');
+      
+      final facebook = diagnostics['facebook'] as Map<String, dynamic>;
+      debugPrint('╠══════════════════════════════════════════════════════════╣');
+      debugPrint('║ FACEBOOK 配置状态:');
+      debugPrint('║   • App ID 已配置: ${facebook['appIdConfigured']}');
+      debugPrint('║   • App ID 长度: ${facebook['appIdLength']}');
+      debugPrint('║   • App ID 预览: ${facebook['appIdPreview']}');
+      debugPrint('║   • 按钮可显示: ${facebook['canShowButton']}');
+      debugPrint('║   • 已初始化: ${facebook['initialized']}');
+      debugPrint('║   • SDK 版本: ${facebook['sdkVersion']}');
+      
+      if (diagnostics['platform'] == 'web') {
+        final web = diagnostics['webSpecific'] as Map<String, dynamic>;
+        debugPrint('╠══════════════════════════════════════════════════════════╣');
+        debugPrint('║ WEB 特定状态:');
+        debugPrint('║   • 缓存账号: ${web['cachedAccount']}');
+        debugPrint('║   • 全局监听器活跃: ${web['globalListenerActive']}');
+        debugPrint('║   • 等待中请求: ${web['pendingWaiter']}');
+      }
+      
+      debugPrint('╠══════════════════════════════════════════════════════════╣');
+      debugPrint('║ 页面状态:');
+      debugPrint('║   • Google Web Ready: $_googleWebReady');
+      debugPrint('║   • 社交登录进行中: $_socialOauthInFlight');
+      debugPrint('║   • 重定向中: $_isSuccessRedirecting');
+      debugPrint('╚══════════════════════════════════════════════════════════╝');
+      
+      // 提供配置建议
+      if (kIsWeb) {
+        if (!google['clientIdConfigured']) {
+          debugPrint('[诊断建议] Google Client ID 未配置，请检查 prod.json 中的 GOOGLE_WEB_CLIENT_ID');
+        } else if (!google['initialized']) {
+          debugPrint('[诊断建议] Google 初始化失败，可能原因:');
+          debugPrint('  1. Google Cloud Console 未配置 Authorized JavaScript origins');
+          debugPrint('  2. 当前域名 ${diagnostics['origin']} 不在允许列表中');
+          debugPrint('  3. Client ID 无效或已被删除');
+        }
+        
+        if (!facebook['appIdConfigured']) {
+          debugPrint('[诊断建议] Facebook App ID 未配置，请检查 prod.json 中的 FACEBOOK_WEB_APP_ID');
+        } else if (!facebook['initialized']) {
+          debugPrint('[诊断建议] Facebook 初始化失败，可能原因:');
+          debugPrint('  1. Facebook Developer Console 未配置 App Domains');
+          debugPrint('  2. 当前域名未添加到 App Domains');
+          debugPrint('  3. App ID 无效或已被删除');
+        }
+      }
+    } catch (e) {
+      debugPrint('[OAuth 诊断错误] $e');
     }
   }
 

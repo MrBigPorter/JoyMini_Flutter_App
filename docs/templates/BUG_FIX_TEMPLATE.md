@@ -1,251 +1,253 @@
-# Bug修复沟通模板
-
-> **重要**：所有Bug修复可以使用本模板进行简化沟通。这是AI协作开发规范的一部分。
-
-## 📋 模板使用说明
-
-### 使用场景：
-- 明显的功能错误修复
-- 界面显示问题修复
-- 性能问题修复
-- 兼容性问题修复
-
-### 使用流程：
-1. **复制模板**：复制本模板内容到沟通中
-2. **填写内容**：根据实际情况填写每个部分
-3. **用户确认**：获得用户确认后开始修复
-4. **记录结果**：记录修复过程和结果
-
-### 注意事项：
-- 本模板适用于相对简单的Bug修复
-- 复杂的Bug修复应使用重要代码修改模板
-- 必须获得用户确认后才能开始修复
 
 ---
 
-## 🔍 Bug修复沟通
+# Bug Fix Communication Template
 
-### Bug基本信息
-- **Bug类型**：[请选择：功能错误/界面问题/性能问题/兼容性问题]
-- **涉及文件**：[列出涉及的文件]
-- **严重程度**：[请选择：高/中/低]
-- **优先级**：[请选择：高/中/低]
-- **沟通时间**：`YYYY-MM-DD HH:MM`
-- **Bug ID**：`[如有]`
+> **Important**: All bug fixes can use this template to simplify communication. This is part of the AI Collaboration Development Specification.
 
----
+## 📋 Template Usage Instructions
 
-## 阶段1：问题分析（需要用户确认 ✅）
+### Use Cases:
+* Obvious functional error fixes.
+* UI display issue fixes.
+* Performance issue fixes.
+* Compatibility issue fixes.
 
-### 1.1 Bug描述
-[详细描述Bug：]
-- Bug的具体表现是什么？
-- 在什么情况下会出现？
-- 重现步骤是什么？
+### Usage Workflow:
+1.  **Copy Template**: Copy this template content into the communication.
+2.  **Fill in Content**: Fill in each section according to the actual situation.
+3.  **User Confirmation**: Start the fix after obtaining user confirmation.
+4.  **Record Results**: Record the fix process and results.
 
-### 1.2 影响分析
-[分析Bug的影响：]
-- 影响了哪些功能？
-- 影响了多少用户？
-- 对用户体验的影响程度？
-
-### 1.3 根本原因
-[分析Bug的根本原因：]
-- 初步判断的原因是什么？
-- 是否有相关错误日志？
-- 是否与特定环境相关？
-
-### 1.4 修复目标
-[明确修复目标：]
-- 主要修复目标是什么？
-- 修复后的预期效果是什么？
-- 成功标准是什么？
-
-### 1.5 用户确认
-- [ ] 用户已理解Bug描述
-- [ ] 用户已确认影响分析
-- [ ] 用户已认可修复目标
-- [ ] 用户同意开始修复
-
-**用户确认记录**：
-```
-[记录用户的确认反馈]
-```
+### Notes:
+* This template is suitable for relatively simple bug fixes.
+* Complex bug fixes should use the "Important Code Modification Template".
+* User confirmation must be obtained before starting the fix.
 
 ---
 
-## 阶段2：修复方案（需要用户确认 ✅）
+## 🔍 Bug Fix Communication
 
-### 2.1 修复方案
-[描述修复方案：]
-- 计划如何修复？
-- 修复的具体步骤是什么？
-- 为什么选择这个方案？
+### Basic Bug Information
+* **Bug Type**: [Please select: Functional Error / UI Issue / Performance Issue / Compatibility Issue].
+* **Involved Files**: [List the involved files].
+* **Severity**: [Please select: High / Medium / Low].
+* **Priority**: [Please select: High / Medium / Low].
+* **Communication Time**: `YYYY-MM-DD HH:MM`.
+* **Bug ID**: `[If applicable]`.
 
-### 2.2 测试计划
-[制定测试计划：]
-- 如何测试修复效果？
-- 需要测试哪些场景？
-- 如何验证修复成功？
+---
 
-### 2.3 风险评估
-[评估修复风险：]
-- 修复可能带来的风险？
-- 如何避免引入新问题？
-- 回滚方案是什么？
+## Phase 1: Problem Analysis (User Confirmation Required ✅)
 
-### 2.4 用户确认
-- [ ] 用户已理解修复方案
-- [ ] 用户已确认测试计划
-- [ ] 用户已认可风险评估
-- [ ] 用户同意实施修复
+### 1.1 Bug Description
+[Detail the bug description:]
+* What is the specific manifestation of the bug?
+* Under what circumstances does it occur?
+* What are the steps to reproduce?
 
-**用户确认记录**：
+### 1.2 Impact Analysis
+[Analyze the impact of the bug:]
+* Which functions are affected?
+* How many users are affected?
+* What is the extent of the impact on user experience?
+
+### 1.3 Root Cause
+[Analyze the root cause of the bug:]
+* What is the preliminary judgment of the cause?
+* Are there relevant error logs?
+* Is it related to a specific environment?
+
+### 1.4 Fix Goals
+[Clarify the fix goals:]
+* What is the primary fix goal?
+* What is the expected effect after the fix?
+* What are the success criteria?
+
+### 1.5 User Confirmation
+* [ ] User understands the bug description.
+* [ ] User confirms the impact analysis.
+* [ ] User approves the fix goals.
+* [ ] User agrees to start the fix.
+
+**User Confirmation Record**:
 ```
-[记录用户的确认反馈]
+[Record user confirmation feedback]
 ```
 
 ---
 
-## 阶段3：修复实施
+## Phase 2: Fix Plan (User Confirmation Required ✅)
 
-### 3.1 实施前检查
-[实施前必须完成的检查：]
-- [ ] 已获得用户确认
-- [ ] 已查阅 `docs/FLUTTER_COMMANDS_CHEATSHEET.md`
-- [ ] 已准备好测试环境
-- [ ] 已制定详细的修复步骤
+### 2.1 Fix Plan
+[Describe the fix plan:]
+* How do you plan to fix it?
+* What are the specific steps for the fix?
+* Why choose this plan?
 
-### 3.2 修复过程记录
-[记录修复过程：]
+### 2.2 Test Plan
+[Develop a test plan:]
+* How to test the effect of the fix?
+* Which scenarios need to be tested?
+* How to verify the fix was successful?
 
-#### 步骤1：[步骤描述]
-**操作**：[具体操作]
-**目的**：[操作目的]
-**结果**：[操作结果]
-**问题**：[遇到的问题]
+### 2.3 Risk Assessment
+[Assess the fix risks:]
+* What are the potential risks brought by the fix?
+* How to avoid introducing new problems?
+* What is the rollback plan?
 
-#### 步骤2：[步骤描述]
-**操作**：[具体操作]
-**目的**：[操作目的]
-**结果**：[操作结果]
-**问题**：[遇到的问题]
+### 2.4 User Confirmation
+* [ ] User understands the fix plan.
+* [ ] User confirms the test plan.
+* [ ] User approves the risk assessment.
+* [ ] User agrees to implement the fix.
 
-### 3.3 命令执行记录
-[记录所有执行的命令：]
-
-#### 命令1：[命令名称]
-**命令**: `[完整命令]`
-**目的**: [执行目的]
-**预期**: [预期结果]
-**实际**: [实际结果]
-
-#### 命令2：[命令名称]
-**命令**: `[完整命令]`
-**目的**: [执行目的]
-**预期**: [预期结果]
-**实际**: [实际结果]
-
----
-
-## 阶段4：测试验证
-
-### 4.1 测试结果
-[记录测试结果：]
-
-#### 测试场景1：[场景描述]
-**测试步骤**：[测试步骤]
-**预期结果**：[预期结果]
-**实际结果**：[实际结果]
-**通过状态**：[✅通过/❌失败]
-
-#### 测试场景2：[场景描述]
-**测试步骤**：[测试步骤]
-**预期结果**：[预期结果]
-**实际结果**：[实际结果]
-**通过状态**：[✅通过/❌失败]
-
-### 4.2 回归测试
-[进行回归测试：]
-- [ ] 相关功能是否正常工作？
-- [ ] 是否引入了新问题？
-- [ ] 性能是否受影响？
-
-### 4.3 验证总结
-[总结验证结果：]
-- **修复效果**：[修复是否成功]
-- **测试覆盖**：[测试是否充分]
-- **质量评估**：[修复质量评估]
-
----
-
-## 阶段5：完成总结
-
-### 5.1 修复结果
-[总结修复结果：]
-- **实际修复内容**：[实际修复了什么]
-- **与计划的差异**：[与计划的差异]
-- **遇到的问题**：[修复过程中遇到的问题]
-
-### 5.2 效果验证
-[验证修复效果：]
-- **功能验证**：[功能是否正常]
-- **性能验证**：[性能是否正常]
-- **兼容性验证**：[兼容性是否正常]
-
-### 5.3 经验总结
-[总结修复经验：]
-- **成功经验**：[哪些做法是成功的]
-- **改进点**：[哪些地方可以改进]
-- **建议**：[对类似Bug修复的建议]
-
-### 5.4 文档更新
-[记录需要更新的文档：]
-- [ ] 更新相关技术文档
-- [ ] 记录Bug修复经验
-- [ ] 更新测试用例
-
-### 5.5 用户验收
-**需要用户最终验收确认**
-
-- [ ] 用户已查看修复结果
-- [ ] 用户已验证修复效果
-- [ ] 用户已认可修复质量
-- [ ] **用户确认验收完成**
-
-**验收记录**：
+**User Confirmation Record**:
 ```
-[记录用户的验收反馈]
+[Record user confirmation feedback]
 ```
 
 ---
 
-## 📊 修复记录总结
+## Phase 3: Fix Implementation
 
-### 修复时间线
-- **开始时间**: `YYYY-MM-DD HH:MM`
-- **问题分析确认**: `YYYY-MM-DD HH:MM`
-- **修复方案确认**: `YYYY-MM-DD HH:MM`
-- **修复完成时间**: `YYYY-MM-DD HH:MM`
-- **测试完成时间**: `YYYY-MM-DD HH:MM`
-- **验收时间**: `YYYY-MM-DD HH:MM`
+### 3.1 Pre-Implementation Check
+[Checks that must be completed before implementation:]
+* [ ] Obtained user confirmation.
+* [ ] Reviewed `docs/FLUTTER_COMMANDS_CHEATSHEET.md`.
+* [ ] Test environment is ready.
+* [ ] Detailed fix steps have been developed.
 
-### 修复效率指标
-- **总修复时间**: [计算总时间]
-- **分析时间**: [问题分析时间]
-- **修复时间**: [实际修复时间]
-- **测试时间**: [测试验证时间]
+### 3.2 Fix Process Log
+[Record the fix process:]
 
-### 质量评估
-- **修复完整性**: [评估修复是否完整]
-- **测试充分性**: [评估测试是否充分]
-- **用户满意度**: [评估用户满意度]
+#### Step 1: [Step Description]
+**Operation**: [Specific operation]
+**Purpose**: [Purpose of operation]
+**Result**: [Result of operation]
+**Issue**: [Issues encountered]
+
+#### Step 2: [Step Description]
+**Operation**: [Specific operation]
+**Purpose**: [Purpose of operation]
+**Result**: [Result of operation]
+**Issue**: [Issues encountered]
+
+### 3.3 Command Execution Log
+[Record all executed commands:]
+
+#### Command 1: [Command Name]
+**Command**: `[Complete command]`
+**Purpose**: [Purpose of execution]
+**Expected**: [Expected result]
+**Actual**: [Actual result]
+
+#### Command 2: [Command Name]
+**Command**: `[Complete command]`
+**Purpose**: [Purpose of execution]
+**Expected**: [Expected result]
+**Actual**: [Actual result]
 
 ---
 
-**模板版本**: v1.0.0  
-**创建时间**: 2026-03-26  
-**最后更新**: 2026-03-26  
-**使用状态**: ✅ 生效中
+## Phase 4: Test Verification
 
-> **重要提醒**：本模板是AI协作开发规范的一部分，Bug修复时应根据复杂度选择使用本模板或重要代码修改模板。
+### 4.1 Test Results
+[Record test results:]
+
+#### Test Scenario 1: [Scenario Description]
+**Test Steps**: [Test steps]
+**Expected Result**: [Expected result]
+**Actual Result**: [Actual result]
+**Pass Status**: [✅Pass / ❌Fail]
+
+#### Test Scenario 2: [Scenario Description]
+**Test Steps**: [Test steps]
+**Expected Result**: [Expected result]
+**Actual Result**: [Actual result]
+**Pass Status**: [✅Pass / ❌Fail]
+
+### 4.2 Regression Testing
+[Perform regression testing:]
+* [ ] Are related functions working properly?
+* [ ] Were new problems introduced?
+* [ ] Is performance affected?
+
+### 4.3 Verification Summary
+[Summarize verification results:]
+* **Fix Effect**: [Whether the fix was successful]
+* **Test Coverage**: [Whether the testing was sufficient]
+* **Quality Assessment**: [Assessment of fix quality]
+
+---
+
+## Phase 5: Completion Summary
+
+### 5.1 Fix Results
+[Summarize fix results:]
+* **Actual Fix Content**: [What was actually fixed]
+* **Difference from Plan**: [Difference from the plan]
+* **Issues Encountered**: [Issues encountered during the fix process]
+
+### 5.2 Effect Verification
+[Verify fix effect:]
+* **Functional Verification**: [Whether the function is normal]
+* **Performance Verification**: [Whether performance is normal]
+* **Compatibility Verification**: [Whether compatibility is normal]
+
+### 5.3 Lessons Learned
+[Summarize fix experience:]
+* **Successes**: [Which practices were successful]
+* **Improvement Points**: [Areas for improvement]
+* **Suggestions**: [Suggestions for similar bug fixes]
+
+### 5.4 Document Updates
+[Record documents needing updates:]
+* [ ] Update relevant technical documents.
+* [ ] Record bug fix experience.
+* [ ] Update test cases.
+
+### 5.5 User Acceptance
+**Final user acceptance confirmation required**
+
+* [ ] User viewed fix results.
+* [ ] User verified fix effect.
+* [ ] User approved fix quality.
+* [ ] **User confirms acceptance is complete**.
+
+**Acceptance Record**:
+```
+[Record user acceptance feedback]
+```
+
+---
+
+## 📊 Fix Record Summary
+
+### Fix Timeline
+* **Start Time**: `YYYY-MM-DD HH:MM`.
+* **Problem Analysis Confirmed**: `YYYY-MM-DD HH:MM`.
+* **Fix Plan Confirmed**: `YYYY-MM-DD HH:MM`.
+* **Fix Completion Time**: `YYYY-MM-DD HH:MM`.
+* **Test Completion Time**: `YYYY-MM-DD HH:MM`.
+* **Acceptance Time**: `YYYY-MM-DD HH:MM`.
+
+### Fix Efficiency Metrics
+* **Total Fix Time**: [Calculate total time].
+* **Analysis Time**: [Problem analysis time].
+* **Fix Time**: [Actual fix time].
+* **Test Time**: [Test verification time].
+
+### Quality Assessment
+* **Fix Integrity**: [Assess if fix is complete].
+* **Test Sufficiency**: [Assess if testing was sufficient].
+* **User Satisfaction**: [Assess user satisfaction].
+
+---
+
+**Template Version**: v1.0.0  
+**Creation Date**: 2026-03-26  
+**Last Updated**: 2026-03-26  
+**Usage Status**: ✅ Active
+
