@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
@@ -12,6 +13,8 @@ import 'package:flutter_app/core/models/index.dart';
 import 'package:flutter_app/ui/animated_list_item.dart';
 import 'package:flutter_app/ui/lucky_tab_bar_delegate.dart';
 import 'package:flutter_app/utils/helper.dart';
+import 'package:flutter_app/utils/image/image_optimization_init.dart';
+import 'package:flutter_app/utils/media/url_resolver.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -135,11 +138,12 @@ class _ProductContentState extends ConsumerState<_ProductContent>
       length: widget.categories.length,
       vsync: this,
     );
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
-        // ref.read(activeCategoryProvider.notifier).state = widget.categories[_tabController.index];
-      }
-    });
+    // 【优化：数据抢跑】启动后立即静默加载前 2 个 Tab 的数据
+    for (int i = 0; i < min(2, widget.categories.length); i++) {
+      final catId = widget.categories[i].id;
+      // 触发 Provider 的异步请求并填入缓存
+      ref.read(productListProvider(catId));
+    }
   }
 
   @override
@@ -222,6 +226,7 @@ class _List extends ConsumerStatefulWidget {
 class _ListState extends ConsumerState<_List>
     with AutomaticKeepAliveClientMixin {
   late final PageListController<ProductListItem> _ctl;
+  late final ImageOptimizationInit _imageOptimizationInit;
 
   @override
   bool get wantKeepAlive => true;
@@ -230,6 +235,8 @@ class _ListState extends ConsumerState<_List>
   void initState() {
     super.initState();
 
+    _imageOptimizationInit = ImageOptimizationInit();
+    
     _ctl = PageListController<ProductListItem>(
       request: ({required int pageSize, required int page}) {
         final req = ref.read(productListProvider(widget.categoryId));
@@ -237,10 +244,48 @@ class _ListState extends ConsumerState<_List>
       },
       requestKey: widget.categoryId,
     );
+
+    // 监听数据变化，进行图片预取
+    _ctl.addListener(_onDataChanged);
+  }
+
+  void _onDataChanged() {
+    final state = _ctl.value;
+    if (state.status == PageStatus.success && state.items.isNotEmpty) {
+      // 数据加载成功且有数据时，预取图片
+      unawaited(_prefetchProductImages(state.items));
+    }
+  }
+
+  Future<void> _prefetchProductImages(List<ProductListItem> items) async {
+    // 预取前12个商品的图片（约2屏）
+    final urls = items
+        .take(12)
+        .map((item) => item.treasureCoverImg)
+        .where((url) => url != null && url.isNotEmpty)
+        .map((url) => UrlResolver.resolveImage(context, url!, logicalWidth: 166))
+        .where((url) => url.isNotEmpty)
+        .toList();
+
+    if (urls.isEmpty) return;
+
+    // 确保图片优化系统已初始化
+    try {
+      await _imageOptimizationInit.initialize(context);
+    } catch (e) {
+      debugPrint('[ProductPage] Failed to initialize image optimization: $e');
+      return;
+    }
+
+    // 延迟执行预取，避免影响当前帧渲染
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _imageOptimizationInit.preloadImages(urls, context);
+    });
   }
 
   @override
   void dispose() {
+    _ctl.removeListener(_onDataChanged);
     _ctl.dispose();
     super.dispose();
   }
@@ -260,6 +305,9 @@ class _ListState extends ConsumerState<_List>
 
     return CustomScrollView(
       physics: platformScrollPhysics(),
+       // 增加预渲染区域：向下滑动方向预留 1000 像素
+       // 这样当用户滑到一半时，底下的图已经在内存里解码完成了
+      cacheExtent: 1000,
       key: PageStorageKey<String>('product_list_${widget.categoryId}'),
       slivers: [
         PageListViewPro(
@@ -320,10 +368,6 @@ class _ProductLoadingSkeleton extends StatelessWidget {
       },
       body: CustomScrollView(
         physics: const NeverScrollableScrollPhysics(),
-        // 核心：增加视窗外的预渲染区域！
-        // 1500 大概是两到三屏的高度。
-        // 意思是：用户还没滑到下面，底层其实已经偷偷把图片下载并准备好渲染了！
-        //cacheExtent: 1500,
         slivers: [
           SliverPadding(
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),

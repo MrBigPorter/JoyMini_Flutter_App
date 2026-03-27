@@ -17,6 +17,7 @@ import 'package:flutter_app/theme/leading_tokens.dart';
 import 'package:flutter_app/ui/button/button.dart';
 import 'package:flutter_app/ui/button/variant.dart';
 import 'package:flutter_app/ui/modal/sheet/radix_sheet.dart';
+import 'package:flutter_app/ui/toast/radix_toast.dart';
 import 'package:flutter_app/utils/date_helper.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 
@@ -296,7 +297,10 @@ class ProductSection extends ConsumerWidget {
                   children: [
                     if (isFlashSale)
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.w),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 6.w,
+                          vertical: 2.w,
+                        ),
                         margin: EdgeInsets.only(bottom: 4.w),
                         decoration: BoxDecoration(
                           color: Colors.red,
@@ -308,7 +312,11 @@ class ProductSection extends ConsumerWidget {
                             Icon(Icons.bolt, color: Colors.white, size: 10.w),
                             Text(
                               'Flash',
-                              style: TextStyle(color: Colors.white, fontSize: 9.sp, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -316,12 +324,15 @@ class ProductSection extends ConsumerWidget {
                     Text(
                       FormatHelper.formatCurrency(purchaseState.unitAmount),
                       style: TextStyle(
-                        color: isFlashSale ? Colors.red : context.textPrimary900,
+                        color: isFlashSale
+                            ? Colors.red
+                            : context.textPrimary900,
                         fontSize: context.textXs,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    if (isFlashSale && originalAmount > purchaseState.unitAmount)
+                    if (isFlashSale &&
+                        originalAmount > purchaseState.unitAmount)
                       Text(
                         FormatHelper.formatCurrency(originalAmount),
                         style: TextStyle(
@@ -408,12 +419,15 @@ class QuantityControlState extends ConsumerState<QuantityControl> {
                 height: 38.w,
                 onPressed: canDec
                     ? () => action.dec(
-                          (v) => _textEditingController.text = v.toString(),
-                        )
-                    : null, // null → Button 自动进入 disabled 态
+                        (v) => _textEditingController.text = v.toString(),
+                      )
+                    : null,
+                // null → Button 自动进入 disabled 态
                 child: Icon(
                   CupertinoIcons.minus,
-                  color: canDec ? context.textPrimary900 : context.textSecondary700.withValues(alpha: 0.4),
+                  color: canDec
+                      ? context.textPrimary900
+                      : context.textSecondary700.withValues(alpha: 0.4),
                   size: 16.w,
                 ),
               ),
@@ -456,12 +470,14 @@ class QuantityControlState extends ConsumerState<QuantityControl> {
                 height: 38.w,
                 onPressed: canInc
                     ? () => action.inc(
-                          (v) => _textEditingController.text = v.toString(),
-                        )
+                        (v) => _textEditingController.text = v.toString(),
+                      )
                     : null,
                 child: Icon(
                   CupertinoIcons.add,
-                  color: canInc ? context.textPrimary900 : context.textSecondary700.withValues(alpha: 0.4),
+                  color: canInc
+                      ? context.textPrimary900
+                      : context.textSecondary700.withValues(alpha: 0.4),
                   size: 16.w,
                 ),
               ),
@@ -722,7 +738,11 @@ class CoinsDiscountSection extends ConsumerWidget {
                 color: const Color(0xFFFFF8E1),
                 borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Icon(Icons.monetization_on_rounded, color: Colors.amber.shade700, size: 18.w),
+              child: Icon(
+                Icons.monetization_on_rounded,
+                color: Colors.amber.shade700,
+                size: 18.w,
+              ),
             ),
             SizedBox(width: 12.w),
             Expanded(
@@ -756,9 +776,7 @@ class CoinsDiscountSection extends ConsumerWidget {
             ),
             Switch(
               value: purchase.useDiscountCoins,
-              onChanged: coinsBalance > 0
-                  ? (v) => notifier.toggleUseDiscountCoins(v)
-                  : null, // 余额为 0 时禁用开关
+              onChanged: (v) => notifier.toggleUseDiscountCoins(v),
               activeTrackColor: context.bgBrandSolid,
             ),
           ],

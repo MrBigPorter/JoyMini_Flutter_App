@@ -125,11 +125,16 @@ extension GlobalHandlerSocketExtension on _GlobalHandlerState {
             if (event.data?['extra'] != null) {
               final metadata = (event.data!['extra'] as Map).cast<String, dynamic>();
               final targetId = metadata['senderId']?.toString();
+              final conversationId = metadata['conversationId']?.toString();
+              final mediaType = metadata['mediaType']?.toString() ?? 'audio';
               if (targetId != null) {
                 ref.read(socketServiceProvider).socket?.emit(SocketEvents.callEnd, {
                   'sessionId': sessionId,
                   'targetId': targetId,
-                  'reason': 'decline'
+                  'reason': 'rejected',
+                  'duration': 0, // 拒接时长必定为 0
+                  'mediaType': mediaType,
+                  if (conversationId != null) 'conversationId': conversationId,
                 });
               }
             }

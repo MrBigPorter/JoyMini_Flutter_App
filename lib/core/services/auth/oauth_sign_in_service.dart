@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_app/core/config/app_config.dart';
 import 'package:flutter_app/core/models/auth.dart';
@@ -156,7 +157,24 @@ class OauthSignInService {
       await _ensureFacebookInitialized();
     }
 
-    final result = await FacebookAuth.instance.login();
+    //  新增：如果是 iOS，先弹授权框
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      // 延迟一下，确保 UI 渲染完毕再弹窗（苹果官方建议）
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final trackingStatus = await AppTrackingTransparency.requestTrackingAuthorization();
+      debugPrint('[FacebookAuth] ATT 授权状态: $trackingStatus');
+
+      // 注意：即使 trackingStatus 是 denied (拒绝)，我们依然继续往下走
+      // 只是如果拒绝了，Facebook 依然会给你发 JWT Token。
+    }
+
+    final result = await FacebookAuth.instance.login(
+      permissions: ['public_profile', 'email'],
+      loginBehavior: LoginBehavior.nativeWithFallback,
+      //  必须加上这一行，强制获取经典 Token
+      loginTracking: LoginTracking.enabled,
+    );
     if (result.status == LoginStatus.cancelled) {
       throw OauthCancelledException('Facebook sign-in cancelled');
     }
@@ -383,6 +401,7 @@ class OauthSignInService {
       _webSignInWaiter!.completeError(
         OauthCancelledException('Superseded by new sign-in request'),
       );
+      _webSignInWaiter = null;
     }
     _webSignInWaiter = Completer<GoogleSignInAccount>();
 
@@ -396,9 +415,9 @@ class OauthSignInService {
       );
 
       final result = await _webSignInWaiter!.future.timeout(
-        const Duration(seconds: 120),
+        const Duration(seconds: 60), // 减少超时时间从120秒到60秒
         onTimeout: () {
-          _log('Google web: sign-in timed out after 120s');
+          _log('Google web: sign-in timed out after 60s');
           throw OauthCancelledException('Google sign-in timed out');
         },
       );
@@ -408,17 +427,21 @@ class OauthSignInService {
     } on OauthCancelledException {
       rethrow;
     } on GoogleSignInException catch (e) {
-      _log('Google web: GoogleSignInException code=${e.code}');
+      _logError('Google web: GoogleSignInException', e);
       if (e.code == GoogleSignInExceptionCode.canceled) {
         throw OauthCancelledException('Google sign-in cancelled');
       }
       rethrow;
-    } catch (e) {
-      _log('Google web: sign-in error: $e');
+    } catch (e, s) {
+      _logError('Google web: sign-in error', e, s);
       rethrow;
     } finally {
       // Clean up waiter reference if it's still pending (shouldn't happen normally)
       if (_webSignInWaiter != null && !_webSignInWaiter!.isCompleted) {
+        _log('Google web: cleaning up pending waiter in finally block');
+        _webSignInWaiter!.completeError(
+          OauthCancelledException('Authentication process was interrupted'),
+        );
         _webSignInWaiter = null;
       }
     }
@@ -429,6 +452,17 @@ class OauthSignInService {
     debugPrint('[OAuthSignInService] $message');
   }
 
+  static void _logError(String message, [Object? error, StackTrace? stack]) {
+    if (!kDebugMode) return;
+    debugPrint('[OAuthSignInService] ERROR: $message');
+    if (error != null) {
+      debugPrint('[OAuthSignInService] Error details: $error');
+      if (stack != null) {
+        debugPrint('[OAuthSignInService] Stack trace: $stack');
+      }
+    }
+  }
+
   static String _maskHead(String value, {int keep = 12}) {
     if (value.isEmpty) return '';
     if (value.length <= keep) return value;
@@ -437,12 +471,20 @@ class OauthSignInService {
 
   static Future<void> _ensureFacebookInitialized() async {
     if (_facebookInitialized) return;
-    await FacebookAuth.instance.webAndDesktopInitialize(
-      appId: AppConfig.facebookWebAppId,
-      cookie: true,
-      xfbml: true,
-      version: AppConfig.facebookWebSdkVersion,
-    );
-    _facebookInitialized = true;
+    try {
+      _log('Facebook web initialization start | appId=${_maskHead(AppConfig.facebookWebAppId)} | version=${AppConfig.facebookWebSdkVersion}');
+      await FacebookAuth.instance.webAndDesktopInitialize(
+        appId: AppConfig.facebookWebAppId,
+        cookie: true,
+        xfbml: true,
+        version: AppConfig.facebookWebSdkVersion,
+      );
+      _facebookInitialized = true;
+      _log('Facebook web initialization success');
+    } catch (e, s) {
+      _logError('Facebook web initialization failed', e, s);
+      _facebookInitialized = false;
+      rethrow;
+    }
   }
 }

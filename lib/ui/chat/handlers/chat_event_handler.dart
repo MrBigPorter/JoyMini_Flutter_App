@@ -38,11 +38,17 @@ class ChatEventHandler {
       );
 
   void init() {
+    debugPrint("💬 [ChatEventHandler] Initializing for conversation: $conversationId");
+    debugPrint("💬 [ChatEventHandler] Current user ID: $_currentUserId");
+    debugPrint("💬 [ChatEventHandler] Socket service available: ${_socketService != null}");
+    debugPrint("💬 [ChatEventHandler] Socket connected: ${_socketService?.isConnected}");
+    
     _setupSubscriptions();
     _setupReadReceiptDebounce();
     _setupJoinRoomLogic();
 
     Future.microtask(() => markAsRead());
+    debugPrint("💬 [ChatEventHandler] Initialization completed");
   }
 
   void dispose() {
@@ -122,8 +128,12 @@ class ChatEventHandler {
 
     if (msg.conversationId != conversationId) return;
 
-    // DirectChatSettingsPage [关键修复 3] 拦截系统消息 (Type 99)，避免在被踢出时触发已读上报
-    if (msg.type == 99) return;
+    // 允许通话结束系统消息通过 (type 99)，但跳过已读上报
+    // 通话结束消息是系统消息，不需要触发已读上报
+    if (msg.type == 99) {
+      // 通话结束系统消息直接返回，不触发已读上报逻辑
+      return;
+    }
 
     if (msg.senderId != _currentUserId) {
       if (!_readReceiptSubject.isClosed) {

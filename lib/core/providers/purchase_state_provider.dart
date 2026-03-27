@@ -260,7 +260,7 @@ class PurchaseNotifier extends StateNotifier<PurchaseState> {
   // Getters
   double get _balanceCoins => ref.read(walletProvider).coinBalance;
   double get _realBalance => ref.read(walletProvider).realBalance;
-  double get _exchangeRate => ref.read(configProvider).exChangeRate;
+  double get _exchangeRate => ref.read(configProvider).exchangeRate;
   bool get _isAuthenticated => ref.read(authProvider).isAuthenticated;
 
   double get coinsCanUse {
