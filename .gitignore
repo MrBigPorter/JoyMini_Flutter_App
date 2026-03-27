@@ -98,10 +98,6 @@ tool/build/
 android/key.properties
 android/app/upload-keystore.jks
 
-# FVM Version Cache
-.fvm/flutter_sdk
-.fvm/versions/
-.fvm/cache/
 /repomix-output.xml
 /local.properties
 # Android 签名与密钥 (最重要)
@@ -119,3 +115,6 @@ local.properties
 
 # 编译产物 (节省仓库空间)
 build/
+
+# FVM Version Cache
+.fvm/
