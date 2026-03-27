@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_app/core/config/app_config.dart';
 import 'package:flutter_app/core/models/auth.dart';
@@ -156,7 +157,24 @@ class OauthSignInService {
       await _ensureFacebookInitialized();
     }
 
-    final result = await FacebookAuth.instance.login();
+    //  新增：如果是 iOS，先弹授权框
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      // 延迟一下，确保 UI 渲染完毕再弹窗（苹果官方建议）
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final trackingStatus = await AppTrackingTransparency.requestTrackingAuthorization();
+      debugPrint('[FacebookAuth] ATT 授权状态: $trackingStatus');
+
+      // 注意：即使 trackingStatus 是 denied (拒绝)，我们依然继续往下走
+      // 只是如果拒绝了，Facebook 依然会给你发 JWT Token。
+    }
+
+    final result = await FacebookAuth.instance.login(
+      permissions: ['public_profile', 'email'],
+      loginBehavior: LoginBehavior.nativeWithFallback,
+      //  必须加上这一行，强制获取经典 Token
+      loginTracking: LoginTracking.enabled,
+    );
     if (result.status == LoginStatus.cancelled) {
       throw OauthCancelledException('Facebook sign-in cancelled');
     }
