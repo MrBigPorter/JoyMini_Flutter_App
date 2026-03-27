@@ -150,38 +150,38 @@ jobs:
       - name: 🔐 7. Restore All Credentials (Environment Aware)
         if: github.event_name != 'pull_request'
         run: |
-          # 1. 还原安卓公共配置文件
+          # 1. 还原公共配置文件
           echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
           echo "${{ secrets.LOCAL_PROPERTIES }}" > local.properties
 
           # 2. 根据环境执行不同的还原逻辑
           if [[ "${{ env.IS_PROD }}" == "true" ]]; then
             echo "🚀 配置正式版环境..."
+            # 还原 iOS 正式版
             echo '${{ secrets.IOS_G_SERVICES_PROD }}' > ios/Runner/GoogleService-Info.plist
+            # 还原安卓正式版 JKS
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           
-            # 注意：下面的 EOF 必须靠最左边！
-            cat <<EOF > android/key.properties
-            storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
-            keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-            keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-            storeFile=upload-keystore.jks
-            EOF
-            else
+            # 使用 echo 逐行写入，彻底避免 EOF 缩进报错
+            echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}" > android/key.properties
+            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
+            echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
+            echo "storeFile=upload-keystore.jks" >> android/key.properties
+          else
             echo "🧪 配置测试版环境..."
+            # 还原 iOS 测试版
             echo '${{ secrets.IOS_G_SERVICES_TEST }}' > ios/Runner/GoogleService-Info.plist
+            # 还原安卓测试版签名
             echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
-            
-            # 注意：下面的 EOF 必须靠最左边！
-            cat <<EOF > android/key.properties
-            storePassword=android
-            keyPassword=android
-            keyAlias=androiddebugkey
-            storeFile=debug.keystore
-            EOF
-            fi
-            
-            echo "✅ All configs restored for ${{ env.ENV_TAG }}"
+          
+            # 使用 echo 逐行写入测试版属性
+            echo "storePassword=android" > android/key.properties
+            echo "keyPassword=android" >> android/key.properties
+            echo "keyAlias=androiddebugkey" >> android/key.properties
+            echo "storeFile=debug.keystore" >> android/key.properties
+          fi
+          
+          echo "✅ All configs restored for ${{ env.ENV_TAG }}"
 
       - name: 🐦 7a. Setup Shorebird
         if: github.event_name != 'pull_request'
