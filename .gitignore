@@ -103,3 +103,4 @@ android/app/upload-keystore.jks
 .fvm/versions/
 .fvm/cache/
 /repomix-output.xml
+local.properties
