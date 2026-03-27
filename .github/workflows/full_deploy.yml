@@ -121,7 +121,10 @@ jobs:
       - name: 🛠️ 4b. Prepare Flutter Environment via FVM
         run: |
           fvm install
+          # [新增] 强制关闭 Flutter 的版本检查，有时能绕过 Git 缺失的问题
           fvm flutter config --no-analytics
+          # 如果还是报错，尝试在 SDK 目录执行这个 (仅当必须绕过时使用)
+          git -C /Volumes/MySSD/fvm_cache/versions/3.41.4 init
           fvm flutter pub get
 
       # ================= Phase 5: Web Deployment =================
