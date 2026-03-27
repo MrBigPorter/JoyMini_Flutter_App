@@ -75,8 +75,14 @@ flutter build ipa --release --dart-define-from-file=lib/core/config/env/prod.jso
 在终端中直接复制并运行这行命令：
 
 ```bash
+生产
+密码默认固定为：密码自己记住
 keytool -genkey -v -keystore android/app/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
 
+
+测试
+keytool -exportcert -alias androiddebugkey -keystore android/app/debug.keystore | openssl sha1 -binary | openssl base64
+(密码默认固定为：android)
 ```
 
 * **操作**：输入一个密码（比如 `123456`，**屏幕不会显示，输完直接回车**），再次确认密码。后面的名字、组织、国家（填 `CN`）随便写，最后输入 `y` 确认。
@@ -87,7 +93,10 @@ keytool -genkey -v -keystore android/app/upload-keystore.jks -keyalg RSA -keysiz
 紧接着在终端运行这行命令，提取新玉玺的指纹：
 
 ```bash
+生产
 keytool -list -v -keystore android/app/upload-keystore.jks -alias upload
+
+
 
 ```
 

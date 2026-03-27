@@ -6,3 +6,7 @@
 # header note.
 #Mon Dec 22 15:45:15 PST 2025
 sdk.dir=/Users/porter/Library/Android/sdk
+
+facebook_app_id=xxxxxx
+facebook_client_token=xxxx
+fb_login_protocol_scheme=xxxx
