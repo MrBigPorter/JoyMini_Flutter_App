@@ -54,6 +54,10 @@ android {
         // 动态修改 App 显示名称 (这里定义了 app_name，所以 strings.xml 中不应再定义)
         resValue("string", "app_name", "JoyMini$appNameSuffix")
 
+        // 添加 Facebook 相关资源定义
+        resValue("string", "facebook_app_id", "1659905501858558")
+        resValue("string", "facebook_client_token", "25c8efc795a1a00f31bec33241b2cfe2")
+        resValue("string", "fb_login_protocol_scheme", "fb1659905501858558")
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
