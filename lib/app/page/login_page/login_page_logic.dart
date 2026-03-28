@@ -13,16 +13,31 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   bool _socialOauthInFlight = false;
   bool _isSuccessRedirecting = false;
   bool _oauthCancelled = false;
-
+  
   @override
   void initState() {
     super.initState();
+    
     Future(() {
       if (!mounted) return;
       ref.read(authLoginGoogleCtrlProvider.notifier).reset();
       ref.read(authLoginFacebookCtrlProvider.notifier).reset();
       ref.read(authLoginAppleCtrlProvider.notifier).reset();
+      
+      // 检查是否有中断的OAuth登录需要恢复（使用全局处理器）
+      _checkForOAuthRecovery();
     });
+  }
+
+  /// 检查并恢复中断的OAuth登录
+  Future<void> _checkForOAuthRecovery() async {
+    if (!mounted) return;
+    
+    debugPrint('[LoginPageLogic] Checking for interrupted OAuth login...');
+    
+    // 使用全局处理器检查恢复
+    // 全局处理器不依赖页面状态，即使页面销毁也能工作
+    await GlobalOAuthHandler.checkAndRecoverInterruptedOAuth();
   }
 
   void submit() {
@@ -85,25 +100,22 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     setState(() => _socialOauthInFlight = true);
 
     try {
-      final idToken = await FirebaseOauthSignInService.signInWithGoogle();
-
-
-      if (!mounted) return; //  关键防线：Firebase 弹窗回来后检查
-
-      if (idToken == null) {
-        throw StateError('Google sign-in failed: no token returned');
-      }
-
-      final result = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
-      idToken: idToken,
-      inviteCode: _currentInviteCode(),
-      ));
-
-      if (!mounted) return; //  关键防线：NestJS 返回后检查
-
+      debugPrint('[LoginPageLogic] Starting Google OAuth with global processor...');
+      
+      // 使用新的全局处理器方法
+      // 这个方法会处理整个流程：Firebase登录 → 后端API → Token同步 → 导航
+      await FirebaseOauthSignInService.signInWithGoogleAndProcess();
+      
+      // 如果成功，设置重定向标志
       _isSuccessRedirecting = true;
-      await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
+      debugPrint('[LoginPageLogic] Google OAuth completed successfully via global processor');
+      
+      // 注意：这里不重置loading状态，让全局处理器处理跳转
+      // 全局处理器会添加延迟确保用户看到loading状态
+      // 页面跳转后会自动销毁，不需要手动重置
+      
     } catch (e) {
+      debugPrint('[LoginPageLogic] Google OAuth error: $e');
       _handleOauthError(e);
     } finally {
       if (mounted && !_isSuccessRedirecting) {
@@ -111,6 +123,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
           await Future.delayed(const Duration(milliseconds: 300));
         }
         if (mounted && !_isSuccessRedirecting) {
+          debugPrint('[LoginPageLogic] Resetting social OAuth loading state');
           setState(() => _socialOauthInFlight = false);
         }
       }
@@ -157,6 +170,12 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
         _isSuccessRedirecting = true;
         await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
       }
+      
+      // 成功登录后，立即重置loading状态（即使页面即将跳转）
+      if (mounted) {
+        setState(() => _socialOauthInFlight = false);
+      }
+      
     } catch (e) {
       _handleOauthError(e);
     } finally {
@@ -195,6 +214,12 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
       _isSuccessRedirecting = true;
       await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
+      
+      // 成功登录后，立即重置loading状态（即使页面即将跳转）
+      if (mounted) {
+        setState(() => _socialOauthInFlight = false);
+      }
+      
     } catch (e) {
       _handleOauthError(e);
     } finally {

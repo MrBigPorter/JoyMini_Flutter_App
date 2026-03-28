@@ -1,5 +1,6 @@
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_app/app/page/deposit/deposit_page.dart';
 import 'package:flutter_app/app/page/group_member_page.dart';
 import 'package:flutter_app/app/page/group_room_page.dart';
@@ -225,6 +226,15 @@ class AppRouter {
           name: "login",
           path: '/login',
           builder: (context, state) => LoginPage(),
+        ),
+
+        // Firebase OAuth callback route - returns empty container, Firebase SDK handles the callback
+        GoRoute(
+          path: '/__/auth/handler',
+          builder: (context, state) {
+            debugPrint('GoRouter: Firebase OAuth callback route matched');
+            return const SizedBox.shrink();
+          },
         ),
 
         // 这样 /product/123 会先被这里匹配，而不会被误认为是 ShellRoute 里的 /product
@@ -493,26 +503,25 @@ class AppRouter {
       redirect: (context, state) {
         final uri = state.uri;
         
-        // Ignore Firebase OAuth callback URLs - these are handled internally by Firebase SDK
+        // Firebase OAuth callback URLs - 重定向到登录页面，让Firebase SDK处理回调
         // Pattern: com.googleusercontent.apps.*://firebaseauth/link?...
-        // Check both scheme and full URL for firebaseauth
         if (uri.scheme.startsWith('com.googleusercontent.apps') || 
             uri.toString().contains('firebaseauth')) {
-          debugPrint('GoRouter: Redirecting Firebase OAuth callback URL to home');
-          return '/home';
+          debugPrint('GoRouter: Firebase OAuth callback detected, redirecting to login page');
+          return '/login';  // 重定向到登录页面，让Firebase SDK处理回调
         }
         
-        // Ignore other OAuth callback URLs (Facebook, Apple, etc.)
+        // Other OAuth callback URLs (Facebook, Apple, etc.)
         if (uri.toString().contains('firebaseauth/link')) {
-          debugPrint('GoRouter: Redirecting Firebase auth callback URL to home');
-          return '/home';
+          debugPrint('GoRouter: Firebase auth callback detected, redirecting to login page');
+          return '/login';  // 重定向到登录页面
         }
         
         // 拦截原生协议
         if (uri.scheme == 'joymini' && uri.host == 'product') {
           final pid = uri.pathSegments.isNotEmpty
               ? uri.pathSegments.first
-              : null;
+              : uri.queryParameters['pid'];
           if (pid != null) {
             final gid =
                 uri.queryParameters['groupId'] ?? uri.queryParameters['gid'];
@@ -544,7 +553,7 @@ class AppRouter {
         return null;
       },
       errorPageBuilder: (context, state) {
-        print('Route error: ${state.error}');
+        debugPrint('Route error: ${state.error}');
         // 重置全局进度条
         Future.microtask(() {
           ref.read(overlayProgressProvider.notifier).state = 0.0;

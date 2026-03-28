@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/core/models/auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -141,14 +142,17 @@ class AuthLoginGoogleCtrl extends _$AuthLoginGoogleCtrl {
     state = const AsyncLoading();
 
     try {
+      debugPrint('[AuthLoginGoogleCtrl] Calling backend API with Firebase idToken (length=${params.idToken.length})');
       // Use Firebase unified login endpoint
       final res = await Api.loginWithFirebaseApi(
         idToken: params.idToken,
         inviteCode: params.inviteCode,
       );
+      debugPrint('[AuthLoginGoogleCtrl] Backend API call successful, returning AuthLoginOauth');
       state = AsyncData(res);
       return res;
     } catch (e, s) {
+      debugPrint('[AuthLoginGoogleCtrl] Backend API error: $e');
       state = AsyncError(e, s);
       rethrow;
     }
