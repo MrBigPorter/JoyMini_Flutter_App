@@ -86,14 +86,19 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   Future<void> _loginWithGoogleOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
+    
+    // 立即设置 loading 状态，防止用户重复点击
     setState(() => _socialOauthInFlight = true);
+    
     try {
       // Use Firebase OAuth - unified solution for all platforms
+      // 注意：Firebase 弹窗期间，loading 状态会持续显示
       final idToken = await FirebaseOauthSignInService.signInWithGoogle();
       if (idToken == null) {
         throw StateError('Google sign-in failed: no token returned');
       }
 
+      // Firebase 返回后，继续显示 loading 直到 API 调用完成
       final result = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
       idToken: idToken,
       inviteCode: _currentInviteCode(),
@@ -104,21 +109,33 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      if (mounted && !_isSuccessRedirecting) setState(() => _socialOauthInFlight = false);
+      // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
+      if (mounted && !_isSuccessRedirecting) {
+        // 添加短暂延迟，确保用户看到 loading 状态结束
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted && !_isSuccessRedirecting) {
+          setState(() => _socialOauthInFlight = false);
+        }
+      }
     }
   }
 
 
   Future<void> _loginWithFacebookOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
+    
+    // 立即设置 loading 状态，防止用户重复点击
     setState(() => _socialOauthInFlight = true);
+    
     try {
       // Use Firebase OAuth - unified solution for all platforms
+      // 注意：Firebase 弹窗期间，loading 状态会持续显示
       final idToken = await FirebaseOauthSignInService.signInWithFacebook();
       if (idToken == null) {
         throw StateError('Facebook sign-in failed: no token returned');
       }
 
+      // Firebase 返回后，继续显示 loading 直到 API 调用完成
       final result = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
       idToken: idToken,
       inviteCode: _currentInviteCode(),
@@ -129,20 +146,32 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      if (mounted && !_isSuccessRedirecting) setState(() => _socialOauthInFlight = false);
+      // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
+      if (mounted && !_isSuccessRedirecting) {
+        // 添加短暂延迟，确保用户看到 loading 状态结束
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted && !_isSuccessRedirecting) {
+          setState(() => _socialOauthInFlight = false);
+        }
+      }
     }
   }
 
   Future<void> _loginWithAppleOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
+    
+    // 立即设置 loading 状态，防止用户重复点击
     setState(() => _socialOauthInFlight = true);
+    
     try {
       // Use Firebase OAuth - unified solution for all platforms
+      // 注意：Firebase 弹窗期间，loading 状态会持续显示
       final idToken = await FirebaseOauthSignInService.signInWithApple();
       if (idToken == null) {
         throw StateError('Apple sign-in failed: no token returned');
       }
 
+      // Firebase 返回后，继续显示 loading 直到 API 调用完成
       final result = await ref.read(authLoginAppleCtrlProvider.notifier).run((
       idToken: idToken,
       inviteCode: _currentInviteCode(),
@@ -153,7 +182,14 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      if (mounted && !_isSuccessRedirecting) setState(() => _socialOauthInFlight = false);
+      // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
+      if (mounted && !_isSuccessRedirecting) {
+        // 添加短暂延迟，确保用户看到 loading 状态结束
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted && !_isSuccessRedirecting) {
+          setState(() => _socialOauthInFlight = false);
+        }
+      }
     }
   }
 
