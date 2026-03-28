@@ -43,8 +43,8 @@ extension LoginPageUI on _LoginPageState {
     // 的历史 AsyncLoading 状态（热重载中断、上次登录残留）污染按钮状态
     final isSocialBtnLoading = _socialOauthInFlight;
 
-    final showGoogleButton = OauthSignInService.canShowGoogleButton;
-    final showFacebookButton = OauthSignInService.canShowFacebookButton;
+    final showGoogleButton = FirebaseOauthSignInService.canShowGoogleButton;
+    final showFacebookButton = FirebaseOauthSignInService.canShowFacebookButton;
 
     return BaseScaffold(
       body: LayoutBuilder(
@@ -187,58 +187,15 @@ extension LoginPageUI on _LoginPageState {
 
                                   // ─── 社交登录按钮区域 ───
                                   if (showGoogleButton) ...[
-                                    if (kIsWeb) ...[
-                                      if (_googleWebReady) ...[
-                                        SizedBox(
-                                          width: double.infinity,
-                                          height: 48.h,
-                                          child: Listener(
-                                            behavior: HitTestBehavior.translucent,
-                                            onPointerDown: (_) => _markGoogleWebUserInitiated(),
-                                            child: Stack(
-                                              fit: StackFit.expand,
-                                              children: [
-                                                Opacity(
-                                                  opacity: 0.01,
-                                                  child: buildGoogleSignInWebButton(),
-                                                ),
-                                                IgnorePointer(
-                                                  child: Button(
-                                                    width: double.infinity,
-                                                    height: 48.h,
-                                                    variant: ButtonVariant.secondary,
-                                                    loading: isSocialBtnLoading,
-                                                    leading: Icon(Icons.g_mobiledata_rounded, size: 35.sp),
-                                                    child: Text('login.oauth.google'.tr()),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ] else ...[
-                                        Button(
-                                          width: double.infinity,
-                                          height: 48.h,
-                                          variant: ButtonVariant.secondary,
-                                          disabled: true,
-                                          loading: false,
-                                          onPressed: null,
-                                          leading: Icon(Icons.g_mobiledata_rounded, size: 35.sp),
-                                          child: Text('login.oauth.google'.tr()),
-                                        ),
-                                      ],
-                                    ] else ...[
-                                      Button(
-                                        width: double.infinity,
-                                        height: 48.h,
-                                        variant: ButtonVariant.secondary,
-                                        loading: isSocialBtnLoading,
-                                        onPressed: isPageBusy || !OauthSignInService.canShowGoogleButton ? null : _loginWithGoogleOauth,
-                                        leading: Icon(Icons.g_mobiledata_rounded, size: 35.sp),
-                                        child: Text('login.oauth.google'.tr()),
-                                      ),
-                                    ],
+                                    Button(
+                                      width: double.infinity,
+                                      height: 48.h,
+                                      variant: ButtonVariant.secondary,
+                                      loading: isSocialBtnLoading,
+                                      onPressed: isPageBusy ? null : _loginWithGoogleOauth,
+                                      leading: Icon(Icons.g_mobiledata_rounded, size: 35.sp),
+                                      child: Text('login.oauth.google'.tr()),
+                                    ),
                                     SizedBox(height: 16.h),
                                   ],
 
@@ -248,7 +205,7 @@ extension LoginPageUI on _LoginPageState {
                                       height: 48.h,
                                       variant: ButtonVariant.secondary,
                                       loading: isSocialBtnLoading,
-                                      onPressed: isPageBusy || !OauthSignInService.canShowFacebookButton ? null : _loginWithFacebookOauth,
+                                      onPressed: isPageBusy ? null : _loginWithFacebookOauth,
                                       leading: const Icon(Icons.facebook_rounded),
                                       child: Text('login.oauth.facebook'.tr()),
                                     ),

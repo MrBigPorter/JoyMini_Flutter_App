@@ -17,10 +17,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   // 新增：标记是否已经登录成功，正在等待路由跳转
   bool _isSuccessRedirecting = false;
 
-  bool _googleWebReady = false;
-  bool _googleWebUserInitiated = false;
-  StreamSubscription<GoogleSignInAuthenticationEvent>? _googleWebAuthSub;
-
   @override
   void initState() {
     super.initState();
@@ -33,94 +29,8 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       ref.read(authLoginFacebookCtrlProvider.notifier).reset();
       ref.read(authLoginAppleCtrlProvider.notifier).reset();
     });
-
-    if (kIsWeb && OauthSignInService.canShowGoogleButton) {
-      _initGoogleWebSignIn();
-    }
-
   }
 
-  Future<void> _initGoogleWebSignIn() async {
-    try {
-      debugPrint('[LoginPage] Google web sign-in initialization start');
-      await OauthSignInService.initializeForWeb(trigger: 'login_page.initState');
-      debugPrint('[LoginPage] Google web sign-in initialization success');
-      
-      _googleWebAuthSub?.cancel();
-      _googleWebAuthSub = GoogleSignIn.instance.authenticationEvents.listen(
-            (event) {
-          debugPrint('[LoginPage] Google web auth event received: ${event.runtimeType}');
-          if (event is GoogleSignInAuthenticationEventSignIn) {
-            debugPrint('[LoginPage] Google web SignIn event | email=${event.user.email}');
-            _processGoogleWebCredential(event.user);
-          } else if (event is GoogleSignInAuthenticationEventSignOut) {
-            debugPrint('[LoginPage] Google web SignOut event');
-          } else {
-            debugPrint('[LoginPage] Google web other event: ${event.runtimeType}');
-          }
-        },
-        onError: (Object error) {
-          debugPrint('[LoginPage] Google web auth stream error: $error');
-          if (error is GoogleSignInException && error.code == GoogleSignInExceptionCode.canceled) {
-            debugPrint('[LoginPage] Google web auth cancelled');
-            return;
-          }
-          _handleOauthError(error);
-        },
-        cancelOnError: false,
-      );
-      debugPrint('[LoginPage] Google web auth listener established');
-      
-      if (mounted) {
-        setState(() {
-          _googleWebReady = true;
-          debugPrint('[LoginPage] Google web ready flag set to true');
-        });
-      }
-    } catch (e, s) {
-      debugPrint('[LoginPage] Google web init error: $e');
-      debugPrint('[LoginPage] Google web init stack trace: $s');
-      if (mounted) {
-        setState(() {
-          _googleWebReady = false;
-          debugPrint('[LoginPage] Google web ready flag set to false due to error');
-        });
-      }
-    }
-  }
-
-  Future<void> _processGoogleWebCredential(GoogleSignInAccount account) async {
-    // Ignore passive FedCM/OneTap events unless the user actually tapped the Google area.
-    if (!_googleWebUserInitiated) {
-      debugPrint('[LoginPage] Ignore Google web credential without user tap');
-      return;
-    }
-    _googleWebUserInitiated = false;
-
-    if (_socialOauthInFlight || _isSuccessRedirecting) return;
-    final idToken = account.authentication.idToken;
-    if (idToken == null || idToken.isEmpty) {
-      _handleOauthError(StateError('Google idToken is empty'));
-      return;
-    }
-
-    setState(() => _socialOauthInFlight = true);
-    try {
-      final result = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
-      idToken: idToken,
-      inviteCode: _currentInviteCode(),
-      ));
-
-      // 成功获取 Token 后，标记正在重定向，保持 Loading 状态
-      _isSuccessRedirecting = true;
-      await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
-    } catch (e) {
-      _handleOauthError(e);
-    } finally {
-      // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
-      if (mounted && !_isSuccessRedirecting) setState(() => _socialOauthInFlight = false);
-    }
-  }
 
   void submit() {
     setState(() {
@@ -178,10 +88,15 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     setState(() => _socialOauthInFlight = true);
     try {
-      final oauthParams = await OauthSignInService.signInWithGoogle(inviteCode: _currentInviteCode());
+      // Use Firebase OAuth - unified solution for all platforms
+      final idToken = await FirebaseOauthSignInService.signInWithGoogle();
+      if (idToken == null) {
+        throw StateError('Google sign-in failed: no token returned');
+      }
+
       final result = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
-      idToken: oauthParams.idToken,
-      inviteCode: oauthParams.inviteCode,
+      idToken: idToken,
+      inviteCode: _currentInviteCode(),
       ));
 
       _isSuccessRedirecting = true;
@@ -193,19 +108,20 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     }
   }
 
-  void _markGoogleWebUserInitiated() {
-    _googleWebUserInitiated = true;
-  }
 
   Future<void> _loginWithFacebookOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     setState(() => _socialOauthInFlight = true);
     try {
-      final oauthParams = await OauthSignInService.signInWithFacebook(inviteCode: _currentInviteCode());
+      // Use Firebase OAuth - unified solution for all platforms
+      final idToken = await FirebaseOauthSignInService.signInWithFacebook();
+      if (idToken == null) {
+        throw StateError('Facebook sign-in failed: no token returned');
+      }
+
       final result = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
-      accessToken: oauthParams.accessToken,
-      userId: oauthParams.userId,
-      inviteCode: oauthParams.inviteCode,
+      idToken: idToken,
+      inviteCode: _currentInviteCode(),
       ));
 
       _isSuccessRedirecting = true;
@@ -221,11 +137,15 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     setState(() => _socialOauthInFlight = true);
     try {
-      final oauthParams = await OauthSignInService.signInWithApple(inviteCode: _currentInviteCode());
+      // Use Firebase OAuth - unified solution for all platforms
+      final idToken = await FirebaseOauthSignInService.signInWithApple();
+      if (idToken == null) {
+        throw StateError('Apple sign-in failed: no token returned');
+      }
+
       final result = await ref.read(authLoginAppleCtrlProvider.notifier).run((
-      idToken: oauthParams.idToken,
-      code: oauthParams.code,
-      inviteCode: oauthParams.inviteCode,
+      idToken: idToken,
+      inviteCode: _currentInviteCode(),
       ));
 
       _isSuccessRedirecting = true;
@@ -271,7 +191,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   @override
   void dispose() {
-    _googleWebAuthSub?.cancel();
     cd.dispose();
     super.dispose();
   }
