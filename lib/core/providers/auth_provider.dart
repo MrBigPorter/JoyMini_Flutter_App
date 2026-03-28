@@ -159,8 +159,7 @@ class AuthLoginGoogleCtrl extends _$AuthLoginGoogleCtrl {
 }
 
 typedef LoginWithFacebookOauthParams = ({
-  String accessToken,
-  String userId,
+  String idToken,
   String? inviteCode,
 });
 
@@ -173,12 +172,10 @@ class AuthLoginFacebookCtrl extends _$AuthLoginFacebookCtrl {
     state = const AsyncLoading();
 
     try {
-      final res = await Api.loginWithFacebookOauthApi(
-        FacebookOauthLoginParams(
-          accessToken: params.accessToken,
-          userId: params.userId,
-          inviteCode: params.inviteCode,
-        ),
+      // Use Firebase unified login endpoint
+      final res = await Api.loginWithFirebaseApi(
+        idToken: params.idToken,
+        inviteCode: params.inviteCode,
       );
       state = AsyncData(res);
       return res;
@@ -193,7 +190,6 @@ class AuthLoginFacebookCtrl extends _$AuthLoginFacebookCtrl {
 
 typedef LoginWithAppleOauthParams = ({
   String idToken,
-  String? code,
   String? inviteCode,
 });
 
@@ -206,12 +202,10 @@ class AuthLoginAppleCtrl extends _$AuthLoginAppleCtrl {
     state = const AsyncLoading();
 
     try {
-      final res = await Api.loginWithAppleOauthApi(
-        AppleOauthLoginParams(
-          idToken: params.idToken,
-          code: params.code,
-          inviteCode: params.inviteCode,
-        ),
+      // Use Firebase unified login endpoint
+      final res = await Api.loginWithFirebaseApi(
+        idToken: params.idToken,
+        inviteCode: params.inviteCode,
       );
       state = AsyncData(res);
       return res;

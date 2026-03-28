@@ -10,6 +10,7 @@ import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/core/providers/auth_provider.dart';
 import 'package:flutter_app/core/services/auth/google_web_button.dart';
 import 'package:flutter_app/core/services/auth/oauth_sign_in_service.dart';
+import 'package:flutter_app/core/services/auth/firebase_oauth_sign_in_service.dart';
 import 'package:flutter_app/core/store/auth/auth_provider.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_app/ui/button/button.dart';

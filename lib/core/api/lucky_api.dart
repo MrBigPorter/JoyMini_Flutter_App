@@ -414,6 +414,25 @@ class Api {
     return AuthLoginOauth.fromJson(res);
   }
 
+  /// Login with Firebase (Unified OAuth for all platforms)
+  /// Solves iOS H5 OAuth interception issues
+  static Future<AuthLoginOauth> loginWithFirebaseApi({
+    required String idToken,
+    String? inviteCode,
+  }) async {
+    final data = <String, dynamic>{
+      'idToken': idToken,
+    };
+    if (inviteCode != null && inviteCode.isNotEmpty) {
+      data['inviteCode'] = inviteCode;
+    }
+    final res = await Http.post(
+      '/api/v1/auth/firebase',
+      data: data,
+    );
+    return AuthLoginOauth.fromJson(res);
+  }
+
   /// Get user profile
   static Future<Profile> profileApi() async {
     final res = await Http.get('/api/v1/auth/profile');
