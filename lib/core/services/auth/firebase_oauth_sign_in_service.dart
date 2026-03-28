@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 import '../firebase_service.dart';
+import 'global_oauth_handler.dart';
 import 'oauth_exception.dart';
 
 /// Firebase OAuth Sign-In Service
@@ -44,7 +45,10 @@ class FirebaseOauthSignInService {
 
       // Ensure Firebase is initialized
       if (!FirebaseService.isInitialized) {
+        _log('Firebase not initialized, initializing now...');
         await FirebaseService.initialize();
+      } else {
+        _log('Firebase already initialized');
       }
 
       final GoogleAuthProvider googleProvider = GoogleAuthProvider();
@@ -65,15 +69,19 @@ class FirebaseOauthSignInService {
             await FirebaseAuth.instance.signInWithProvider(googleProvider);
       }
 
+      _log('Google sign-in completed, userCredential received');
       final user = userCredential.user;
       if (user == null) {
         _log('Google sign-in failed: no user returned');
         return null;
       }
 
+      _log('Google user obtained: email=${user.email} | uid=${user.uid} | isAnonymous=${user.isAnonymous}');
+      
       // Get Firebase ID Token
+      _log('Getting Firebase ID Token...');
       final idToken = await user.getIdToken();
-      _log('Google sign-in success | email=${user.email} | uid=${user.uid}');
+      _log('Google sign-in success | email=${user.email} | uid=${user.uid} | idToken length=${idToken?.length ?? 0}');
 
       return idToken;
     } on FirebaseAuthException catch (e) {
@@ -85,6 +93,34 @@ class FirebaseOauthSignInService {
       rethrow;
     } catch (e) {
       _log('Google sign-in error: $e');
+      rethrow;
+    }
+  }
+
+  /// Google Sign-In with automatic backend processing
+  /// Uses GlobalOAuthHandler to handle the entire flow
+  /// This is the recommended method for Native platforms
+  static Future<void> signInWithGoogleAndProcess() async {
+    try {
+      _log('Starting Google OAuth with automatic processing...');
+      
+      // Get ID Token from Firebase
+      final idToken = await signInWithGoogle();
+      
+      if (idToken == null) {
+        _log('Google sign-in failed: no token returned');
+        throw StateError('Google sign-in failed: no token returned');
+      }
+
+      _log('Google sign-in successful, processing with GlobalOAuthHandler...');
+      
+      // Use GlobalOAuthHandler to process the callback
+      // This handles backend API call, token sync, and navigation
+      await GlobalOAuthHandler.handleGoogleOAuthCallback(idToken: idToken);
+      
+      _log('Google OAuth processing completed successfully');
+    } catch (e) {
+      _log('Google OAuth processing failed: $e');
       rethrow;
     }
   }

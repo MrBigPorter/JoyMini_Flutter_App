@@ -6,8 +6,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/api/http_client.dart';
+import 'package:flutter_app/core/services/firebase_service.dart';
 import 'package:flutter_app/core/store/auth/auth_initial.dart';
-import 'package:flutter_app/firebase_options.dart';
 import 'package:flutter_app/theme/theme_provider.dart';
 import 'package:flutter_app/utils/asset/asset_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,9 +124,8 @@ class AppBootstrap {
 
   static Future<void> _setupFirebase() async {
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      // Use FirebaseService to ensure proper initialization tracking
+      await FirebaseService.initialize();
 
       //  核心修改：只有在【非 Web】平台才注册这个后台处理函数
       if (!kIsWeb) {

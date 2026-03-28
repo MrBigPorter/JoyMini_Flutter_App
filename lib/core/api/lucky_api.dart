@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:camera/camera.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/core/models/coupon_threshold_data.dart';
 import 'package:flutter_app/core/models/groups.dart';
@@ -420,16 +421,20 @@ class Api {
     required String idToken,
     String? inviteCode,
   }) async {
+    debugPrint('[Api.loginWithFirebaseApi] Starting Firebase login with idToken (length=${idToken.length})');
     final data = <String, dynamic>{
       'idToken': idToken,
     };
     if (inviteCode != null && inviteCode.isNotEmpty) {
       data['inviteCode'] = inviteCode;
+      debugPrint('[Api.loginWithFirebaseApi] Including inviteCode: $inviteCode');
     }
+    debugPrint('[Api.loginWithFirebaseApi] Calling POST /api/v1/auth/firebase');
     final res = await Http.post(
       '/api/v1/auth/firebase',
       data: data,
     );
+    debugPrint('[Api.loginWithFirebaseApi] Backend response received, parsing AuthLoginOauth');
     return AuthLoginOauth.fromJson(res);
   }
 

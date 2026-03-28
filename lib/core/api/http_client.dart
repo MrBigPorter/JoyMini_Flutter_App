@@ -81,7 +81,7 @@ class Http {
     // 我们把 _rawDio 传给它，让它去处理刷新逻辑
     _dio.interceptors.add(UnifiedInterceptor(_rawDio));
 
-   /* //  调试：打印 API 请求/响应（只在 debug）
+    //  调试：打印 API 请求/响应（只在 debug）
     assert(() {
       _dio.interceptors.add(InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -104,7 +104,7 @@ class Http {
         },
       ));
       return true;
-    }());*/
+    }());
   }
 
   // =========================================================

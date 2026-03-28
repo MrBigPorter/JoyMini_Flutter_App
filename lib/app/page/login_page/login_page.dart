@@ -8,6 +8,7 @@ import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/core/providers/auth_provider.dart';
 import 'package:flutter_app/core/services/auth/firebase_oauth_sign_in_service.dart';
+import 'package:flutter_app/core/services/auth/oauth_state_manager.dart';
 import 'package:flutter_app/core/store/auth/auth_provider.dart';
 import 'package:flutter_app/ui/button/button.dart';
 import 'package:flutter_app/ui/form/index.dart';
@@ -23,6 +24,11 @@ import 'package:flutter_app/ui/toast/radix_toast.dart';
 import 'package:flutter_app/utils/form/validation_messages.dart';
 
 import 'package:flutter_app/core/services/auth/oauth_exception.dart';
+
+// 导入全局appRouter
+import 'package:flutter_app/app/routes/app_router.dart';
+
+import 'package:flutter_app/core/services/auth/global_oauth_handler.dart';
 
 // 关联 logic 和 ui 文件
 part 'login_page_logic.dart';
