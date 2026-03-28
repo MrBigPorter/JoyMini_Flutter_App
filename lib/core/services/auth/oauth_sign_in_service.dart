@@ -7,7 +7,10 @@ import 'oauth_web_bridge.dart' as oauth_web;
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:web/web.dart' as web_pkg;
+
+// Conditional import for web-specific functionality
+import 'oauth_sign_in_service_web.dart'
+    if (dart.library.io) 'oauth_sign_in_service_stub.dart';
 
 class OauthCancelledException implements Exception {
   final String message;
@@ -57,7 +60,7 @@ class OauthSignInService {
   static bool get _isIosSafari {
     if (!kIsWeb) return false;
     try {
-      final userAgent = web_pkg.window.navigator.userAgent;
+      final userAgent = getUserAgent();
       return (userAgent.contains('iPhone') || userAgent.contains('iPad')) &&
           userAgent.contains('Safari') &&
           !userAgent.contains('Chrome') &&
@@ -557,7 +560,7 @@ class OauthSignInService {
     
     try {
       // 打开新窗口进行 OAuth 认证
-      final windowRef = web_pkg.window.open(authUrl, 'google_oauth', 'width=500,height=600');
+      final windowRef = openWindow(authUrl, 'google_oauth', 'width=500,height=600');
       
       if (windowRef == null) {
         throw OauthCancelledException('Popup blocked by browser');
