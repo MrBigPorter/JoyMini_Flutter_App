@@ -1647,6 +1647,248 @@ void main() {
 3. Check backend token validation logic
 4. Ensure app has proper session management
 
+### Issue 6: GoRouter Error on Firebase OAuth Callback
+
+**Symptoms**: 
+- Google/Facebook/Apple sign-in succeeds (shows user email and uid in logs)
+- But GoRouter throws error: `GoException: no routes for location: com.googleusercontent.apps.1065683669109-4tip6jjqodddtffhi7fb3efrcit3uhlt://firebaseauth/link?...`
+
+**Root Cause**: 
+When Firebase completes the OAuth flow, it triggers a deep link with the scheme `com.googleusercontent.apps.*://firebaseauth/link?...`. GoRouter tries to route this URL but doesn't have a matching route configuration.
+
+**Solution**:
+Add checks in both GoRouter redirect and DeepLinkService to ignore Firebase OAuth callback URLs.
+
+**1. Update `lib/app/routes/app_router.dart`**:
+
+In the `redirect` function, add these checks at the beginning:
+
+```dart
+redirect: (context, state) {
+  final uri = state.uri;
+  
+  // Ignore Firebase OAuth callback URLs - these are handled internally by Firebase SDK
+  // Pattern: com.googleusercontent.apps.*://firebaseauth/link?...
+  // Check both scheme and full URL for firebaseauth
+  if (uri.scheme.startsWith('com.googleusercontent.apps') || 
+      uri.toString().contains('firebaseauth')) {
+    debugPrint('GoRouter: Ignoring Firebase OAuth callback URL: ${uri.toString().substring(0, 100)}...');
+    return null;
+  }
+  
+  // Ignore other OAuth callback URLs (Facebook, Apple, etc.)
+  if (uri.toString().contains('firebaseauth/link')) {
+    debugPrint('GoRouter: Ignoring Firebase auth callback URL');
+    return null;
+  }
+  
+  // ... rest of redirect logic
+}
+```
+
+**2. Update `lib/features/share/services/deep_link_service.dart`**:
+
+In the `_handleDeepLinkTarget` function, add these checks after the `joymini` scheme check:
+
+```dart
+static void _handleDeepLinkTarget(Uri uri, {bool isColdStart = false}) {
+  // If the scheme is joymini://, exit immediately.
+  if (uri.scheme == 'joymini') {
+    debugPrint('JoyMini [DeepLink] Scheme handled by GoRouter Redirect, Service exiting');
+    return;
+  }
+  
+  // Ignore Firebase OAuth callback URLs - these are handled internally by Firebase SDK
+  // Pattern: com.googleusercontent.apps.*://firebaseauth/link?...
+  // Check both scheme and full URL for firebaseauth
+  if (uri.scheme.startsWith('com.googleusercontent.apps') || 
+      uri.toString().contains('firebaseauth')) {
+    debugPrint('JoyMini [DeepLink] Ignoring Firebase OAuth callback URL: ${uri.toString().substring(0, 100)}...');
+    return;
+  }
+  
+  // Ignore other Firebase auth callback URLs
+  if (uri.toString().contains('firebaseauth/link')) {
+    debugPrint('JoyMini [DeepLink] Ignoring Firebase auth callback URL');
+    return;
+  }
+  
+  // ... rest of the function
+}
+```
+
+**Why This Works**:
+- Firebase OAuth callback URLs are now ignored by both GoRouter and DeepLinkService
+- Firebase SDK handles these callbacks internally
+- The sign-in flow completes successfully without routing errors
+- No changes needed to the OAuth service itself
+
+**Verification**:
+After applying the fix, the logs should show:
+1. `[FirebaseOauthSignInService] Google sign-in start via Firebase`
+2. `[FirebaseOauthSignInService] Google native sign-in using provider`
+3. `GoRouter: Ignoring Firebase OAuth callback URL` (new log)
+4. `[FirebaseOauthSignInService] Google sign-in success | email=... | uid=...`
+
+The error `GoException: no routes for location` should no longer appear.
+
+### Issue 7: Facebook Login Fails on iOS
+
+**Symptoms**: 
+- Facebook sign-in fails on iOS with error: `FirebaseAuth/OAuthProvider.swift:80: Fatal error: Sign in with Facebook is not supported via generic IDP; the Facebook TOS dictate that you must use the Facebook iOS SDK for Facebook login.`
+
+**Root Cause**: 
+Facebook's Terms of Service require that on iOS, you must use the native Facebook iOS SDK for login. Firebase's generic OAuth provider approach is not allowed on iOS for Facebook.
+
+**Platform Support**:
+| Platform | Firebase Facebook Login | Native Facebook SDK |
+|----------|------------------------|-------------------|
+| **iOS** | ❌ Not supported | ✅ Required |
+| **Android** | ✅ Supported | ✅ Optional |
+| **Web** | ✅ Supported | ✅ Optional |
+
+**Solution**:
+Modify `signInWithFacebook()` to use native Facebook SDK on iOS and Firebase on other platforms.
+
+**1. Add dependency to `pubspec.yaml`**:
+
+```yaml
+dependencies:
+  flutter_facebook_auth: ^7.1.1
+```
+
+**2. Update `lib/core/services/auth/firebase_oauth_sign_in_service.dart`**:
+
+```dart
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+
+/// Facebook Sign-In using Firebase
+/// Returns Firebase ID Token for backend verification
+static Future<String?> signInWithFacebook() async {
+  try {
+    _log('Facebook sign-in start via Firebase');
+
+    // Ensure Firebase is initialized
+    if (!FirebaseService.isInitialized) {
+      await FirebaseService.initialize();
+    }
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      // iOS: Use native Facebook SDK (required by Facebook TOS)
+      return await _signInWithFacebookNative();
+    } else {
+      // Android/Web: Use Firebase
+      return await _signInWithFacebookFirebase();
+    }
+  } catch (e) {
+    _log('Facebook sign-in error: $e');
+    rethrow;
+  }
+}
+
+/// Facebook sign-in using native SDK (iOS only)
+static Future<String?> _signInWithFacebookNative() async {
+  _log('Facebook iOS: Using native Facebook SDK');
+  
+  final result = await FacebookAuth.instance.login(
+    permissions: ['email', 'public_profile'],
+  );
+
+  if (result.status == LoginStatus.cancelled) {
+    throw OauthCancelledException('Facebook sign-in cancelled');
+  }
+
+  if (result.status != LoginStatus.success || result.accessToken == null) {
+    throw StateError(result.message ?? 'Facebook sign-in failed');
+  }
+
+  final accessToken = result.accessToken!.tokenString;
+  
+  // Exchange Facebook token for Firebase credential
+  final credential = FacebookAuthProvider.credential(accessToken);
+  final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+  
+  final user = userCredential.user;
+  if (user == null) {
+    _log('Facebook iOS sign-in failed: no user returned');
+    return null;
+  }
+
+  // Get Firebase ID Token
+  final idToken = await user.getIdToken();
+  _log('Facebook iOS sign-in success | email=${user.email} | uid=${user.uid}');
+
+  return idToken;
+}
+
+/// Facebook sign-in using Firebase (Android/Web)
+static Future<String?> _signInWithFacebookFirebase() async {
+  _log('Facebook: Using Firebase OAuth provider');
+  
+  final FacebookAuthProvider facebookProvider = FacebookAuthProvider();
+  facebookProvider.addScope('email');
+  facebookProvider.addScope('public_profile');
+
+  final UserCredential userCredential;
+
+  if (kIsWeb) {
+    // Web: Use signInWithPopup
+    _log('Facebook web sign-in using popup');
+    userCredential =
+        await FirebaseAuth.instance.signInWithPopup(facebookProvider);
+  } else {
+    // Android: Use signInWithProvider
+    _log('Facebook Android sign-in using provider');
+    userCredential =
+        await FirebaseAuth.instance.signInWithProvider(facebookProvider);
+  }
+
+  final user = userCredential.user;
+  if (user == null) {
+    _log('Facebook sign-in failed: no user returned');
+    return null;
+  }
+
+  // Get Firebase ID Token
+  final idToken = await user.getIdToken();
+  _log('Facebook sign-in success | email=${user.email} | uid=${user.uid}');
+
+  return idToken;
+}
+```
+
+**3. iOS Configuration (if needed)**:
+
+Add to `ios/Runner/Info.plist`:
+
+```xml
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>fb{your-facebook-app-id}</string>
+    </array>
+  </dict>
+</array>
+<key>FacebookAppID</key>
+<string>{your-facebook-app-id}</string>
+<key>FacebookDisplayName</key>
+<string>{your-app-name}</string>
+```
+
+**Why This Works**:
+- iOS uses native Facebook SDK (required by Facebook TOS)
+- Android/Web continues using Firebase (simpler implementation)
+- All platforms return Firebase ID Token (backend unchanged)
+- Backend API remains unchanged
+
+**Verification**:
+After applying the fix, iOS Facebook login should work without the fatal error. The logs should show:
+1. `[FirebaseOauthSignInService] Facebook sign-in start via Firebase`
+2. `[FirebaseOauthSignInService] Facebook iOS: Using native Facebook SDK`
+3. `[FirebaseOauthSignInService] Facebook iOS sign-in success | email=... | uid=...`
+
 ---
 
 ## Appendix

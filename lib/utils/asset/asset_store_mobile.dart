@@ -16,8 +16,24 @@ class PlatformAssetStore implements AssetStore {
   Future<void> init() async {
     if (kIsWeb) return;
 
-    final dir = await getApplicationDocumentsDirectory();
-    _docPath = dir.path;
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      _docPath = dir.path;
+    } catch (e) {
+      // Handle MissingPluginException or other path_provider errors
+      // This can happen during testing or if plugin is not properly initialized
+      debugPrint('[PlatformAssetStore] Failed to get documents directory: $e');
+      // Use a fallback approach - try to get temporary directory instead
+      try {
+        final tempDir = await getTemporaryDirectory();
+        _docPath = tempDir.path;
+        debugPrint('[PlatformAssetStore] Using temporary directory as fallback: $_docPath');
+      } catch (fallbackError) {
+        debugPrint('[PlatformAssetStore] Fallback also failed: $fallbackError');
+        // Set a default path or leave empty - the app can still function
+        _docPath = '';
+      }
+    }
   }
 
   @override

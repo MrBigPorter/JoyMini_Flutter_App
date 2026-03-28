@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/common.dart';
 import 'package:flutter_app/ui/button/button_size.dart';
 import 'package:flutter_app/ui/button/variant.dart';
 import 'package:flutter_app/ui/button/button_visual.dart';

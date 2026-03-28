@@ -9,22 +9,14 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   );
 
   bool _submitted = false;
-
-  // 新增：专门追踪邮箱登录的完整生命周期
   bool _emailLoginInFlight = false;
-  // 追踪社交登录的完整生命周期
   bool _socialOauthInFlight = false;
-  // 新增：标记是否已经登录成功，正在等待路由跳转
   bool _isSuccessRedirecting = false;
-  // 追踪是否用户主动取消了 OAuth 登录
   bool _oauthCancelled = false;
 
   @override
   void initState() {
     super.initState();
-    // keepAlive providers 可能因热重载中断或上次流程异常，残留 AsyncLoading 状态。
-    // 用 Future(() {}) 延迟到 widget 树构建完毕后再 reset，
-    // 避免 Riverpod "Tried to modify a provider while the widget tree was building" 断言。
     Future(() {
       if (!mounted) return;
       ref.read(authLoginGoogleCtrlProvider.notifier).reset();
@@ -32,7 +24,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       ref.read(authLoginAppleCtrlProvider.notifier).reset();
     });
   }
-
 
   void submit() {
     setState(() {
@@ -48,7 +39,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     if (ref.watch(authLoginEmailCtrlProvider).isLoading || _emailLoginInFlight || _isSuccessRedirecting) return;
 
     final model = emailForm.model;
-    setState(() => _emailLoginInFlight = true); // 开启本地死锁 Loading
+    setState(() => _emailLoginInFlight = true);
 
     try {
       final result = await ref.read(authLoginEmailCtrlProvider.notifier).run((
@@ -56,15 +47,15 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       code: model.code,
       ));
 
+      if (!mounted) return; //  关键防线：API 返回后，页面可能已销毁
+
       if (result.isNotNullOrEmpty && result.tokens.isNotNullOrEmpty) {
-        // 成功！标记重定向状态
         _isSuccessRedirecting = true;
         await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
       }
     } catch (e) {
-      // 处理错误，API 的错误通常被 Controller 内部处理了，这里做个兜底
+      // 兜底错误
     } finally {
-      // 如果登录失败，解除 Loading 状态；如果成功，保持 Loading 陪伴用户度过路由延迟
       if (mounted && !_isSuccessRedirecting) setState(() => _emailLoginInFlight = false);
     }
   }
@@ -82,40 +73,41 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> _syncLoginTokens(String accessToken, String refreshToken) async {
+    if (!mounted) return; //  关键防线：确保在用 ref.read 之前页面还在
     final auth = ref.read(authProvider.notifier);
     await auth.login(accessToken, refreshToken);
   }
 
   Future<void> _loginWithGoogleOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
-    
-    // 立即设置 loading 状态，防止用户重复点击
-    _oauthCancelled = false; // 重置取消标记
+
+    _oauthCancelled = false;
     setState(() => _socialOauthInFlight = true);
-    
+
     try {
-      // Use Firebase OAuth - unified solution for all platforms
-      // 注意：Firebase 弹窗期间，loading 状态会持续显示
       final idToken = await FirebaseOauthSignInService.signInWithGoogle();
+
+
+      if (!mounted) return; //  关键防线：Firebase 弹窗回来后检查
+
       if (idToken == null) {
         throw StateError('Google sign-in failed: no token returned');
       }
 
-      // Firebase 返回后，继续显示 loading 直到 API 调用完成
       final result = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
       idToken: idToken,
       inviteCode: _currentInviteCode(),
       ));
+
+      if (!mounted) return; //  关键防线：NestJS 返回后检查
 
       _isSuccessRedirecting = true;
       await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
       if (mounted && !_isSuccessRedirecting) {
-        // 用户取消登录时跳过延迟，立即恢复按钮状态
-        if (!_oauthCancelled) {
+        if (!_oauthCancelled && mounted) {
           await Future.delayed(const Duration(milliseconds: 300));
         }
         if (mounted && !_isSuccessRedirecting) {
@@ -125,37 +117,51 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     }
   }
 
-
   Future<void> _loginWithFacebookOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
-    
-    // 立即设置 loading 状态，防止用户重复点击
-    _oauthCancelled = false; // 重置取消标记
+
+    _oauthCancelled = false;
     setState(() => _socialOauthInFlight = true);
-    
+
     try {
-      // Use Firebase OAuth - unified solution for all platforms
-      // 注意：Firebase 弹窗期间，loading 状态会持续显示
-      final idToken = await FirebaseOauthSignInService.signInWithFacebook();
-      if (idToken == null) {
-        throw StateError('Facebook sign-in failed: no token returned');
+      final result = await FirebaseOauthSignInService.signInWithFacebook();
+
+      if (!mounted) return; //  关键防线：Facebook 弹窗回来后检查
+
+      if (result == null) {
+        throw StateError('Facebook sign-in failed: no result returned');
       }
 
-      // Firebase 返回后，继续显示 loading 直到 API 调用完成
-      final result = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
-      idToken: idToken,
-      inviteCode: _currentInviteCode(),
-      ));
+      if (result.containsKey('accessToken')) {
+        final apiResult = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
+        idToken: null,
+        accessToken: result['accessToken'],
+        userId: result['userId'],
+        inviteCode: _currentInviteCode(),
+        ));
 
-      _isSuccessRedirecting = true;
-      await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
+        if (!mounted) return; //  关键防线
+
+        _isSuccessRedirecting = true;
+        await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
+      } else {
+        final apiResult = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
+        idToken: result['idToken'],
+        accessToken: null,
+        userId: null,
+        inviteCode: _currentInviteCode(),
+        ));
+
+        if (!mounted) return; //  关键防线
+
+        _isSuccessRedirecting = true;
+        await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
+      }
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
       if (mounted && !_isSuccessRedirecting) {
-        // 用户取消登录时跳过延迟，立即恢复按钮状态
-        if (!_oauthCancelled) {
+        if (!_oauthCancelled && mounted) {
           await Future.delayed(const Duration(milliseconds: 300));
         }
         if (mounted && !_isSuccessRedirecting) {
@@ -167,34 +173,33 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   Future<void> _loginWithAppleOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
-    
-    // 立即设置 loading 状态，防止用户重复点击
-    _oauthCancelled = false; // 重置取消标记
+
+    _oauthCancelled = false;
     setState(() => _socialOauthInFlight = true);
-    
+
     try {
-      // Use Firebase OAuth - unified solution for all platforms
-      // 注意：Firebase 弹窗期间，loading 状态会持续显示
       final idToken = await FirebaseOauthSignInService.signInWithApple();
+
+      if (!mounted) return; //  关键防线
+
       if (idToken == null) {
         throw StateError('Apple sign-in failed: no token returned');
       }
 
-      // Firebase 返回后，继续显示 loading 直到 API 调用完成
       final result = await ref.read(authLoginAppleCtrlProvider.notifier).run((
       idToken: idToken,
       inviteCode: _currentInviteCode(),
       ));
+
+      if (!mounted) return; //  关键防线
 
       _isSuccessRedirecting = true;
       await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
     } catch (e) {
       _handleOauthError(e);
     } finally {
-      // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
       if (mounted && !_isSuccessRedirecting) {
-        // 用户取消登录时跳过延迟，立即恢复按钮状态
-        if (!_oauthCancelled) {
+        if (!_oauthCancelled && mounted) {
           await Future.delayed(const Duration(milliseconds: 300));
         }
         if (mounted && !_isSuccessRedirecting) {
@@ -206,7 +211,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   void _handleOauthError(Object error) {
     if (error is OauthCancelledException) {
-      // 用户主动取消登录，标记以便跳过延迟
       _oauthCancelled = true;
       return;
     }
@@ -229,6 +233,9 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     final emailValue = email.value.toString();
     try {
       await ref.read(sendEmailCodeCtrlProvider.notifier).run(emailValue);
+
+      if (!mounted) return; //  关键防线
+
       RadixToast.success(
         'login.email_code_sent'.tr(namedArgs: {'email': emailValue}),
       );
@@ -238,7 +245,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       RadixToast.error(message);
     }
   }
-
 
   @override
   void dispose() {
