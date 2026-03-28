@@ -16,6 +16,8 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   bool _socialOauthInFlight = false;
   // 新增：标记是否已经登录成功，正在等待路由跳转
   bool _isSuccessRedirecting = false;
+  // 追踪是否用户主动取消了 OAuth 登录
+  bool _oauthCancelled = false;
 
   @override
   void initState() {
@@ -88,6 +90,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     
     // 立即设置 loading 状态，防止用户重复点击
+    _oauthCancelled = false; // 重置取消标记
     setState(() => _socialOauthInFlight = true);
     
     try {
@@ -111,8 +114,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     } finally {
       // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
       if (mounted && !_isSuccessRedirecting) {
-        // 添加短暂延迟，确保用户看到 loading 状态结束
-        await Future.delayed(const Duration(milliseconds: 300));
+        // 用户取消登录时跳过延迟，立即恢复按钮状态
+        if (!_oauthCancelled) {
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
         if (mounted && !_isSuccessRedirecting) {
           setState(() => _socialOauthInFlight = false);
         }
@@ -125,6 +130,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     
     // 立即设置 loading 状态，防止用户重复点击
+    _oauthCancelled = false; // 重置取消标记
     setState(() => _socialOauthInFlight = true);
     
     try {
@@ -148,8 +154,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     } finally {
       // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
       if (mounted && !_isSuccessRedirecting) {
-        // 添加短暂延迟，确保用户看到 loading 状态结束
-        await Future.delayed(const Duration(milliseconds: 300));
+        // 用户取消登录时跳过延迟，立即恢复按钮状态
+        if (!_oauthCancelled) {
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
         if (mounted && !_isSuccessRedirecting) {
           setState(() => _socialOauthInFlight = false);
         }
@@ -161,6 +169,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     
     // 立即设置 loading 状态，防止用户重复点击
+    _oauthCancelled = false; // 重置取消标记
     setState(() => _socialOauthInFlight = true);
     
     try {
@@ -184,8 +193,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     } finally {
       // 只有在没成功的情况下，才取消 Loading；如果成功了，就让它一直转圈直到页面被卸载
       if (mounted && !_isSuccessRedirecting) {
-        // 添加短暂延迟，确保用户看到 loading 状态结束
-        await Future.delayed(const Duration(milliseconds: 300));
+        // 用户取消登录时跳过延迟，立即恢复按钮状态
+        if (!_oauthCancelled) {
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
         if (mounted && !_isSuccessRedirecting) {
           setState(() => _socialOauthInFlight = false);
         }
@@ -194,7 +205,11 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   void _handleOauthError(Object error) {
-    if (error is OauthCancelledException) return;
+    if (error is OauthCancelledException) {
+      // 用户主动取消登录，标记以便跳过延迟
+      _oauthCancelled = true;
+      return;
+    }
     final raw = error.toString();
     if (raw.contains('origin_mismatch')) {
       RadixToast.error('Google login blocked: origin_mismatch.');
