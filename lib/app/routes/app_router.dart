@@ -492,6 +492,22 @@ class AppRouter {
       ],
       redirect: (context, state) {
         final uri = state.uri;
+        
+        // Ignore Firebase OAuth callback URLs - these are handled internally by Firebase SDK
+        // Pattern: com.googleusercontent.apps.*://firebaseauth/link?...
+        // Check both scheme and full URL for firebaseauth
+        if (uri.scheme.startsWith('com.googleusercontent.apps') || 
+            uri.toString().contains('firebaseauth')) {
+          debugPrint('GoRouter: Redirecting Firebase OAuth callback URL to home');
+          return '/home';
+        }
+        
+        // Ignore other OAuth callback URLs (Facebook, Apple, etc.)
+        if (uri.toString().contains('firebaseauth/link')) {
+          debugPrint('GoRouter: Redirecting Firebase auth callback URL to home');
+          return '/home';
+        }
+        
         // 拦截原生协议
         if (uri.scheme == 'joymini' && uri.host == 'product') {
           final pid = uri.pathSegments.isNotEmpty

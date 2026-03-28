@@ -109,7 +109,7 @@ final authLoginEmailCtrlProvider =
 
 typedef _$AuthLoginEmailCtrl = Notifier<AsyncValue<AuthLoginEmail?>>;
 String _$authLoginGoogleCtrlHash() =>
-    r'ede9beaca90f587eda92be38daf527851500ff8e';
+    r'898c8c54ee359f468056971bd2e06f405aaef637';
 
 /// See also [AuthLoginGoogleCtrl].
 @ProviderFor(AuthLoginGoogleCtrl)
@@ -126,7 +126,7 @@ final authLoginGoogleCtrlProvider =
 
 typedef _$AuthLoginGoogleCtrl = Notifier<AsyncValue<AuthLoginOauth?>>;
 String _$authLoginFacebookCtrlHash() =>
-    r'0e0f22fc7b03e14c29ce3757aa2fc31b775fde3e';
+    r'e571ff4547f564bdd15b356c6dbf78ed3db5d8a6';
 
 /// See also [AuthLoginFacebookCtrl].
 @ProviderFor(AuthLoginFacebookCtrl)

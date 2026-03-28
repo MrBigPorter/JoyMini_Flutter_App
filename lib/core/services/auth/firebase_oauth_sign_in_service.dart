@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 import '../firebase_service.dart';
 import 'oauth_exception.dart';
@@ -88,57 +89,113 @@ class FirebaseOauthSignInService {
     }
   }
 
-  /// Facebook Sign-In using Firebase
-  /// Returns Firebase ID Token for backend verification
-  static Future<String?> signInWithFacebook() async {
+  /// Facebook Sign-In
+  /// iOS/Android: Use native SDK (required by Facebook TOS)
+  /// Web: Use Firebase
+  static Future<Map<String, String>?> signInWithFacebook() async {
     try {
-      _log('Facebook sign-in start via Firebase');
+      _log('Facebook sign-in start');
 
-      // Ensure Firebase is initialized
-      if (!FirebaseService.isInitialized) {
-        await FirebaseService.initialize();
-      }
-
-      final FacebookAuthProvider facebookProvider = FacebookAuthProvider();
-      facebookProvider.addScope('email');
-      facebookProvider.addScope('public_profile');
-
-      final UserCredential userCredential;
-
-      if (kIsWeb) {
-        // Web: Use signInWithPopup
-        _log('Facebook web sign-in using popup');
-        userCredential =
-            await FirebaseAuth.instance.signInWithPopup(facebookProvider);
+      if (!kIsWeb) {
+        // iOS/Android: Use native Facebook SDK (required by Facebook TOS)
+        return await _signInWithFacebookNative();
       } else {
-        // Native: Use signInWithProvider
-        _log('Facebook native sign-in using provider');
-        userCredential =
-            await FirebaseAuth.instance.signInWithProvider(facebookProvider);
+        // Web: Use Firebase
+        return await _signInWithFacebookFirebase();
       }
-
-      final user = userCredential.user;
-      if (user == null) {
-        _log('Facebook sign-in failed: no user returned');
-        return null;
-      }
-
-      // Get Firebase ID Token
-      final idToken = await user.getIdToken();
-      _log('Facebook sign-in success | email=${user.email} | uid=${user.uid}');
-
-      return idToken;
-    } on FirebaseAuthException catch (e) {
-      _log('Facebook sign-in FirebaseAuthException: ${e.code} - ${e.message}');
-      if (e.code == 'popup-closed-by-user' ||
-          e.code == 'cancelled-popup-request') {
-        throw OauthCancelledException('Facebook sign-in cancelled');
-      }
-      rethrow;
     } catch (e) {
       _log('Facebook sign-in error: $e');
       rethrow;
     }
+  }
+
+  /// Facebook sign-in using native SDK (iOS/Android)
+  static Future<Map<String, String>?> _signInWithFacebookNative() async {
+    _log('Facebook iOS/Android: Using native Facebook SDK');
+    
+    final result = await FacebookAuth.instance.login(
+      permissions: ['email', 'public_profile'],
+    );
+
+    if (result.status == LoginStatus.cancelled) {
+      throw OauthCancelledException('Facebook sign-in cancelled');
+    }
+    
+    if (result.status != LoginStatus.success || result.accessToken == null) {
+      throw StateError(result.message ?? 'Facebook sign-in failed');
+    }
+
+    final accessToken = result.accessToken!;
+
+    // 打印完整信息用于调试
+    print('Facebook login result: ${accessToken.runtimeType} | ${accessToken.toJson()}');
+
+    // 取出基础字段
+    final Map<String, String> data = {
+      'accessToken': accessToken.tokenString,
+      'type': accessToken.type.name,
+    };
+
+    // 根据类型取出 userId 和其他字段
+    if (accessToken is LimitedToken) {
+      final limitedToken = accessToken;
+      data['userId'] = limitedToken.userId;
+      data['userName'] = limitedToken.userName;
+      data['userEmail'] = limitedToken.userEmail ?? '';
+      data['nonce'] = limitedToken.nonce;
+      _log('LimitedToken extracted: userId=${limitedToken.userId}, userName=${limitedToken.userName}');
+    } else if (accessToken is ClassicToken) {
+      final classicToken = accessToken;
+      data['userId'] = classicToken.userId;
+      data['expires'] = classicToken.expires.toIso8601String();
+      data['applicationId'] = classicToken.applicationId;
+      _log('ClassicToken extracted: userId=${classicToken.userId}');
+    }
+
+    return data;
+  }
+
+  /// Facebook sign-in using Firebase (Android/Web)
+  static Future<Map<String, String>?> _signInWithFacebookFirebase() async {
+    _log('Facebook: Using Firebase OAuth provider');
+    
+    // Ensure Firebase is initialized
+    if (!FirebaseService.isInitialized) {
+      await FirebaseService.initialize();
+    }
+
+    final FacebookAuthProvider facebookProvider = FacebookAuthProvider();
+    facebookProvider.addScope('email');
+    facebookProvider.addScope('public_profile');
+
+    final UserCredential userCredential;
+
+    if (kIsWeb) {
+      // Web: Use signInWithPopup
+      _log('Facebook web sign-in using popup');
+      userCredential =
+          await FirebaseAuth.instance.signInWithPopup(facebookProvider);
+    } else {
+      // Android: Use signInWithProvider
+      _log('Facebook Android sign-in using provider');
+      userCredential =
+          await FirebaseAuth.instance.signInWithProvider(facebookProvider);
+    }
+
+    final user = userCredential.user;
+    if (user == null) {
+      _log('Facebook sign-in failed: no user returned');
+      return null;
+    }
+
+    // Get Firebase ID Token
+    final idToken = await user.getIdToken();
+    _log('Facebook sign-in success | email=${user.email} | uid=${user.uid}');
+
+    // Return Firebase ID Token for backend
+    return {
+      'idToken': idToken!,
+    };
   }
 
   /// Apple Sign-In using Firebase
