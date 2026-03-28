@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../firebase_service.dart';
-import 'oauth_sign_in_service.dart';
+import 'oauth_exception.dart';
 
 /// Firebase OAuth Sign-In Service
 /// Unified authentication using Firebase Authentication for all platforms

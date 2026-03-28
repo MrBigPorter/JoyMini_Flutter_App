@@ -2,17 +2,13 @@
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart'; // 引入动画库
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/core/providers/auth_provider.dart';
-import 'package:flutter_app/core/services/auth/google_web_button.dart';
-import 'package:flutter_app/core/services/auth/oauth_sign_in_service.dart';
 import 'package:flutter_app/core/services/auth/firebase_oauth_sign_in_service.dart';
 import 'package:flutter_app/core/store/auth/auth_provider.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_app/ui/button/button.dart';
 import 'package:flutter_app/ui/form/index.dart';
 import 'package:flutter_app/utils/form/auth_forms/auth_forms.dart';
@@ -25,6 +21,8 @@ import 'package:reactive_forms/reactive_forms.dart';
 import 'package:flutter_app/ui/button/variant.dart';
 import 'package:flutter_app/ui/toast/radix_toast.dart';
 import 'package:flutter_app/utils/form/validation_messages.dart';
+
+import 'package:flutter_app/core/services/auth/oauth_exception.dart';
 
 // 关联 logic 和 ui 文件
 part 'login_page_logic.dart';

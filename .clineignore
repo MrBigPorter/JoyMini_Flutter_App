@@ -1,0 +1,11 @@
+# 排除 Flutter 编译生成的垃圾
+build/
+.dart_tool/
+.fvm/
+ios/Pods/
+ios/.symlinks/
+
+# 排除版本控制和缓存
+.git/
+.idea/
+.vscode/

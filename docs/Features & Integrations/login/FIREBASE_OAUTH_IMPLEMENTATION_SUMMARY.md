@@ -24,6 +24,7 @@ Successfully implemented Firebase Authentication as a unified OAuth solution for
 #### `pubspec.yaml`
 - Added `firebase_auth: ^6.2.0` dependency
 
+
 #### `lib/core/api/lucky_api.dart`
 - Added `loginWithFirebaseApi` method
 - New endpoint: `POST /api/v1/auth/firebase`
@@ -42,6 +43,14 @@ Successfully implemented Firebase Authentication as a unified OAuth solution for
 - Updated `_loginWithFacebookOauth()` to use `FirebaseOauthSignInService.signInWithFacebook()`
 - Updated `_loginWithAppleOauth()` to use `FirebaseOauthSignInService.signInWithApple()`
 - All methods now return Firebase ID Token instead of provider-specific tokens
+
+
+#### `test/widgets/login_page_oauth_test.dart`
+- Updated to use `FirebaseOauthSignInService` instead of `OauthSignInService`
+
+#### `lib/core/services/auth/oauth_exception.dart`
+- Created new file with `OauthCancelledException` class (extracted from old service)
+
 
 ## Architecture
 
