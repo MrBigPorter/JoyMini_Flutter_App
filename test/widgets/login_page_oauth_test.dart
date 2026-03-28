@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/app/page/login_page/login_page.dart';
-import 'package:flutter_app/core/services/auth/oauth_sign_in_service.dart';
+import 'package:flutter_app/core/services/auth/firebase_oauth_sign_in_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,10 +28,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 20));
 
-      final googleExpected = OauthSignInService.canShowGoogleButton
+      final googleExpected = FirebaseOauthSignInService.canShowGoogleButton
           ? findsOneWidget
           : findsNothing;
-      final facebookExpected = OauthSignInService.canShowFacebookButton
+      final facebookExpected = FirebaseOauthSignInService.canShowFacebookButton
           ? findsOneWidget
           : findsNothing;
 
@@ -51,7 +51,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 20));
 
-      final expected = OauthSignInService.canShowAppleButton
+      final expected = FirebaseOauthSignInService.canShowAppleButton
           ? findsOneWidget
           : findsNothing;
       expect(find.text('login.oauth.apple'), expected);

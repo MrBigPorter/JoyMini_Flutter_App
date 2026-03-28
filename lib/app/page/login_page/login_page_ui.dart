@@ -212,17 +212,6 @@ extension LoginPageUI on _LoginPageState {
                                     SizedBox(height: 16.h),
                                   ],
 
-                                 /* if (OauthSignInService.canShowAppleButton) ...[
-                                    Button(
-                                      width: double.infinity,
-                                      height: 48.h,
-                                      variant: ButtonVariant.secondary,
-                                      loading: isSocialBtnLoading,
-                                      onPressed: isPageBusy ? null : _loginWithAppleOauth,
-                                      leading: const Icon(Icons.apple_rounded),
-                                      child: Text('login.oauth.apple'.tr()),
-                                    ),
-                                  ],*/
                                 ],
                               ),
                             ),
