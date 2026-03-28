@@ -162,7 +162,7 @@ class _ButtonState extends State<Button> {
             child: SizedBox(
               width: 10.w,
               height: 10.w,
-              child: CircularProgressIndicator(strokeWidth: 2, color: context.textWhite,),
+              child: CircularProgressIndicator(strokeWidth: 2, color: fg),
             ),
           ),
         if (widget.leading != null) ...[
