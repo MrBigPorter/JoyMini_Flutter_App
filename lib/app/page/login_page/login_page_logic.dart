@@ -13,31 +13,63 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   bool _socialOauthInFlight = false;
   bool _isSuccessRedirecting = false;
   bool _oauthCancelled = false;
-  
+  bool _oauthRecoveryStarted = false;
+
   @override
   void initState() {
     super.initState();
-    
-    Future(() {
+
+    // Riverpod 不允许在构建期间直接改 provider，这里放到微任务中执行
+    Future.microtask(() {
       if (!mounted) return;
       ref.read(authLoginGoogleCtrlProvider.notifier).reset();
       ref.read(authLoginFacebookCtrlProvider.notifier).reset();
       ref.read(authLoginAppleCtrlProvider.notifier).reset();
-      
-      // 检查是否有中断的OAuth登录需要恢复（使用全局处理器）
-      _checkForOAuthRecovery();
     });
+
+    // 检查是否有中断的OAuth登录需要恢复（使用全局处理器）
+    _checkForOAuthRecovery();
   }
 
   /// 检查并恢复中断的OAuth登录
   Future<void> _checkForOAuthRecovery() async {
-    if (!mounted) return;
-    
+    if (!mounted || _oauthRecoveryStarted) return;
+
+    // dedicated OAuth processing 页面已接管 callback 恢复，登录页仅保留入口回退
+    if (isAppRouterReady) {
+      final currentPath = appRouter.routeInformationProvider.value.uri.path;
+      if (currentPath == '/oauth/processing') {
+        return;
+      }
+    }
+
+    _oauthRecoveryStarted = true;
+
+    // 只有存在可恢复 token 时才显示 busy，避免无 token 时页面闪一下 loading
+    final hasRecoverableGoogleToken = OAuthStateManager.hasValidIdToken(
+      'google',
+    );
+
+    // 立即显示过渡中的忙碌状态，避免出现“晚一拍”的视觉延迟
+    if (mounted && hasRecoverableGoogleToken) {
+      setState(() {
+        _socialOauthInFlight = true;
+      });
+    }
+
     debugPrint('[LoginPageLogic] Checking for interrupted OAuth login...');
-    
+
     // 使用全局处理器检查恢复
     // 全局处理器不依赖页面状态，即使页面销毁也能工作
-    await GlobalOAuthHandler.checkAndRecoverInterruptedOAuth();
+    try {
+      await GlobalOAuthHandler.checkAndRecoverInterruptedOAuth();
+    } finally {
+      if (mounted && !_isSuccessRedirecting && hasRecoverableGoogleToken) {
+        setState(() {
+          _socialOauthInFlight = false;
+        });
+      }
+    }
   }
 
   void submit() {
@@ -51,27 +83,34 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> loginWithEmailCode() async {
-    if (ref.watch(authLoginEmailCtrlProvider).isLoading || _emailLoginInFlight || _isSuccessRedirecting) return;
+    if (ref.watch(authLoginEmailCtrlProvider).isLoading ||
+        _emailLoginInFlight ||
+        _isSuccessRedirecting)
+      return;
 
     final model = emailForm.model;
     setState(() => _emailLoginInFlight = true);
 
     try {
       final result = await ref.read(authLoginEmailCtrlProvider.notifier).run((
-      email: model.email,
-      code: model.code,
+        email: model.email,
+        code: model.code,
       ));
 
       if (!mounted) return; //  关键防线：API 返回后，页面可能已销毁
 
       if (result.isNotNullOrEmpty && result.tokens.isNotNullOrEmpty) {
         _isSuccessRedirecting = true;
-        await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
+        await _syncLoginTokens(
+          result.tokens.accessToken,
+          result.tokens.refreshToken,
+        );
       }
     } catch (e) {
       // 兜底错误
     } finally {
-      if (mounted && !_isSuccessRedirecting) setState(() => _emailLoginInFlight = false);
+      if (mounted && !_isSuccessRedirecting)
+        setState(() => _emailLoginInFlight = false);
     }
   }
 
@@ -100,20 +139,23 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     setState(() => _socialOauthInFlight = true);
 
     try {
-      debugPrint('[LoginPageLogic] Starting Google OAuth with global processor...');
-      
+      debugPrint(
+        '[LoginPageLogic] Starting Google OAuth with global processor...',
+      );
+
       // 使用新的全局处理器方法
       // 这个方法会处理整个流程：Firebase登录 → 后端API → Token同步 → 导航
       await FirebaseOauthSignInService.signInWithGoogleAndProcess();
-      
+
       // 如果成功，设置重定向标志
       _isSuccessRedirecting = true;
-      debugPrint('[LoginPageLogic] Google OAuth completed successfully via global processor');
-      
+      debugPrint(
+        '[LoginPageLogic] Google OAuth completed successfully via global processor',
+      );
+
       // 注意：这里不重置loading状态，让全局处理器处理跳转
       // 全局处理器会添加延迟确保用户看到loading状态
       // 页面跳转后会自动销毁，不需要手动重置
-      
     } catch (e) {
       debugPrint('[LoginPageLogic] Google OAuth error: $e');
       _handleOauthError(e);
@@ -146,36 +188,45 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       }
 
       if (result.containsKey('accessToken')) {
-        final apiResult = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
-        idToken: null,
-        accessToken: result['accessToken'],
-        userId: result['userId'],
-        inviteCode: _currentInviteCode(),
-        ));
+        final apiResult = await ref
+            .read(authLoginFacebookCtrlProvider.notifier)
+            .run((
+              idToken: null,
+              accessToken: result['accessToken'],
+              userId: result['userId'],
+              inviteCode: _currentInviteCode(),
+            ));
 
         if (!mounted) return; //  关键防线
 
         _isSuccessRedirecting = true;
-        await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
+        await _syncLoginTokens(
+          apiResult.tokens.accessToken,
+          apiResult.tokens.refreshToken,
+        );
       } else {
-        final apiResult = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
-        idToken: result['idToken'],
-        accessToken: null,
-        userId: null,
-        inviteCode: _currentInviteCode(),
-        ));
+        final apiResult = await ref
+            .read(authLoginFacebookCtrlProvider.notifier)
+            .run((
+              idToken: result['idToken'],
+              accessToken: null,
+              userId: null,
+              inviteCode: _currentInviteCode(),
+            ));
 
         if (!mounted) return; //  关键防线
 
         _isSuccessRedirecting = true;
-        await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
+        await _syncLoginTokens(
+          apiResult.tokens.accessToken,
+          apiResult.tokens.refreshToken,
+        );
       }
-      
+
       // 成功登录后，立即重置loading状态（即使页面即将跳转）
       if (mounted) {
         setState(() => _socialOauthInFlight = false);
       }
-      
     } catch (e) {
       _handleOauthError(e);
     } finally {
@@ -206,20 +257,22 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       }
 
       final result = await ref.read(authLoginAppleCtrlProvider.notifier).run((
-      idToken: idToken,
-      inviteCode: _currentInviteCode(),
+        idToken: idToken,
+        inviteCode: _currentInviteCode(),
       ));
 
       if (!mounted) return; //  关键防线
 
       _isSuccessRedirecting = true;
-      await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
-      
+      await _syncLoginTokens(
+        result.tokens.accessToken,
+        result.tokens.refreshToken,
+      );
+
       // 成功登录后，立即重置loading状态（即使页面即将跳转）
       if (mounted) {
         setState(() => _socialOauthInFlight = false);
       }
-      
     } catch (e) {
       _handleOauthError(e);
     } finally {
@@ -249,7 +302,11 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> sendCode() async {
-    if (cd.running || _emailLoginInFlight || _socialOauthInFlight || _isSuccessRedirecting) return;
+    if (cd.running ||
+        _emailLoginInFlight ||
+        _socialOauthInFlight ||
+        _isSuccessRedirecting)
+      return;
 
     final email = emailForm.form.control('email');
     email.markAsTouched();

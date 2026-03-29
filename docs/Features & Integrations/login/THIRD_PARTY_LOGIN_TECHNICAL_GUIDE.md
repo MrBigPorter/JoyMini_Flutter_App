@@ -19,7 +19,8 @@
 8. [Security Best Practices](#security-best-practices)
 9. [Testing Guide](#testing-guide)
 10. [Troubleshooting](#troubleshooting)
-11. [Appendix](#appendix)
+11. [OAuth Callback Loading Optimization Summary](#oauth-callback-loading-optimization-summary)
+12. [Appendix](#appendix)
 
 ---
 
@@ -1888,6 +1889,68 @@ After applying the fix, iOS Facebook login should work without the fatal error. 
 1. `[FirebaseOauthSignInService] Facebook sign-in start via Firebase`
 2. `[FirebaseOauthSignInService] Facebook iOS: Using native Facebook SDK`
 3. `[FirebaseOauthSignInService] Facebook iOS sign-in success | email=... | uid=...`
+
+---
+
+## OAuth Callback Loading Optimization Summary
+
+### Problem Statement
+
+In the current Google/Firebase OAuth callback flow, users may see a delayed loading state after returning to `/login`. This creates a perception that the app is "stuck" for a short period before transition completes.
+
+### Current Root Causes (Observed)
+
+1. **Callback is redirected to `/login` first** (not a dedicated processing route).
+2. **Recovery logic starts with deferred scheduling** (`Future(() {})`), so loading appears later than ideal.
+3. **Global loading hide timing** may occur too close to route transition, causing visual flicker/gap.
+
+### Difficulty & Solution Options
+
+| Option | Difficulty | Change Scope | UX Effect | Risk |
+|---|---|---|---|---|
+| A. Keep current flow + timing fixes | Low | Small (logic/order only) | Good improvement | Low |
+| B. Add dedicated OAuth processing page (`/auth/processing`) | Medium | Medium (route + page + handler flow) | Best, stable and explicit | Medium |
+| C. Full auth flow refactor (state machine/unified orchestrator) | High | Large (multi-module) | Excellent long-term | High |
+
+### Option A — Low-Risk Quick Win (Recommended First Step)
+
+**What to change**:
+- Trigger recovery/loading immediately when callback context is detected.
+- Remove unnecessary deferred execution before showing loading.
+- Keep loading visible until navigation target is confirmed (avoid early hide).
+
+**Estimated effort**: ~0.5 day  
+**Best for**: immediate UX improvement without architecture expansion.
+
+### Option B — Dedicated Processing Page (Recommended Target Design)
+
+**Design**:
+- Route callback directly to `/auth/processing`.
+- Show full-screen loading instantly.
+- Execute token verification + backend login + auth sync on this page (or its controller).
+- On success: `go('/home')`; on failure: `go('/login')` + error toast.
+
+**Estimated effort**: ~1–2 days  
+**Best for**: clear user feedback and clean OAuth transition semantics.
+
+### Option C — Full Orchestration Refactor
+
+**Design**:
+- Introduce a dedicated auth state machine/provider to manage all OAuth transitions.
+- Remove page-level coupling from callback processing.
+- Unify retry/recovery/cancellation states across providers.
+
+**Estimated effort**: ~3–5 days  
+**Best for**: long-term maintainability when more providers/scenarios are expected.
+
+### Final Recommendation
+
+Use a **two-step rollout**:
+
+1. **Now**: implement **Option A** to quickly reduce perceived delay.
+2. **Next iteration**: implement **Option B** as the durable UX solution for all OAuth callbacks.
+
+This balances delivery speed with architecture stability and gives users immediate improvement while preserving a clean migration path.
 
 ---
 
