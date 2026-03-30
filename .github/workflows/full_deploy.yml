@@ -120,34 +120,29 @@ jobs:
         run: |
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
-          
-          # ================= Phase 4: Environment Setup =================
-          - name: 🛠️ 4b. Prepare Flutter Environment (Optimized)
-            run: |
-              # 仅清理构建产物，保留 .dart_tool 缓存
-              rm -rf build
-          
-              # 智能安装：如果版本已存在则跳过
-              if ! fvm list | grep -q "3.41.4"; then
-                fvm install 3.41.4
-              fi
-          
-              fvm flutter config --no-analytics
-          
-              # 只在依赖有变动时才跑 pub get (如果耗时太长，可以先手动在 Mac 跑一次)
-              # 这里去掉 flutter clean，除非你修改了原生插件配置
-              fvm flutter pub get
 
-      # ================= Phase 5: Web Deployment =================
-      - name: 🚀 Build Web (H5 - Compatibility Mode)
+      - name: 🛠️ 4b. Prepare Flutter Environment (Optimized)
         run: |
-          # 强行切换到 HTML 渲染器并关掉 WASM，这能避开 99% 的插件兼容性报错
-          fvm flutter build web --release \
-            --web-renderer html \
-            --no-wasm \
-            --dart-define-from-file=${{ env.ENV_FILE }}
+          # 仅清理构建产物，保留 .dart_tool 缓存
+          rm -rf build
+
+          # 智能安装：如果版本已存在则跳过
+          if ! fvm list | grep -q "3.41.4"; then
+            fvm install 3.41.4
+          fi
+
+          fvm flutter config --no-analytics
+
+          # 强制重新获取一次依赖 (如果你本地 SSD 慢，建议保留这步)
+          fvm flutter pub get
           
-          echo "✅ Web 构建成功"
+          fvm flutter --version
+      # ================= Phase 5: Web Deployment =================
+      - name: 🚀 Build Web (H5)
+        run: |
+          rm -rf build/web
+          # 加上 --no-wasm 和 --web-renderer html 救命参数
+          fvm flutter build web --release --web-renderer html --no-wasm --dart-define-from-file=${{ env.ENV_FILE }}
 
       - name: ☁️ Deploy to Cloudflare Pages
         id: cf_deploy
