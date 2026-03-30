@@ -32,22 +32,9 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-// 4. 读取 local.properties 里的 Facebook 配置 (新增)
-val localProperties = Properties()
-// 优先找 Flutter 根目录的 local.properties，找不到再找 android/ 目录下的
-var localPropertiesFile = rootProject.file("../local.properties")
-if (!localPropertiesFile.exists()) {
-    localPropertiesFile = rootProject.file("local.properties")
-}
-if (localPropertiesFile.exists()) {
-    localProperties.load(FileInputStream(localPropertiesFile))
-}
-
-// 提取变量，如果文件里没配，默认给个 000000 防报错
-val fbAppId = localProperties.getProperty("facebook_app_id") ?: "000000"
-val fbClientToken = localProperties.getProperty("facebook_client_token") ?: "000000"
-val fbProtocolScheme = localProperties.getProperty("fb_login_protocol_scheme") ?: "fb000000"
-
+val fbAppId = dartEnvironmentVariables["FACEBOOK_WEB_APP_ID"] ?: "1659905501858558"
+val fbClientToken = dartEnvironmentVariables["FACEBOOK_CLIENT_TOKEN"] ?: "25c8efc795a1a00f31bec33241b2cfe2"
+val fbProtocolScheme = "fb$fbAppId"
 
 android {
     namespace = "com.porter.joyminis"

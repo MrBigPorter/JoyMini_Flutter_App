@@ -1,5 +1,6 @@
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_app/app/page/deposit/deposit_page.dart';
 import 'package:flutter_app/app/page/group_member_page.dart';
 import 'package:flutter_app/app/page/group_room_page.dart';
@@ -40,6 +41,7 @@ import 'package:flutter_app/app/page/transaction_record_page.dart';
 import 'package:flutter_app/app/page/me_components/me_page.dart';
 import 'package:flutter_app/app/page/login_page/login_page.dart';
 import 'package:flutter_app/app/page/lucky_draw/lucky_draw_page.dart';
+import 'package:flutter_app/app/page/oauth_processing_page/oauth_processing_page.dart';
 import 'package:flutter_app/app/page/pwa_debug_page.dart';
 import 'package:flutter_app/app/page/product_detail_page.dart';
 import 'package:flutter_app/app/page/withdraw/withdraw_page.dart';
@@ -193,7 +195,9 @@ class AppRouter {
           builder: (context, state) {
             final userId = state.pathParameters['userId']!;
             // 安全转换：extra 可能为 null（deep link / URL 直访），不能硬 cast
-            final cachedUser = state.extra is ChatUser ? state.extra as ChatUser : null;
+            final cachedUser = state.extra is ChatUser
+                ? state.extra as ChatUser
+                : null;
 
             return ContactProfilePage(userId: userId, cachedUser: cachedUser);
           },
@@ -225,6 +229,21 @@ class AppRouter {
           name: "login",
           path: '/login',
           builder: (context, state) => LoginPage(),
+        ),
+
+        GoRoute(
+          name: 'oauthProcessing',
+          path: '/oauth/processing',
+          builder: (context, state) => const OauthProcessingPage(),
+        ),
+
+        // Firebase OAuth callback route - returns empty container, Firebase SDK handles the callback
+        GoRoute(
+          path: '/__/auth/handler',
+          builder: (context, state) {
+            debugPrint('GoRouter: Firebase OAuth callback route matched');
+            return const SizedBox.shrink();
+          },
         ),
 
         // 这样 /product/123 会先被这里匹配，而不会被误认为是 ShellRoute 里的 /product
@@ -492,11 +511,30 @@ class AppRouter {
       ],
       redirect: (context, state) {
         final uri = state.uri;
+
+        // Firebase OAuth callback URLs - 重定向到登录页面，让Firebase SDK处理回调
+        // Pattern: com.googleusercontent.apps.*://firebaseauth/link?...
+        if (uri.scheme.startsWith('com.googleusercontent.apps') ||
+            uri.toString().contains('firebaseauth')) {
+          debugPrint(
+            'GoRouter: Firebase OAuth callback detected, redirecting to oauth processing page',
+          );
+          return '/oauth/processing';
+        }
+
+        // Other OAuth callback URLs (Facebook, Apple, etc.)
+        if (uri.toString().contains('firebaseauth/link')) {
+          debugPrint(
+            'GoRouter: Firebase auth callback detected, redirecting to oauth processing page',
+          );
+          return '/oauth/processing';
+        }
+
         // 拦截原生协议
         if (uri.scheme == 'joymini' && uri.host == 'product') {
           final pid = uri.pathSegments.isNotEmpty
               ? uri.pathSegments.first
-              : null;
+              : uri.queryParameters['pid'];
           if (pid != null) {
             final gid =
                 uri.queryParameters['groupId'] ?? uri.queryParameters['gid'];
@@ -525,10 +563,15 @@ class AppRouter {
           return '/home';
         }
 
+        // 已登录用户也允许访问 OAuth processing 页面，避免 callback 期间被提前重定向打断
+        if (path == '/oauth/processing') {
+          return null;
+        }
+
         return null;
       },
       errorPageBuilder: (context, state) {
-        print('Route error: ${state.error}');
+        debugPrint('Route error: ${state.error}');
         // 重置全局进度条
         Future.microtask(() {
           ref.read(overlayProgressProvider.notifier).state = 0.0;

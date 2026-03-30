@@ -31,6 +31,7 @@ import '../../ui/chat/core/call_manager/callkit_service.dart';
 import '../../ui/modal/base/nav_hub.dart';
 import '../../ui/toast/radix_toast.dart';
 import '../constants/socket_events.dart';
+import '../providers/global_loading_provider.dart';
 import '../providers/lucky_draw_provider.dart';
 import '../providers/socket_provider.dart';
 import '../services/customer_service/customer_service_helper.dart';
@@ -64,6 +65,7 @@ class _GlobalHandlerState extends ConsumerState<GlobalHandler> {
 
   bool _isAcceptingCall = false;
   bool _isDecliningCall = false;
+  bool _isShowingGlobalLoading = false;
 
   SocketService? _cachedSocketService;
 
@@ -96,6 +98,14 @@ class _GlobalHandlerState extends ConsumerState<GlobalHandler> {
       _subscribeToSocket(next);
     });
 
+    // 监听全局loading状态
+    ref.listen<bool>(globalLoadingProvider, (_, isLoading) {
+      if (isLoading) {
+        _showGlobalLoading();
+      } else {
+        _hideGlobalLoading();
+      }
+    });
 
     return widget.child;
   }

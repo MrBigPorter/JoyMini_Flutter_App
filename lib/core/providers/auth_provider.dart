@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/core/models/auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -141,15 +142,17 @@ class AuthLoginGoogleCtrl extends _$AuthLoginGoogleCtrl {
     state = const AsyncLoading();
 
     try {
-      final res = await Api.loginWithGoogleOauthApi(
-        GoogleOauthLoginParams(
-          idToken: params.idToken,
-          inviteCode: params.inviteCode,
-        ),
+      debugPrint('[AuthLoginGoogleCtrl] Calling backend API with Firebase idToken (length=${params.idToken.length})');
+      // Use Firebase unified login endpoint
+      final res = await Api.loginWithFirebaseApi(
+        idToken: params.idToken,
+        inviteCode: params.inviteCode,
       );
+      debugPrint('[AuthLoginGoogleCtrl] Backend API call successful, returning AuthLoginOauth');
       state = AsyncData(res);
       return res;
     } catch (e, s) {
+      debugPrint('[AuthLoginGoogleCtrl] Backend API error: $e');
       state = AsyncError(e, s);
       rethrow;
     }
@@ -159,8 +162,9 @@ class AuthLoginGoogleCtrl extends _$AuthLoginGoogleCtrl {
 }
 
 typedef LoginWithFacebookOauthParams = ({
-  String accessToken,
-  String userId,
+  String? idToken,
+  String? accessToken,
+  String? userId,
   String? inviteCode,
 });
 
@@ -173,15 +177,27 @@ class AuthLoginFacebookCtrl extends _$AuthLoginFacebookCtrl {
     state = const AsyncLoading();
 
     try {
-      final res = await Api.loginWithFacebookOauthApi(
-        FacebookOauthLoginParams(
-          accessToken: params.accessToken,
-          userId: params.userId,
+      // Check if it's iOS native login (accessToken + userId) or Firebase (idToken)
+      if (params.accessToken != null && params.userId != null) {
+        // iOS: Use native Facebook SDK - send to /auth/oauth/facebook
+        final res = await Api.loginWithFacebookOauthApi(
+          FacebookOauthLoginParams(
+            accessToken: params.accessToken!,
+            userId: params.userId!,
+            inviteCode: params.inviteCode,
+          ),
+        );
+        state = AsyncData(res);
+        return res;
+      } else {
+        // Android/Web: Use Firebase - send to /auth/firebase
+        final res = await Api.loginWithFirebaseApi(
+          idToken: params.idToken!,
           inviteCode: params.inviteCode,
-        ),
-      );
-      state = AsyncData(res);
-      return res;
+        );
+        state = AsyncData(res);
+        return res;
+      }
     } catch (e, s) {
       state = AsyncError(e, s);
       rethrow;
@@ -193,7 +209,6 @@ class AuthLoginFacebookCtrl extends _$AuthLoginFacebookCtrl {
 
 typedef LoginWithAppleOauthParams = ({
   String idToken,
-  String? code,
   String? inviteCode,
 });
 
@@ -206,12 +221,10 @@ class AuthLoginAppleCtrl extends _$AuthLoginAppleCtrl {
     state = const AsyncLoading();
 
     try {
-      final res = await Api.loginWithAppleOauthApi(
-        AppleOauthLoginParams(
-          idToken: params.idToken,
-          code: params.code,
-          inviteCode: params.inviteCode,
-        ),
+      // Use Firebase unified login endpoint
+      final res = await Api.loginWithFirebaseApi(
+        idToken: params.idToken,
+        inviteCode: params.inviteCode,
       );
       state = AsyncData(res);
       return res;

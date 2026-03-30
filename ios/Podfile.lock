@@ -5,16 +5,6 @@ PODS:
     - Flutter
   - app_tracking_transparency (0.0.1):
     - Flutter
-  - AppAuth (2.0.0):
-    - AppAuth/Core (= 2.0.0)
-    - AppAuth/ExternalUserAgent (= 2.0.0)
-  - AppAuth/Core (2.0.0)
-  - AppAuth/ExternalUserAgent (2.0.0):
-    - AppAuth/Core
-  - AppCheckCore (11.2.0):
-    - GoogleUtilities/Environment (~> 8.0)
-    - GoogleUtilities/UserDefaults (~> 8.0)
-    - PromisesObjC (~> 2.4)
   - audio_session (0.0.1):
     - Flutter
   - blurhash (0.0.1):
@@ -76,6 +66,9 @@ PODS:
   - file_picker (0.0.1):
     - DKImagePickerController/PhotoGallery
     - Flutter
+  - Firebase/Auth (12.9.0):
+    - Firebase/CoreOnly
+    - FirebaseAuth (~> 12.9.0)
   - Firebase/CoreOnly (12.9.0):
     - FirebaseCore (~> 12.9.0)
   - Firebase/Messaging (12.9.0):
@@ -84,6 +77,10 @@ PODS:
   - Firebase/Performance (12.9.0):
     - Firebase/CoreOnly
     - FirebasePerformance (~> 12.9.0)
+  - firebase_auth (6.2.0):
+    - Firebase/Auth (= 12.9.0)
+    - firebase_core
+    - Flutter
   - firebase_core (4.5.0):
     - Firebase/CoreOnly (= 12.9.0)
     - Flutter
@@ -97,6 +94,17 @@ PODS:
     - Flutter
   - FirebaseABTesting (12.9.0):
     - FirebaseCore (~> 12.9.0)
+  - FirebaseAppCheckInterop (12.9.0)
+  - FirebaseAuth (12.9.0):
+    - FirebaseAppCheckInterop (~> 12.9.0)
+    - FirebaseAuthInterop (~> 12.9.0)
+    - FirebaseCore (~> 12.9.0)
+    - FirebaseCoreExtension (~> 12.9.0)
+    - GoogleUtilities/AppDelegateSwizzler (~> 8.1)
+    - GoogleUtilities/Environment (~> 8.1)
+    - GTMSessionFetcher/Core (< 6.0, >= 3.4)
+    - RecaptchaInterop (~> 101.0)
+  - FirebaseAuthInterop (12.9.0)
   - FirebaseCore (12.9.0):
     - FirebaseCoreInternal (~> 12.9.0)
     - GoogleUtilities/Environment (~> 8.1)
@@ -199,11 +207,6 @@ PODS:
     - Flutter
     - google_mlkit_commons
     - GoogleMLKit/TextRecognition (~> 9.0.0)
-  - google_sign_in_ios (0.0.1):
-    - Flutter
-    - FlutterMacOS
-    - GoogleSignIn (~> 9.0)
-    - GTMSessionFetcher (>= 3.4.0)
   - GoogleDataTransport (10.1.0):
     - nanopb (~> 3.30910.0)
     - PromisesObjC (~> 2.4)
@@ -215,11 +218,6 @@ PODS:
   - GoogleMLKit/TextRecognition (9.0.0):
     - GoogleMLKit/MLKitCore
     - MLKitTextRecognition (~> 7.0.0)
-  - GoogleSignIn (9.1.0):
-    - AppAuth (~> 2.0)
-    - AppCheckCore (~> 11.0)
-    - GTMAppAuth (~> 5.0)
-    - GTMSessionFetcher/Core (~> 3.3)
   - GoogleToolboxForMac/Defines (4.2.1)
   - GoogleToolboxForMac/Logger (4.2.1):
     - GoogleToolboxForMac/Defines (= 4.2.1)
@@ -252,14 +250,7 @@ PODS:
   - GoogleUtilities/UserDefaults (8.1.0):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
-  - GTMAppAuth (5.0.0):
-    - AppAuth/Core (~> 2.0)
-    - GTMSessionFetcher/Core (< 4.0, >= 3.3)
-  - GTMSessionFetcher (3.5.0):
-    - GTMSessionFetcher/Full (= 3.5.0)
   - GTMSessionFetcher/Core (3.5.0)
-  - GTMSessionFetcher/Full (3.5.0):
-    - GTMSessionFetcher/Core
   - image_picker_ios (0.0.1):
     - Flutter
   - just_audio (0.0.1):
@@ -322,6 +313,7 @@ PODS:
   - PromisesObjC (2.4.0)
   - PromisesSwift (2.4.0):
     - PromisesObjC (= 2.4.0)
+  - RecaptchaInterop (101.0.0)
   - record_darwin (1.0.0):
     - Flutter
   - SDWebImage (5.21.7):
@@ -335,8 +327,6 @@ PODS:
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
-  - sign_in_with_apple (0.0.1):
-    - Flutter
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
@@ -367,6 +357,7 @@ DEPENDENCIES:
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - ffmpeg_kit_flutter_new (from `.symlinks/plugins/ffmpeg_kit_flutter_new/ios`)
   - file_picker (from `.symlinks/plugins/file_picker/ios`)
+  - firebase_auth (from `.symlinks/plugins/firebase_auth/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - firebase_performance (from `.symlinks/plugins/firebase_performance/ios`)
@@ -386,7 +377,6 @@ DEPENDENCIES:
   - google_mlkit_commons (from `.symlinks/plugins/google_mlkit_commons/ios`)
   - google_mlkit_face_detection (from `.symlinks/plugins/google_mlkit_face_detection/ios`)
   - google_mlkit_text_recognition (from `.symlinks/plugins/google_mlkit_text_recognition/ios`)
-  - google_sign_in_ios (from `.symlinks/plugins/google_sign_in_ios/darwin`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - just_audio (from `.symlinks/plugins/just_audio/darwin`)
   - map_launcher (from `.symlinks/plugins/map_launcher/ios`)
@@ -396,7 +386,6 @@ DEPENDENCIES:
   - record_darwin (from `.symlinks/plugins/record_darwin/ios`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
-  - sign_in_with_apple (from `.symlinks/plugins/sign_in_with_apple/ios`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
   - video_compress (from `.symlinks/plugins/video_compress/ios`)
@@ -406,8 +395,6 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
-    - AppAuth
-    - AppCheckCore
     - CryptoSwift
     - DKImagePickerController
     - DKPhotoGallery
@@ -417,6 +404,9 @@ SPEC REPOS:
     - FBSDKLoginKit
     - Firebase
     - FirebaseABTesting
+    - FirebaseAppCheckInterop
+    - FirebaseAuth
+    - FirebaseAuthInterop
     - FirebaseCore
     - FirebaseCoreExtension
     - FirebaseCoreInternal
@@ -429,10 +419,8 @@ SPEC REPOS:
     - FirebaseSharedSwift
     - GoogleDataTransport
     - GoogleMLKit
-    - GoogleSignIn
     - GoogleToolboxForMac
     - GoogleUtilities
-    - GTMAppAuth
     - GTMSessionFetcher
     - KeychainAccess
     - libwebp
@@ -447,6 +435,7 @@ SPEC REPOS:
     - OrderedSet
     - PromisesObjC
     - PromisesSwift
+    - RecaptchaInterop
     - SDWebImage
     - SDWebImageWebPCoder
     - SwiftyGif
@@ -475,6 +464,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/ffmpeg_kit_flutter_new/ios"
   file_picker:
     :path: ".symlinks/plugins/file_picker/ios"
+  firebase_auth:
+    :path: ".symlinks/plugins/firebase_auth/ios"
   firebase_core:
     :path: ".symlinks/plugins/firebase_core/ios"
   firebase_messaging:
@@ -513,8 +504,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/google_mlkit_face_detection/ios"
   google_mlkit_text_recognition:
     :path: ".symlinks/plugins/google_mlkit_text_recognition/ios"
-  google_sign_in_ios:
-    :path: ".symlinks/plugins/google_sign_in_ios/darwin"
   image_picker_ios:
     :path: ".symlinks/plugins/image_picker_ios/ios"
   just_audio:
@@ -533,8 +522,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/share_plus/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
-  sign_in_with_apple:
-    :path: ".symlinks/plugins/sign_in_with_apple/ios"
   sqflite_darwin:
     :path: ".symlinks/plugins/sqflite_darwin/darwin"
   url_launcher_ios:
@@ -552,8 +539,6 @@ SPEC CHECKSUMS:
   app_badge_plus: f2c3391ddd4a207254871e3d6fe41d879fea1d1a
   app_links: a754cbec3c255bd4bbb4d236ecc06f28cd9a7ce8
   app_tracking_transparency: 3d84f147f67ca82d3c15355c36b1fa6b66ca7c92
-  AppAuth: 1c1a8afa7e12f2ec3a294d9882dfa5ab7d3cb063
-  AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
   blurhash: 7d0156d68a21f3d4276b71c2fae094d9c0753959
   camera_avfoundation: 5675ca25298b6f81fa0a325188e7df62cc217741
@@ -570,10 +555,14 @@ SPEC CHECKSUMS:
   ffmpeg_kit_flutter_new: 12426a19f10ac81186c67c6ebc4717f8f4364b7f
   file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
   Firebase: 065f2bb395062046623036d8e6dc857bc2521d56
+  firebase_auth: eeb19010b5aa7c83cc85f23b6c4f009ea28461f1
   firebase_core: afac1aac13c931e0401c7e74ed1276112030efab
   firebase_messaging: 7cb2727feb789751fc6936bcc8e08408970e2820
   firebase_performance: a14e0fcd8c20835c2d6a96c6a948c976ba010805
   FirebaseABTesting: a399ffe546392a39b19a5c2fb28bd8ea178a6f47
+  FirebaseAppCheckInterop: 4bade10286cc977e516f75d2d8312cbdfa534789
+  FirebaseAuth: 3a39f6436c21ebfd7919b698228b4f89ff94c23b
+  FirebaseAuthInterop: f8f6ff72dc24621906497fbe5cf3c42ee815e59c
   FirebaseCore: 428912f751178b06bef0a1793effeb4a5e09a9b8
   FirebaseCoreExtension: e911052d59cd0da237a45d706fc0f81654f035c1
   FirebaseCoreInternal: b321eafae5362113bc182956fafc9922cfc77b72
@@ -600,13 +589,10 @@ SPEC CHECKSUMS:
   google_mlkit_commons: a5e4ffae5bc59ea4c7b9025dc72cb6cb79dc1166
   google_mlkit_face_detection: ee4b72cfae062b4c972204be955d83055a4bfd36
   google_mlkit_text_recognition: b3de5adb786ad7a0fe8e13618387b8d2df0f3c70
-  google_sign_in_ios: 000870aa06da9b28d1d0bf7ef70ff0213059dd28
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleMLKit: b1eee21a41c57704fe72483b15c85cb2c0cd7444
-  GoogleSignIn: fcee2257188d5eda57a5e2b6a715550ffff9206d
   GoogleToolboxForMac: d1a2cbf009c453f4d6ded37c105e2f67a32206d8
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
-  GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
   just_audio: 4e391f57b79cad2b0674030a00453ca5ce817eed
@@ -627,12 +613,12 @@ SPEC CHECKSUMS:
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   PromisesSwift: 9d77319bbe72ebf6d872900551f7eeba9bce2851
+  RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
   record_darwin: fb1f375f1d9603714f55b8708a903bbb91ffdb0a
   SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
   SDWebImageWebPCoder: 0e06e365080397465cc73a7a9b472d8a3bd0f377
   share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
-  sign_in_with_apple: c5dcc141574c8c54d5ac99dd2163c0c72ad22418
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   SwiftyGif: 706c60cf65fa2bc5ee0313beece843c8eb8194d4
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b

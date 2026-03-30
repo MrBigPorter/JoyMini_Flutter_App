@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/common.dart';
 import 'package:flutter_app/ui/button/button_size.dart';
 import 'package:flutter_app/ui/button/variant.dart';
 import 'package:flutter_app/ui/button/button_visual.dart';
@@ -162,7 +161,7 @@ class _ButtonState extends State<Button> {
             child: SizedBox(
               width: 10.w,
               height: 10.w,
-              child: CircularProgressIndicator(strokeWidth: 2, color: context.textWhite,),
+              child: CircularProgressIndicator(strokeWidth: 2, color: fg),
             ),
           ),
         if (widget.leading != null) ...[

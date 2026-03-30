@@ -1,7 +1,134 @@
 part of 'global_handler.dart';
 
-// 职责：专注于“样式呈现与交互”的逻辑分层
+// 职责：专注于"样式呈现与交互"的逻辑分层
 extension GlobalHandlerUIExtension on _GlobalHandlerState {
+  /// 显示全局loading
+  void _showGlobalLoading() {
+    if (_isShowingGlobalLoading) return; // 避免重复显示
+    
+    debugPrint('[GlobalHandlerUI] Showing global loading');
+    
+    _isShowingGlobalLoading = true;
+    BotToast.showCustomLoading(
+      toastBuilder: (cancelFunc) {
+        return Container(
+          width: 80.w,
+          height: 80.w,
+          decoration: BoxDecoration(
+            color: context.bgPrimary.withOpacity(0.95),
+            borderRadius: BorderRadius.circular(16.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 32.w,
+                height: 32.w,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3.w,
+                  valueColor: AlwaysStoppedAnimation<Color>(context.utilityBrand500),
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                'Loading...',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: context.textSecondary700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      allowClick: false,
+      clickClose: false,
+      backButtonBehavior: BackButtonBehavior.ignore,
+      backgroundColor: Colors.transparent,
+      duration: null, // 持续显示直到手动关闭
+    );
+  }
+
+  /// 隐藏全局loading
+  void _hideGlobalLoading() {
+    if (!_isShowingGlobalLoading) return;
+    
+    debugPrint('[GlobalHandlerUI] Hiding global loading');
+    
+    BotToast.closeAllLoading();
+    _isShowingGlobalLoading = false;
+  }
+
+  /// 显示全局loading（带自定义消息）
+  void _showGlobalLoadingWithMessage(String message) {
+    if (_isShowingGlobalLoading) {
+      _hideGlobalLoading();
+    }
+    
+    debugPrint('[GlobalHandlerUI] Showing global loading with message: $message');
+    
+    _isShowingGlobalLoading = true;
+    BotToast.showCustomLoading(
+      toastBuilder: (cancelFunc) {
+        return Container(
+          width: 120.w,
+          height: 120.w,
+          decoration: BoxDecoration(
+            color: context.bgPrimary.withOpacity(0.95),
+            borderRadius: BorderRadius.circular(16.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 32.w,
+                height: 32.w,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3.w,
+                  valueColor: AlwaysStoppedAnimation<Color>(context.utilityBrand500),
+                ),
+              ),
+              SizedBox(height: 12.h),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    color: context.textSecondary700,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      allowClick: false,
+      clickClose: false,
+      backButtonBehavior: BackButtonBehavior.ignore,
+      backgroundColor: Colors.transparent,
+      duration: null,
+    );
+  }
 
   /// 1. 交互式好友申请通知 (使用 RadixToast 核心逻辑)
   void _showContactApplyNotification(Map<String, dynamic> data) {
@@ -73,7 +200,7 @@ extension GlobalHandlerUIExtension on _GlobalHandlerState {
     if(!isAuthenticated){
       return;
     }
-    if (event.type == GlobalEventType.deviceBanned) _showLockDialog();
+   /* if (event.type == GlobalEventType.deviceBanned) _showLockDialog();*/
   }
 
   /// 4. 系统锁定对话框 (完整的 RadixModal 实现)
