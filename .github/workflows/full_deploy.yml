@@ -123,16 +123,47 @@ jobs:
 
       - name: 🛠️ 4b. Prepare Flutter Environment via FVM
         run: |
+          # 清理旧的构建缓存
+          rm -rf .dart_tool
+          rm -rf build
+          rm -rf .flutter-plugins
+          rm -rf .flutter-plugins-dependencies
+          
+          # 安装 Flutter
           fvm install
-          # [新增] 强制关闭 Flutter 的版本检查，有时能绕过 Git 缺失的问题
+          
+          # 配置 Flutter
           fvm flutter config --no-analytics
-          # 如果还是报错，尝试在 SDK 目录执行这个 (仅当必须绕过时使用)
-          git -C /Volumes/MySSD/fvm_cache/versions/3.41.4 init
+          
+          # 强制清理并重新获取依赖
+          fvm flutter clean
           fvm flutter pub get
+          
+          # 验证 Flutter 版本
+          fvm flutter --version
 
       # ================= Phase 5: Web Deployment =================
       - name: 🚀 Build Web (H5)
-        run: fvm flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }}
+        run: |
+          # 清理旧的构建缓存
+          rm -rf build/web
+          
+          # 构建 Web
+          fvm flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }}
+          
+          # 验证构建结果
+          if [ ! -d "build/web" ]; then
+            echo "❌ Web 构建失败：build/web 目录不存在"
+            exit 1
+          fi
+          
+          if [ ! -f "build/web/index.html" ]; then
+            echo "❌ Web 构建失败：index.html 文件不存在"
+            exit 1
+          fi
+          
+          echo "✅ Web 构建成功"
+          ls -la build/web/
 
       - name: ☁️ Deploy to Cloudflare Pages
         id: cf_deploy
