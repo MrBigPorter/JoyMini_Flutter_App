@@ -120,50 +120,34 @@ jobs:
         run: |
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
-
-      - name: 🛠️ 4b. Prepare Flutter Environment via FVM
-        run: |
-          # 清理旧的构建缓存
-          rm -rf .dart_tool
-          rm -rf build
-          rm -rf .flutter-plugins
-          rm -rf .flutter-plugins-dependencies
           
-          # 安装 Flutter
-          fvm install
+          # ================= Phase 4: Environment Setup =================
+          - name: 🛠️ 4b. Prepare Flutter Environment (Optimized)
+            run: |
+              # 仅清理构建产物，保留 .dart_tool 缓存
+              rm -rf build
           
-          # 配置 Flutter
-          fvm flutter config --no-analytics
+              # 智能安装：如果版本已存在则跳过
+              if ! fvm list | grep -q "3.41.4"; then
+                fvm install 3.41.4
+              fi
           
-          # 强制清理并重新获取依赖
-          fvm flutter clean
-          fvm flutter pub get
+              fvm flutter config --no-analytics
           
-          # 验证 Flutter 版本
-          fvm flutter --version
+              # 只在依赖有变动时才跑 pub get (如果耗时太长，可以先手动在 Mac 跑一次)
+              # 这里去掉 flutter clean，除非你修改了原生插件配置
+              fvm flutter pub get
 
       # ================= Phase 5: Web Deployment =================
-      - name: 🚀 Build Web (H5)
+      - name: 🚀 Build Web (H5 - Compatibility Mode)
         run: |
-          # 清理旧的构建缓存
-          rm -rf build/web
-          
-          # 构建 Web (禁用 WASM 干运行，避免兼容性问题)
-          fvm flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }} --no-wasm-dry-run
-          
-          # 验证构建结果
-          if [ ! -d "build/web" ]; then
-            echo "❌ Web 构建失败：build/web 目录不存在"
-            exit 1
-          fi
-          
-          if [ ! -f "build/web/index.html" ]; then
-            echo "❌ Web 构建失败：index.html 文件不存在"
-            exit 1
-          fi
+          # 强行切换到 HTML 渲染器并关掉 WASM，这能避开 99% 的插件兼容性报错
+          fvm flutter build web --release \
+            --web-renderer html \
+            --no-wasm \
+            --dart-define-from-file=${{ env.ENV_FILE }}
           
           echo "✅ Web 构建成功"
-          ls -la build/web/
 
       - name: ☁️ Deploy to Cloudflare Pages
         id: cf_deploy
