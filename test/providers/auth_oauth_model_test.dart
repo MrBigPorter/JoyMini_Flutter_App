@@ -181,29 +181,8 @@ void main() {
     });
   });
 
-  group('OAuth providers initial/reset states', () {
-    test('google/facebook/apple controllers default to AsyncData(null)', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-
-      expect(container.read(authLoginGoogleCtrlProvider).valueOrNull, isNull);
-      expect(container.read(authLoginFacebookCtrlProvider).valueOrNull, isNull);
-      expect(container.read(authLoginAppleCtrlProvider).valueOrNull, isNull);
-    });
-
-    test('reset keeps controller state as AsyncData(null)', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-
-      container.read(authLoginGoogleCtrlProvider.notifier).reset();
-      container.read(authLoginFacebookCtrlProvider.notifier).reset();
-      container.read(authLoginAppleCtrlProvider.notifier).reset();
-
-      expect(container.read(authLoginGoogleCtrlProvider).valueOrNull, isNull);
-      expect(container.read(authLoginFacebookCtrlProvider).valueOrNull, isNull);
-      expect(container.read(authLoginAppleCtrlProvider).valueOrNull, isNull);
-    });
-  });
+  // 移除老的OAuth Provider测试，使用Deep Link OAuth系统
+  // 老的Google/Facebook/Apple OAuth控制器已废弃
 
   group('Email providers initial/reset states', () {
     test('sendEmail/loginEmail controllers default to AsyncData(null)', () {

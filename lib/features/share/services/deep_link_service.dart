@@ -50,20 +50,8 @@ class DeepLinkService {
       return;
     }
     
-    // Ignore Firebase OAuth callback URLs - these are handled internally by Firebase SDK
-    // Pattern: com.googleusercontent.apps.*://firebaseauth/link?...
-    // Check both scheme and full URL for firebaseauth
-    if (uri.scheme.startsWith('com.googleusercontent.apps') || 
-        uri.toString().contains('firebaseauth')) {
-      debugPrint('JoyMini [DeepLink] Ignoring Firebase OAuth callback URL: ${uri.toString().substring(0, 100)}...');
-      return;
-    }
-    
-    // Ignore other Firebase auth callback URLs
-    if (uri.toString().contains('firebaseauth/link')) {
-      debugPrint('JoyMini [DeepLink] Ignoring Firebase auth callback URL');
-      return;
-    }
+    // 移除老的Firebase OAuth回调URL过滤，使用Deep Link OAuth系统
+    // Firebase OAuth回调现在由Deep Link OAuth服务处理
 
     // Handle HTTPS (Web sharing pages) logic here
     final currentLink = uri.toString();

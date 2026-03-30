@@ -19,13 +19,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   void initState() {
     super.initState();
 
-    Future.microtask(() {
-      if (!mounted) return;
-      ref.read(authLoginGoogleCtrlProvider.notifier).reset();
-      ref.read(authLoginFacebookCtrlProvider.notifier).reset();
-      ref.read(authLoginAppleCtrlProvider.notifier).reset();
-    });
-
+    // 移除老OAuth Provider重置逻辑，Deep Link OAuth不需要
     _checkForOAuthRecovery();
   }
 

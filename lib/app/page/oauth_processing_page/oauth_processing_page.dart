@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/core/services/auth/global_oauth_handler.dart';
-import 'package:flutter_app/core/services/auth/oauth_state_manager.dart';
 import 'package:flutter_app/core/store/auth/auth_provider.dart';
 import 'package:flutter_app/ui/toast/radix_toast.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -89,16 +88,8 @@ class _OauthProcessingPageState extends State<OauthProcessingPage> {
         return true;
       }
 
-      if (OAuthStateManager.hasValidIdToken('google')) {
-        final recovered =
-            await GlobalOAuthHandler.checkAndRecoverInterruptedOAuth(
-              navigateAfterSuccess: false,
-              showGlobalLoading: false,
-            );
-        if (recovered) {
-          return true;
-        }
-      }
+      // Deep Link OAuth系统不需要恢复逻辑，所有状态由后端管理
+      // 直接检查认证状态即可
 
       await Future<void>.delayed(_pollInterval);
     }

@@ -579,23 +579,8 @@ class AppRouter {
       redirect: (context, state) {
         final uri = state.uri;
 
-        // Firebase OAuth callback URLs - 重定向到登录页面，让Firebase SDK处理回调
-        // Pattern: com.googleusercontent.apps.*://firebaseauth/link?...
-        if (uri.scheme.startsWith('com.googleusercontent.apps') ||
-            uri.toString().contains('firebaseauth')) {
-          debugPrint(
-            'GoRouter: Firebase OAuth callback detected, redirecting to oauth processing page',
-          );
-          return '/oauth/processing';
-        }
-
-        // Other OAuth callback URLs (Facebook, Apple, etc.)
-        if (uri.toString().contains('firebaseauth/link')) {
-          debugPrint(
-            'GoRouter: Firebase auth callback detected, redirecting to oauth processing page',
-          );
-          return '/oauth/processing';
-        }
+        // 移除老的Firebase OAuth回调处理，使用Deep Link OAuth系统
+        // Firebase OAuth回调现在由Deep Link OAuth服务处理
 
         // 拦截原生协议
         if (uri.scheme == 'joymini' && uri.host == 'product') {
