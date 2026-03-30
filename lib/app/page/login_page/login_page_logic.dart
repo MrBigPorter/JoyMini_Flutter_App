@@ -64,8 +64,9 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   Future<void> loginWithEmailCode() async {
     if (ref.watch(authLoginEmailCtrlProvider).isLoading ||
         _emailLoginInFlight ||
-        _isSuccessRedirecting)
+        _isSuccessRedirecting) {
       return;
+    }
 
     final model = emailForm.model;
     setState(() => _emailLoginInFlight = true);
@@ -83,9 +84,11 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
         await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
       }
     } catch (e) {
+      // 静默处理错误
     } finally {
-      if (mounted && !_isSuccessRedirecting)
+      if (mounted && !_isSuccessRedirecting) {
         setState(() => _emailLoginInFlight = false);
+      }
     }
   }
 
@@ -102,7 +105,9 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> _syncLoginTokens(String accessToken, String refreshToken) async {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final auth = ref.read(authProvider.notifier);
     await auth.login(accessToken, refreshToken);
   }
@@ -119,14 +124,9 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
       if (!mounted) return;
 
-      // 调用后端验证 token 并完成登录
-      final apiResult = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
-        idToken: result['token']!,
-        inviteCode: _currentInviteCode(),
-      ));
-
+      // Deep Link OAuth 直接使用后端返回的 Luna Token，不调用 Firebase API
       _isSuccessRedirecting = true;
-      await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
+      await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
       if (mounted) setState(() => _socialOauthInFlight = false);
     } on DeepLinkOAuthException catch (e) {
@@ -161,16 +161,9 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
       if (!mounted) return;
 
-      // 调用后端验证 token 并完成登录
-      final apiResult = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
-        idToken: result['token']!,
-        accessToken: null,           // Deep Link OAuth 不使用 accessToken
-        userId: null,                // Deep Link OAuth 不使用 userId
-        inviteCode: _currentInviteCode(),
-      ));
-
+      // Deep Link OAuth 直接使用后端返回的 Luna Token，不调用 Firebase API
       _isSuccessRedirecting = true;
-      await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
+      await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
       if (mounted) setState(() => _socialOauthInFlight = false);
     } on DeepLinkOAuthException catch (e) {
@@ -205,14 +198,9 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
       if (!mounted) return;
 
-      // 调用后端验证 token 并完成登录
-      final apiResult = await ref.read(authLoginAppleCtrlProvider.notifier).run((
-        idToken: result['token']!,
-        inviteCode: _currentInviteCode(),
-      ));
-
+      // Deep Link OAuth 直接使用后端返回的 Luna Token，不调用 Firebase API
       _isSuccessRedirecting = true;
-      await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
+      await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
       if (mounted) setState(() => _socialOauthInFlight = false);
     } on DeepLinkOAuthException catch (e) {
