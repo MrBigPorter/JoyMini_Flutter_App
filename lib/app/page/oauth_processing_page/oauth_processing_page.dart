@@ -17,8 +17,9 @@ class OauthProcessingPage extends StatefulWidget {
 class _OauthProcessingPageState extends State<OauthProcessingPage> {
   bool _started = false;
 
-  static const Duration _completionWindow = Duration(seconds: 8);
-  static const Duration _pollInterval = Duration(milliseconds: 250);
+  // 华为设备优化：缩短等待时间，提高轮询频率
+  static const Duration _completionWindow = Duration(seconds: 4);
+  static const Duration _pollInterval = Duration(milliseconds: 100);
 
   @override
   void initState() {
@@ -121,6 +122,14 @@ class _OauthProcessingPageState extends State<OauthProcessingPage> {
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w500,
                 color: context.textSecondary700,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'This may take a few seconds',
+              style: TextStyle(
+                fontSize: 12.sp,
+                color: context.textSecondary700.withOpacity(0.6),
               ),
             ),
           ],

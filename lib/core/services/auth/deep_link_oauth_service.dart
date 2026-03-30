@@ -220,11 +220,11 @@ class DeepLinkOAuthService {
         debugPrint('[DeepLinkOAuthService] Mobile OAuth URL: $loginUrl');
       }
 
-      // 启动 In-App Browser 进行 OAuth
+      // 启动外部浏览器进行 OAuth（华为设备兼容性更好）
       final uri = Uri.parse(loginUrl);
       final launched = await launchUrl(
         uri,
-        mode: LaunchMode.inAppBrowserView,
+        mode: LaunchMode.externalApplication,
       );
 
       if (!launched) {
