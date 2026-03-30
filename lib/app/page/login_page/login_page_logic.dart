@@ -19,7 +19,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   void initState() {
     super.initState();
 
-    // Riverpod 不允许在构建期间直接改 provider，这里放到微任务中执行
     Future.microtask(() {
       if (!mounted) return;
       ref.read(authLoginGoogleCtrlProvider.notifier).reset();
@@ -27,47 +26,27 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       ref.read(authLoginAppleCtrlProvider.notifier).reset();
     });
 
-    // 检查是否有中断的OAuth登录需要恢复（使用全局处理器）
     _checkForOAuthRecovery();
   }
 
-  /// 检查并恢复中断的OAuth登录
   Future<void> _checkForOAuthRecovery() async {
     if (!mounted || _oauthRecoveryStarted) return;
 
-    // dedicated OAuth processing 页面已接管 callback 恢复，登录页仅保留入口回退
     if (isAppRouterReady) {
       final currentPath = appRouter.routeInformationProvider.value.uri.path;
-      if (currentPath == '/oauth/processing') {
-        return;
-      }
+      if (currentPath == '/oauth/processing') return;
     }
 
     _oauthRecoveryStarted = true;
 
-    // 只有存在可恢复 token 时才显示 busy，避免无 token 时页面闪一下 loading
-    final hasRecoverableGoogleToken = OAuthStateManager.hasValidIdToken(
-      'google',
-    );
+    // Deep Link OAuth 不需要 Web 重定向恢复逻辑
+    // 所有 OAuth 状态由后端管理，前端只需等待 Deep Link 回调
 
-    // 立即显示过渡中的忙碌状态，避免出现"晚一拍"的视觉延迟
-    if (mounted && hasRecoverableGoogleToken) {
-      setState(() {
-        _socialOauthInFlight = true;
-      });
-    }
-
-    debugPrint('[LoginPageLogic] Checking for interrupted OAuth login...');
-
-    // 使用全局处理器检查恢复
-    // 全局处理器不依赖页面状态，即使页面销毁也能工作
     try {
       await GlobalOAuthHandler.checkAndRecoverInterruptedOAuth();
     } finally {
-      if (mounted && !_isSuccessRedirecting && hasRecoverableGoogleToken) {
-        setState(() {
-          _socialOauthInFlight = false;
-        });
+      if (mounted && !_isSuccessRedirecting) {
+        setState(() => _socialOauthInFlight = false);
       }
     }
   }
@@ -93,21 +72,17 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
     try {
       final result = await ref.read(authLoginEmailCtrlProvider.notifier).run((
-        email: model.email,
-        code: model.code,
+      email: model.email,
+      code: model.code,
       ));
 
-      if (!mounted) return; //  关键防线：API 返回后，页面可能已销毁
+      if (!mounted) return;
 
       if (result.isNotNullOrEmpty && result.tokens.isNotNullOrEmpty) {
         _isSuccessRedirecting = true;
-        await _syncLoginTokens(
-          result.tokens.accessToken,
-          result.tokens.refreshToken,
-        );
+        await _syncLoginTokens(result.tokens.accessToken, result.tokens.refreshToken);
       }
     } catch (e) {
-      // 兜底错误
     } finally {
       if (mounted && !_isSuccessRedirecting)
         setState(() => _emailLoginInFlight = false);
@@ -127,37 +102,40 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> _syncLoginTokens(String accessToken, String refreshToken) async {
-    if (!mounted) return; //  关键防线：确保在用 ref.read 之前页面还在
+    if (!mounted) return;
     final auth = ref.read(authProvider.notifier);
     await auth.login(accessToken, refreshToken);
   }
 
   Future<void> _loginWithGoogleOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
-
     _oauthCancelled = false;
     setState(() => _socialOauthInFlight = true);
-
     try {
-      debugPrint(
-        '[LoginPageLogic] Starting Google OAuth with global processor...',
+      final result = await DeepLinkOAuthService.loginWithGoogle(
+        apiBaseUrl: OAuthConfig.apiBaseUrl,
+        inviteCode: _currentInviteCode(),
       );
 
-      // 使用新的全局处理器方法
-      // 这个方法会处理整个流程：Firebase登录 → 后端API → Token同步 → 导航
-      await FirebaseOauthSignInService.signInWithGoogleAndProcess();
+      if (!mounted) return;
 
-      // 如果成功，设置重定向标志
+      // 调用后端验证 token 并完成登录
+      final apiResult = await ref.read(authLoginGoogleCtrlProvider.notifier).run((
+        idToken: result['token']!,
+        inviteCode: _currentInviteCode(),
+      ));
+
       _isSuccessRedirecting = true;
-      debugPrint(
-        '[LoginPageLogic] Google OAuth completed successfully via global processor',
-      );
+      await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
 
-      // 注意：这里不重置loading状态，让全局处理器处理跳转
-      // 全局处理器会添加延迟确保用户看到loading状态
-      // 页面跳转后会自动销毁，不需要手动重置
+      if (mounted) setState(() => _socialOauthInFlight = false);
+    } on DeepLinkOAuthException catch (e) {
+      if (e.message.contains('cancelled') || e.message.contains('timeout')) {
+        _oauthCancelled = true;
+        return;
+      }
+      _handleOauthError(e);
     } catch (e) {
-      debugPrint('[LoginPageLogic] Google OAuth error: $e');
       _handleOauthError(e);
     } finally {
       if (mounted && !_isSuccessRedirecting) {
@@ -165,7 +143,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
           await Future.delayed(const Duration(milliseconds: 300));
         }
         if (mounted && !_isSuccessRedirecting) {
-          debugPrint('[LoginPageLogic] Resetting social OAuth loading state');
           setState(() => _socialOauthInFlight = false);
         }
       }
@@ -174,59 +151,34 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   Future<void> _loginWithFacebookOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
-
     _oauthCancelled = false;
     setState(() => _socialOauthInFlight = true);
-
     try {
-      final result = await FirebaseOauthSignInService.signInWithFacebook();
+      final result = await DeepLinkOAuthService.loginWithFacebook(
+        apiBaseUrl: OAuthConfig.apiBaseUrl,
+        inviteCode: _currentInviteCode(),
+      );
 
-      if (!mounted) return; //  关键防线：Facebook 弹窗回来后检查
+      if (!mounted) return;
 
-      if (result == null) {
-        throw StateError('Facebook sign-in failed: no result returned');
+      // 调用后端验证 token 并完成登录
+      final apiResult = await ref.read(authLoginFacebookCtrlProvider.notifier).run((
+        idToken: result['token']!,
+        accessToken: null,           // Deep Link OAuth 不使用 accessToken
+        userId: null,                // Deep Link OAuth 不使用 userId
+        inviteCode: _currentInviteCode(),
+      ));
+
+      _isSuccessRedirecting = true;
+      await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
+
+      if (mounted) setState(() => _socialOauthInFlight = false);
+    } on DeepLinkOAuthException catch (e) {
+      if (e.message.contains('cancelled') || e.message.contains('timeout')) {
+        _oauthCancelled = true;
+        return;
       }
-
-      if (result.containsKey('accessToken')) {
-        final apiResult = await ref
-            .read(authLoginFacebookCtrlProvider.notifier)
-            .run((
-              idToken: null,
-              accessToken: result['accessToken'],
-              userId: result['userId'],
-              inviteCode: _currentInviteCode(),
-            ));
-
-        if (!mounted) return; //  关键防线
-
-        _isSuccessRedirecting = true;
-        await _syncLoginTokens(
-          apiResult.tokens.accessToken,
-          apiResult.tokens.refreshToken,
-        );
-      } else {
-        final apiResult = await ref
-            .read(authLoginFacebookCtrlProvider.notifier)
-            .run((
-              idToken: result['idToken'],
-              accessToken: null,
-              userId: null,
-              inviteCode: _currentInviteCode(),
-            ));
-
-        if (!mounted) return; //  关键防线
-
-        _isSuccessRedirecting = true;
-        await _syncLoginTokens(
-          apiResult.tokens.accessToken,
-          apiResult.tokens.refreshToken,
-        );
-      }
-
-      // 成功登录后，立即重置loading状态（即使页面即将跳转）
-      if (mounted) {
-        setState(() => _socialOauthInFlight = false);
-      }
+      _handleOauthError(e);
     } catch (e) {
       _handleOauthError(e);
     } finally {
@@ -243,36 +195,32 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   Future<void> _loginWithAppleOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
-
     _oauthCancelled = false;
     setState(() => _socialOauthInFlight = true);
-
     try {
-      final idToken = await FirebaseOauthSignInService.signInWithApple();
+      final result = await DeepLinkOAuthService.loginWithApple(
+        apiBaseUrl: OAuthConfig.apiBaseUrl,
+        inviteCode: _currentInviteCode(),
+      );
 
-      if (!mounted) return; //  关键防线
+      if (!mounted) return;
 
-      if (idToken == null) {
-        throw StateError('Apple sign-in failed: no token returned');
-      }
-
-      final result = await ref.read(authLoginAppleCtrlProvider.notifier).run((
-        idToken: idToken,
+      // 调用后端验证 token 并完成登录
+      final apiResult = await ref.read(authLoginAppleCtrlProvider.notifier).run((
+        idToken: result['token']!,
         inviteCode: _currentInviteCode(),
       ));
 
-      if (!mounted) return; //  关键防线
-
       _isSuccessRedirecting = true;
-      await _syncLoginTokens(
-        result.tokens.accessToken,
-        result.tokens.refreshToken,
-      );
+      await _syncLoginTokens(apiResult.tokens.accessToken, apiResult.tokens.refreshToken);
 
-      // 成功登录后，立即重置loading状态（即使页面即将跳转）
-      if (mounted) {
-        setState(() => _socialOauthInFlight = false);
+      if (mounted) setState(() => _socialOauthInFlight = false);
+    } on DeepLinkOAuthException catch (e) {
+      if (e.message.contains('cancelled') || e.message.contains('timeout')) {
+        _oauthCancelled = true;
+        return;
       }
+      _handleOauthError(e);
     } catch (e) {
       _handleOauthError(e);
     } finally {
@@ -302,11 +250,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> sendCode() async {
-    if (cd.running ||
-        _emailLoginInFlight ||
-        _socialOauthInFlight ||
-        _isSuccessRedirecting)
-      return;
+    if (cd.running || _emailLoginInFlight || _socialOauthInFlight || _isSuccessRedirecting) return;
 
     final email = emailForm.form.control('email');
     email.markAsTouched();
@@ -315,12 +259,8 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
     final emailValue = email.value.toString();
     try {
       await ref.read(sendEmailCodeCtrlProvider.notifier).run(emailValue);
-
-      if (!mounted) return; //  关键防线
-
-      RadixToast.success(
-        'login.email_code_sent'.tr(namedArgs: {'email': emailValue}),
-      );
+      if (!mounted) return;
+      RadixToast.success('login.email_code_sent'.tr(namedArgs: {'email': emailValue}));
       cd.start(60);
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');

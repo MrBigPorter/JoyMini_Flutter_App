@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/app/page/login_page/login_page.dart';
 import 'package:flutter_app/app/page/oauth_processing_page/oauth_processing_page.dart';
-import 'package:flutter_app/core/services/auth/firebase_oauth_sign_in_service.dart';
+import 'package:flutter_app/core/services/auth/deep_link_oauth_service.dart';
 import 'package:flutter_app/core/services/auth/global_oauth_handler.dart';
 import 'package:flutter_app/core/store/auth/auth_initial.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,15 +32,9 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 20));
 
-      final googleExpected = FirebaseOauthSignInService.canShowGoogleButton
-          ? findsOneWidget
-          : findsNothing;
-      final facebookExpected = FirebaseOauthSignInService.canShowFacebookButton
-          ? findsOneWidget
-          : findsNothing;
-
-      expect(find.text('login.oauth.google'), googleExpected);
-      expect(find.text('login.oauth.facebook'), facebookExpected);
+      // Deep Link OAuth 总是显示 Google 和 Facebook 按钮
+      expect(find.text('login.oauth.google'), findsOneWidget);
+      expect(find.text('login.oauth.facebook'), findsOneWidget);
     });
 
     testWidgets('apple button visibility follows platform support flag', (
@@ -56,7 +50,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 20));
 
-      final expected = FirebaseOauthSignInService.canShowAppleButton
+      final expected = DeepLinkOAuthService.canShowAppleButton
           ? findsOneWidget
           : findsNothing;
       expect(find.text('login.oauth.apple'), expected);

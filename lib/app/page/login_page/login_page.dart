@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
@@ -7,8 +6,6 @@ import 'package:flutter_animate/flutter_animate.dart'; // 引入动画库
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/core/providers/auth_provider.dart';
-import 'package:flutter_app/core/services/auth/firebase_oauth_sign_in_service.dart';
-import 'package:flutter_app/core/services/auth/oauth_state_manager.dart';
 import 'package:flutter_app/core/store/auth/auth_provider.dart';
 import 'package:flutter_app/ui/button/button.dart';
 import 'package:flutter_app/ui/form/index.dart';
@@ -24,6 +21,8 @@ import 'package:flutter_app/ui/toast/radix_toast.dart';
 import 'package:flutter_app/utils/form/validation_messages.dart';
 
 import 'package:flutter_app/core/services/auth/oauth_exception.dart';
+import 'package:flutter_app/core/services/auth/deep_link_oauth_service.dart';
+import 'package:flutter_app/core/config/oauth_config.dart';
 
 // 导入全局appRouter
 import 'package:flutter_app/app/routes/app_router.dart';

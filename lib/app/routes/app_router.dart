@@ -14,6 +14,7 @@ import 'package:flutter_app/app/page/treasure_coins_page.dart';
 import 'package:flutter_app/app/routes/route_auth_config.dart';
 import 'package:flutter_app/app/routes/transitions.dart';
 import 'package:flutter_app/core/models/payment.dart';
+import 'package:flutter_app/core/services/auth/global_oauth_handler.dart';
 import 'package:flutter_app/core/store/auth/auth_provider.dart';
 import 'package:flutter_app/ui/chat/chat_search/chat_search_page.dart';
 import 'package:flutter_app/ui/chat/conversation_list_page.dart';
@@ -235,6 +236,72 @@ class AppRouter {
           name: 'oauthProcessing',
           path: '/oauth/processing',
           builder: (context, state) => const OauthProcessingPage(),
+        ),
+
+        // Deep Link OAuth callback route - handles token from backend
+        GoRoute(
+          name: 'oauthCallback',
+          path: '/oauth/callback',
+          builder: (context, state) {
+            debugPrint('GoRouter: Deep Link OAuth callback route matched');
+            debugPrint('Callback URL: ${state.uri}');
+            
+            // Extract token from URL parameters
+            final token = state.uri.queryParameters['token'];
+            final refreshToken = state.uri.queryParameters['refreshToken'];
+            final stateParam = state.uri.queryParameters['state'];
+            
+            if (token != null) {
+              debugPrint('Token received: ${token.substring(0, 20)}...');
+              debugPrint('Refresh token: ${refreshToken?.substring(0, 20)}...');
+              debugPrint('State: $stateParam');
+              
+              // 调用全局处理器处理 Deep Link OAuth 回调
+              // 注意：这里需要异步处理，但路由 builder 是同步的
+              // 所以使用 Future.microtask 在下一帧执行
+              Future.microtask(() async {
+                try {
+                  // 获取 provider（默认为 google，可根据需要从 URL 参数或 state 解析）
+                  final provider = 'google'; // TODO: 从 state 或 URL 参数解析 provider
+                  
+                  // 调用全局处理器保存 token
+                  await GlobalOAuthHandler.handleDeepLinkOAuthCallback(
+                    token: token,
+                    refreshToken: refreshToken ?? '',
+                    state: stateParam ?? '',
+                    provider: provider,
+                    navigateAfterSuccess: true,
+                    showGlobalLoading: true,
+                  );
+                  
+                  debugPrint('GoRouter: Deep Link OAuth processing completed');
+                } catch (e, stackTrace) {
+                  debugPrint('GoRouter: Deep Link OAuth processing failed: $e');
+                  debugPrint('Stack trace: $stackTrace');
+                  
+                  // 即使处理失败，也重定向到首页（避免卡在回调页面）
+                  if (context.mounted) {
+                    context.go('/home');
+                  }
+                }
+              });
+            } else {
+              debugPrint('No token found in callback URL');
+              // 没有 token，直接重定向到首页
+              Future.microtask(() {
+                if (context.mounted) {
+                  context.go('/home');
+                }
+              });
+            }
+            
+            // Show loading indicator while processing
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          },
         ),
 
         // Firebase OAuth callback route - returns empty container, Firebase SDK handles the callback

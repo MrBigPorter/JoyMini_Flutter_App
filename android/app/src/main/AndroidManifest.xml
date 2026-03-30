@@ -75,6 +75,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="joymini" android:host="product" />
                 <data android:scheme="joymini" android:host="home" />
+                <data android:scheme="joymini" android:host="oauth" />
             </intent-filter>
 
             <intent-filter android:autoVerify="true">

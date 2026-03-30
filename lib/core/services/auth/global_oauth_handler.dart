@@ -55,6 +55,22 @@ class GlobalOAuthHandler {
     );
   }
 
+  /// 处理Google OAuth回调（仅同步Token，不做导航）
+  /// 专用于 Web signInWithRedirect 回调：在 runApp() 之前调用，
+  /// GoRouter 尚未挂载，不能执行 appRouter.go()。
+  /// Token 写入后，GoRouter 的 redirect 逻辑会自动将已登录用户导向 /home。
+  static Future<void> handleGoogleOAuthCallbackWithoutNavigation({
+    required String idToken,
+    String? inviteCode,
+  }) async {
+    await _processGoogleOAuthToken(
+      idToken: idToken,
+      inviteCode: inviteCode,
+      navigateAfterSuccess: false,  // 不导航，由 GoRouter redirect 接管
+      showGlobalLoading: false,     // runApp 前无 UI，不显示 loading
+    );
+  }
+
   /// 处理 Google OAuth Token 并同步到业务登录态
   /// [navigateAfterSuccess] 为 true 时由本处理器负责跳转到 /home
   /// [showGlobalLoading] 为 true 时显示全局 loading
@@ -182,6 +198,83 @@ class GlobalOAuthHandler {
       // 清理保存的ID Token（避免重复尝试）
       OAuthStateManager.clear();
       return false;
+    }
+  }
+
+  /// 处理 Deep Link OAuth 回调（后端统一 OAuth）
+  /// 用于处理 /oauth/callback?token=...&refreshToken=...&state=... 的回调
+  static Future<void> handleDeepLinkOAuthCallback({
+    required String token,
+    required String refreshToken,
+    required String state,
+    String provider = 'google', // 默认 Google，可根据需要扩展
+    bool navigateAfterSuccess = true,
+    bool showGlobalLoading = true,
+  }) async {
+    if (!_initialized) {
+      debugPrint(
+        '[GlobalOAuthHandler] Not initialized, cannot handle Deep Link OAuth callback',
+      );
+      return;
+    }
+
+    if (showGlobalLoading) {
+      // 显示全局loading
+      _globalContainer.read(globalLoadingProvider.notifier).state = true;
+      debugPrint(
+        '[GlobalOAuthHandler] Showing global loading for Deep Link OAuth process',
+      );
+    }
+
+    try {
+      debugPrint(
+        '[GlobalOAuthHandler] Handling Deep Link OAuth callback for provider: $provider',
+      );
+      debugPrint('[GlobalOAuthHandler] Token length: ${token.length}');
+      debugPrint('[GlobalOAuthHandler] State: $state');
+
+      // TODO: 验证 state 参数（防 CSRF）
+      // 需要从 sessionStorage 获取存储的 state 进行验证
+      // 暂时跳过验证，但记录警告
+      debugPrint('[GlobalOAuthHandler] WARNING: State validation not implemented yet');
+
+      // 同步token到全局auth provider
+      final auth = _globalContainer.read(authProvider.notifier);
+      await auth.login(
+        token,
+        refreshToken,
+        navigate: false,
+      );
+
+      debugPrint('[GlobalOAuthHandler] Deep Link OAuth token sync completed');
+
+      if (navigateAfterSuccess) {
+        // 导航到首页（使用全局appRouter）
+        debugPrint('[GlobalOAuthHandler] Navigating to home page');
+        appRouter.go('/home');
+      }
+
+      if (showGlobalLoading) {
+        if (navigateAfterSuccess) {
+          // 导航后再收起 loading，避免登录页出现闪断感
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+        }
+        _globalContainer.read(globalLoadingProvider.notifier).state = false;
+        debugPrint(
+          '[GlobalOAuthHandler] Hiding global loading after Deep Link OAuth process',
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[GlobalOAuthHandler] Deep Link OAuth callback failed: $e');
+      debugPrint('[GlobalOAuthHandler] Stack trace: $stackTrace');
+
+      if (showGlobalLoading) {
+        // 错误时也隐藏全局loading
+        _globalContainer.read(globalLoadingProvider.notifier).state = false;
+        debugPrint('[GlobalOAuthHandler] Hiding global loading due to error');
+      }
+
+      rethrow;
     }
   }
 

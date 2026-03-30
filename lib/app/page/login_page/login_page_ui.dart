@@ -43,8 +43,10 @@ extension LoginPageUI on _LoginPageState {
     // 的历史 AsyncLoading 状态（热重载中断、上次登录残留）污染按钮状态
     final isSocialBtnLoading = _socialOauthInFlight;
 
-    final showGoogleButton = FirebaseOauthSignInService.canShowGoogleButton;
-    final showFacebookButton = FirebaseOauthSignInService.canShowFacebookButton;
+    // Deep Link OAuth 总是显示所有支持的按钮
+    final showGoogleButton = true;
+    final showFacebookButton = true;
+    final showAppleButton = DeepLinkOAuthService.canShowAppleButton;
 
     return BaseScaffold(
       body: LayoutBuilder(
@@ -208,6 +210,19 @@ extension LoginPageUI on _LoginPageState {
                                       onPressed: isPageBusy ? null : _loginWithFacebookOauth,
                                       leading: const Icon(Icons.facebook_rounded),
                                       child: Text('login.oauth.facebook'.tr()),
+                                    ),
+                                    SizedBox(height: 16.h),
+                                  ],
+
+                                  if (showAppleButton) ...[
+                                    Button(
+                                      width: double.infinity,
+                                      height: 48.h,
+                                      variant: ButtonVariant.secondary,
+                                      loading: isSocialBtnLoading,
+                                      onPressed: isPageBusy ? null : _loginWithAppleOauth,
+                                      leading: const Icon(Icons.apple_rounded),
+                                      child: Text('login.oauth.apple'.tr()),
                                     ),
                                     SizedBox(height: 16.h),
                                   ],
