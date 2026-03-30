@@ -58,6 +58,10 @@ post_install do |installer|
 
            # 3. 禁用死代码剥离警告
            config.build_settings['GCC_WARN_64_TO_32_BIT_CONVERSION'] = 'NO'
+
+           # 4. 修复 DKPhotoGallery 在 macOS Tahoe/Xcode 26 上的资产编译问题
+           # 跳过资产目录的模拟器设备验证，避免 "Failed to find a suitable device" 错误
+           config.build_settings['ASSETCATALOG_COMPILER_SKIP_SIMULATOR_DEVICE_VALIDATION'] = 'YES'
         end
   end
 end
