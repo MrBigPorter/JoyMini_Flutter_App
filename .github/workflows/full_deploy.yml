@@ -141,8 +141,8 @@ jobs:
       - name: 🚀 Build Web (H5)
         run: |
           rm -rf build/web
-          # 加上 --no-wasm 和 --web-renderer html 救命参数
-          fvm flutter build web --release --web-renderer html --no-wasm --dart-define-from-file=${{ env.ENV_FILE }}
+          # 使用 --no-wasm-dry-run 禁用 WASM 干运行，避免兼容性问题
+          fvm flutter build web --release --no-wasm-dry-run --dart-define-from-file=${{ env.ENV_FILE }}
 
       - name: ☁️ Deploy to Cloudflare Pages
         id: cf_deploy
