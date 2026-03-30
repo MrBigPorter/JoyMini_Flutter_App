@@ -148,8 +148,8 @@ jobs:
           # 清理旧的构建缓存
           rm -rf build/web
           
-          # 构建 Web (使用 HTML 渲染器，避免 WASM 编译问题)
-          fvm flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }} --web-renderer html --no-wasm
+          # 构建 Web (禁用 WASM 干运行，避免兼容性问题)
+          fvm flutter build web --release --dart-define-from-file=${{ env.ENV_FILE }} --no-wasm-dry-run
           
           # 验证构建结果
           if [ ! -d "build/web" ]; then
