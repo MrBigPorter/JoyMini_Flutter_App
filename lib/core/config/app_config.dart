@@ -28,20 +28,6 @@ class AppConfig {
       defaultValue: true
   );
 
-  static const String _googleWebClientIdRaw = String.fromEnvironment(
-    'GOOGLE_WEB_CLIENT_ID',
-    defaultValue: '',
-  );
-
-  static const String _facebookWebAppIdRaw = String.fromEnvironment(
-    'FACEBOOK_WEB_APP_ID',
-    defaultValue: '',
-  );
-
-  static const String _facebookWebSdkVersionRaw = String.fromEnvironment(
-    'FACEBOOK_WEB_SDK_VERSION',
-    defaultValue: 'v19.0',
-  );
 
   // =========================================================
   // 2. 公开 Getters (经过处理的)
@@ -50,9 +36,6 @@ class AppConfig {
   static String get flavor => _flavorRaw;
   static bool get logHttp => _logHttpRaw;
   static bool get isProd => _flavorRaw == 'prod';
-  static String get googleWebClientId => _googleWebClientIdRaw.trim();
-  static String get facebookWebAppId => _facebookWebAppIdRaw.trim();
-  static String get facebookWebSdkVersion => _facebookWebSdkVersionRaw.trim();
 
   /// 获取处理过的 API 域名 (自动修正 Android 模拟器地址)
   static String get apiBaseUrl => _resolveLocalhost(_apiBaseRaw);

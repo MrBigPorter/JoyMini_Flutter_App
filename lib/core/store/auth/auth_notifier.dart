@@ -14,17 +14,17 @@ import '../wallet_store.dart';
 /// AuthNotifier manages the authentication lifecycle of the application.
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(
-      this.ref,
-      this.storage,
-      String? initialAccess,
-      String? initialRefresh,
-      ) : super(
-    AuthState(
-      accessToken: initialAccess,
-      refreshToken: initialRefresh,
-      isAuthenticated: initialAccess != null,
-    ),
-  ) {
+    this.ref,
+    this.storage,
+    String? initialAccess,
+    String? initialRefresh,
+  ) : super(
+        AuthState(
+          accessToken: initialAccess,
+          refreshToken: initialRefresh,
+          isAuthenticated: initialAccess != null,
+        ),
+      ) {
     // Initialize HTTP client token if access token exists
     if (initialAccess != null && initialAccess.isNotEmpty) {
       Http.setToken(initialAccess);
@@ -36,7 +36,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final TokenStorage storage;
 
   /// Handles user login by storing tokens and fetching initial profile data.
-  Future<void> login(String access, String? refresh) async {
+  Future<void> login(
+    String access,
+    String? refresh, {
+    bool navigate = true,
+  }) async {
     Http.setToken(access);
     await storage.save(access, refresh);
 
@@ -46,18 +50,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
       isAuthenticated: true,
     );
 
-    Future.microtask(() => appRouter.go('/home'));
+    if (navigate) {
+      Future.microtask(() => appRouter.go('/home'));
+    }
 
-
-   Future.wait<void>([
-     // Critical Path: Fetch user profile synchronously to ensure UserID is available.
-    ref.read(userProvider.notifier).fetchProfile(),
-    ref.read(walletProvider.notifier).fetchBalance(),
-   ]).then((_) {
-     debugPrint('[Auth] Login: User profile and wallet balance fetched successfully');
-   }).catchError((e) {
-     debugPrint('[Auth] Login: Error fetching user profile or wallet balance - $e');
-   });
+    Future.wait<void>([
+          // Critical Path: Fetch user profile synchronously to ensure UserID is available.
+          ref.read(userProvider.notifier).fetchProfile(),
+          ref.read(walletProvider.notifier).fetchBalance(),
+        ])
+        .then((_) {
+          debugPrint(
+            '[Auth] Login: User profile and wallet balance fetched successfully',
+          );
+        })
+        .catchError((e) {
+          debugPrint(
+            '[Auth] Login: Error fetching user profile or wallet balance - $e',
+          );
+        });
   }
 
   /// Updates current access and refresh tokens.

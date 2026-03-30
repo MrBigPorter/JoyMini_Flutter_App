@@ -112,6 +112,8 @@
         <string>1659905501858558</string>
         <key>FacebookDisplayName</key>
         <string>JoyMini App</string>
+        <key>FacebookAutoLogAppEventsEnabled</key>
+        <true/>
         <key>FacebookAdvertiserIDCollectionEnabled</key>
         <false/>
     </dict>

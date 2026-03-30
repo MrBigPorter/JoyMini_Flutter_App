@@ -205,5 +205,50 @@
 **New Iteration — Sharing Feature Configuration-Based Fix (Completed 2026-03-26)**:
 - [x] **Analysis of hard-coded sharing bridge URLs**.
 
+**New Iteration — OAuth Callback Loading UX Analysis (Completed 2026-03-29)**:
+- [x] **Google OAuth callback loading delay analysis**: Identified delayed loading causes after callback redirect to `/login` (deferred recovery trigger, route-first handling, and loading hide timing).
+- [x] **Solution comparison and difficulty grading**: Added Low/Medium/High方案分级（timing quick fix / dedicated processing page / full orchestration refactor）with risk and effort estimates.
+- [x] **Third-party login documentation update**: Added `OAuth Callback Loading Optimization Summary` to `docs/Features & Integrations/login/THIRD_PARTY_LOGIN_TECHNICAL_GUIDE.md`.
+
+**New Iteration — OAuth Callback Loading Quick Fix Implementation (Completed 2026-03-29)**:
+- [x] **Login recovery trigger timing optimization**: Triggered recovery check directly in `LoginPage.initState` path (while keeping provider reset in microtask for Riverpod lifecycle safety).
+- [x] **Reduced visual delay on login return**: Added token-existence gating and immediate local busy state to avoid late loading feedback and unnecessary flash when no recovery token exists.
+- [x] **Global loading transition smoothing**: Delayed hiding global loading until shortly after route navigation to reduce pre-navigation flicker.
+- [x] **Regression verification update**: Added/adjusted OAuth timing tests (`test/widgets/login_page_oauth_test.dart`) and completed targeted test run.
+
+**New Iteration — OAuth Callback Dedicated Processing Page (Completed 2026-03-29)**:
+- [x] **Dedicated callback processing route**: Added `/oauth/processing` route and redirect target for Firebase callback URLs.
+- [x] **Immediate loading feedback page**: Implemented `OauthProcessingPage` with first-frame loading UI for callback recovery path.
+- [x] **OAuth handler decoupling**: Refactored `GlobalOAuthHandler` to support recovery-only mode (no forced navigation/global loading).
+- [x] **Auth navigation control**: Added optional `navigate` parameter to `AuthNotifier.login()` to prevent double-navigation during processing-page flow.
+- [x] **Login page fallback de-duplication**: Updated login recovery behavior to avoid duplicate recovery when processing page is active.
+- [x] **Regression tests updated**: Extended `test/widgets/login_page_oauth_test.dart` for updated recovery return behavior and processing-page loading rendering.
+
+**New Iteration — Unified Error Handler Implementation (Completed 2026-03-29)**:
+- [x] **Error pattern analysis**: Analyzed 228+ error handling patterns across codebase.
+- [x] **Unified ErrorHandler class**: Created `lib/utils/error_handler.dart` with centralized error handling.
+- [x] **User-friendly messages**: Implemented error message mapping for SocketException, TimeoutException, DioException, etc.
+- [x] **Automatic retry mechanism**: Added `RetryHelper` class with configurable retry logic.
+- [x] **Extension methods**: Provided `withErrorHandling()` and `withRetry()` extensions for easy usage.
+- [x] **Documentation**: Created `docs/ERROR_HANDLER_USAGE.md` with usage guide and migration instructions.
+- [x] **Compilation verified**: Passed `fvm flutter analyze` with no errors.
+
+**Error Handler Features**:
+- ✅ Unified error handling across the app
+- ✅ User-friendly error messages (Chinese)
+- ✅ Automatic retry with exponential backoff
+- ✅ Dio error handling (timeout, connection, status codes)
+- ✅ Extension methods for simplified usage
+- ✅ Error logging and reporting integration ready
+
+**Usage Example**:
+```dart
+// Automatic error handling with Toast
+await apiCall().withErrorHandling(context: 'Loading data');
+
+// Automatic retry with error handling
+await apiCall().withRetry(maxRetries: 3, context: 'Upload file');
+```
+
 ---
 
