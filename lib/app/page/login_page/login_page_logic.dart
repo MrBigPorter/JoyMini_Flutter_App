@@ -50,7 +50,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       'google',
     );
 
-    // 立即显示过渡中的忙碌状态，避免出现“晚一拍”的视觉延迟
+    // 立即显示过渡中的忙碌状态，避免出现"晚一拍"的视觉延迟
     if (mounted && hasRecoverableGoogleToken) {
       setState(() {
         _socialOauthInFlight = true;

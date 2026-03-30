@@ -62,6 +62,12 @@ post_install do |installer|
            # 4. 修复 DKPhotoGallery 在 macOS Tahoe/Xcode 26 上的资产编译问题
            # 跳过资产目录的模拟器设备验证，避免 "Failed to find a suitable device" 错误
            config.build_settings['ASSETCATALOG_COMPILER_SKIP_SIMULATOR_DEVICE_VALIDATION'] = 'YES'
+
+           # 5. 修复 flutter_inappwebview_ios storyboard 编译问题
+           # 跳过 Interface Builder storyboard 编译，避免 Xcode 26 执行上下文错误
+           if target.name == 'flutter_inappwebview_ios'
+             config.build_settings['IBSC_MODULE'] = nil
+           end
         end
   end
 end

@@ -58,10 +58,12 @@ class FirebaseOauthSignInService {
       final UserCredential userCredential;
 
       if (kIsWeb) {
-        // Web: Use signInWithPopup for better UX
-        _log('Google web sign-in using popup');
-        userCredential =
-            await FirebaseAuth.instance.signInWithPopup(googleProvider);
+        // Web: Use signInWithRedirect — avoids popup-blocked / ITP / WebView issues.
+        // The page navigates away to Google; result is handled by
+        // handleWebRedirectResult() called on app startup via getRedirectResult().
+        _log('Google web sign-in using redirect');
+        await FirebaseAuth.instance.signInWithRedirect(googleProvider);
+        return null; // unreachable — page navigates away
       } else {
         // Native: Use signInWithProvider
         _log('Google native sign-in using provider');
@@ -207,10 +209,11 @@ class FirebaseOauthSignInService {
     final UserCredential userCredential;
 
     if (kIsWeb) {
-      // Web: Use signInWithPopup
-      _log('Facebook web sign-in using popup');
-      userCredential =
-          await FirebaseAuth.instance.signInWithPopup(facebookProvider);
+      // Web: Use signInWithRedirect — avoids popup-blocked / ITP / WebView issues.
+      // Result is handled by handleWebRedirectResult() on app startup.
+      _log('Facebook web sign-in using redirect');
+      await FirebaseAuth.instance.signInWithRedirect(facebookProvider);
+      return null; // unreachable — page navigates away
     } else {
       // Android: Use signInWithProvider
       _log('Facebook Android sign-in using provider');
@@ -252,10 +255,11 @@ class FirebaseOauthSignInService {
       final UserCredential userCredential;
 
       if (kIsWeb) {
-        // Web: Use signInWithPopup
-        _log('Apple web sign-in using popup');
-        userCredential =
-            await FirebaseAuth.instance.signInWithPopup(appleProvider);
+        // Web: Use signInWithRedirect — avoids popup-blocked / ITP / WebView issues.
+        // Result is handled by handleWebRedirectResult() on app startup.
+        _log('Apple web sign-in using redirect');
+        await FirebaseAuth.instance.signInWithRedirect(appleProvider);
+        return null; // unreachable — page navigates away
       } else {
         // Native: Use signInWithProvider
         _log('Apple native sign-in using provider');
@@ -284,6 +288,43 @@ class FirebaseOauthSignInService {
     } catch (e) {
       _log('Apple sign-in error: $e');
       rethrow;
+    }
+  }
+
+  /// Web 专用：处理 signInWithRedirect 跳转回来后的 OAuth 结果。
+  /// 必须在 App 启动时（Firebase 初始化 + GlobalOAuthHandler.initialize 完成后）调用一次。
+  /// Native 平台调用此方法是无操作（kIsWeb guard）。
+  ///
+  /// 支持 Google / Apple / Facebook 三种 provider 的 redirect 结果，
+  /// 统一通过 GlobalOAuthHandler.handleGoogleOAuthCallback 完成后续流程
+  /// （后端 API → Token 同步 → 导航）。
+  static Future<void> handleWebRedirectResult() async {
+    if (!kIsWeb) return;
+    try {
+      _log('Web: checking getRedirectResult...');
+      final userCredential = await FirebaseAuth.instance.getRedirectResult();
+
+      if (userCredential.user == null) {
+        _log('Web: no redirect result (normal cold start)');
+        return;
+      }
+
+      _log('Web: redirect result received | email=${userCredential.user?.email} | uid=${userCredential.user?.uid}');
+
+      final idToken = await userCredential.user!.getIdToken();
+      if (idToken == null) {
+        _log('Web: redirect result — failed to get idToken');
+        return;
+      }
+
+      // 复用全局处理器：后端 API → Token 同步 → 导航
+      await GlobalOAuthHandler.handleGoogleOAuthCallback(idToken: idToken);
+      _log('Web: redirect result processed successfully');
+    } on FirebaseAuthException catch (e) {
+      _log('Web: getRedirectResult FirebaseAuthException: ${e.code} - ${e.message}');
+      // 不 rethrow，避免影响正常启动流程
+    } catch (e) {
+      _log('Web: getRedirectResult unknown error: $e');
     }
   }
 

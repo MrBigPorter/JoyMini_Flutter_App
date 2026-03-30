@@ -8,6 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'app/app.dart';
 import 'app/app_startup.dart';
 import 'app/bootstrap.dart';
+import 'core/services/auth/firebase_oauth_sign_in_service.dart';
 import 'core/services/auth/global_oauth_handler.dart';
 import 'utils/pwa_helper_web.dart'
     if (dart.library.io) 'utils/pwa_helper_stub.dart';
@@ -39,6 +40,10 @@ void main() {
     // 初始化全局OAuth处理器（解决Native端OAuth页面销毁问题）
     GlobalOAuthHandler.initialize(container);
     debugPrint(' [架构日志] 全局OAuth处理器已初始化');
+
+    // Web 端：处理 signInWithRedirect 跳转回来后的 OAuth 结果
+    // Native 平台此调用是无操作（内部有 kIsWeb guard），无副作用
+    await FirebaseOauthSignInService.handleWebRedirectResult();
 
     //  核心架构升级：数据屏障！
     // 在这里强制阻断，通过 container.read 手动触发并等待 startup 逻辑跑完。
