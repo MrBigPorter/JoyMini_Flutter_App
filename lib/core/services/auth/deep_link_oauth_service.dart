@@ -12,6 +12,7 @@ import 'deep_link_oauth_service_web_stub.dart'
 /// OAuth Deep Link 异常
 class DeepLinkOAuthException implements Exception {
   final String message;
+
   DeepLinkOAuthException(this.message);
 
   @override
@@ -29,18 +30,47 @@ class DeepLinkOAuthService {
   static bool _initialized = false;
 
   static bool get canShowGoogleButton => true;
+
   static bool get canShowFacebookButton => true;
+
   static bool get canShowAppleButton => true;
+
+  /// 检查后端 OAuth 配置是否正常
+  static Future<bool> checkOAuthConfiguration(String apiBaseUrl) async {
+    try {
+      // 尝试访问 Google OAuth 端点
+      final testUrl = '$apiBaseUrl/auth/google/login?callback=joymini://oauth/callback';
+      final uri = Uri.parse(testUrl);
+      
+      // 检查 URL 是否可以打开
+      final canLaunch = await canLaunchUrl(uri);
+      
+      if (kDebugMode) {
+        debugPrint('[DeepLinkOAuthService] OAuth configuration check: $canLaunch');
+        debugPrint('[DeepLinkOAuthService] Test URL: $testUrl');
+      }
+      
+      return canLaunch;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[DeepLinkOAuthService] OAuth configuration check failed: $e');
+      }
+      return false;
+    }
+  }
 
   /// 初始化 Deep Link 监听
   static void initialize() {
     if (_initialized) return;
 
-    _deepLinkSubscription = _appLinks.uriLinkStream.listen((uri) {
-      _handleDeepLink(uri);
-    }, onError: (err) {
-      debugPrint('[DeepLinkOAuthService] Deep Link Error: $err');
-    });
+    _deepLinkSubscription = _appLinks.uriLinkStream.listen(
+      (uri) {
+        _handleDeepLink(uri);
+      },
+      onError: (err) {
+        debugPrint('[DeepLinkOAuthService] Deep Link Error: $err');
+      },
+    );
 
     _initialized = true;
 
@@ -52,24 +82,50 @@ class DeepLinkOAuthService {
   /// 处理 Deep Link
   static void _handleDeepLink(Uri uri) {
     if (kDebugMode) {
-      debugPrint('[DeepLinkOAuthService] Received Deep Link: $uri');
+      debugPrint('[DeepLinkOAuthService] Received URI: $uri');
     }
 
-    // 只处理 oauth 相关的 Deep Link
+    // 只处理 oauth 相关的 Deep Link (joymini://oauth/callback)
     if (uri.scheme == 'joymini' && uri.host == 'oauth') {
+      if (kDebugMode) {
+        debugPrint('[DeepLinkOAuthService] Processing OAuth Deep Link: $uri');
+      }
+
       final token = uri.queryParameters['token'];
       final refreshToken = uri.queryParameters['refreshToken'];
 
-      if (token != null && _loginCompleter != null && !_loginCompleter!.isCompleted) {
+      if (token != null &&
+          _loginCompleter != null &&
+          !_loginCompleter!.isCompleted) {
         _loginCompleter!.complete({
           'token': token,
           'refreshToken': refreshToken ?? '',
         });
 
         if (kDebugMode) {
-          debugPrint('[DeepLinkOAuthService] OAuth token received: ${token.substring(0, 20)}...');
+          debugPrint(
+            '[DeepLinkOAuthService] OAuth token received: ${token.substring(0, 20)}...',
+          );
+        }
+      } else if (kDebugMode) {
+        if (token == null) {
+          debugPrint('[DeepLinkOAuthService] No token found in Deep Link');
+        }
+        if (_loginCompleter == null) {
+          debugPrint('[DeepLinkOAuthService] No login completer found');
+        } else if (_loginCompleter!.isCompleted) {
+          debugPrint(
+            '[DeepLinkOAuthService] Login completer already completed',
+          );
         }
       }
+    } else if (uri.scheme == 'https' || uri.scheme == 'http') {
+      // 忽略 HTTP/HTTPS URL，这些不是 OAuth Deep Link 回调
+      if (kDebugMode) {
+        debugPrint('[DeepLinkOAuthService] Ignoring HTTP/HTTPS URL: $uri');
+      }
+    } else if (kDebugMode) {
+      debugPrint('[DeepLinkOAuthService] Ignoring non-OAuth Deep Link: $uri');
     }
   }
 
@@ -107,7 +163,7 @@ class DeepLinkOAuthService {
   /// 获取 Web 应用当前 origin
   static String _getWebOrigin() {
     if (!kIsWeb) return 'http://localhost:4000';
-    
+
     // 条件导入 dart:html
     try {
       // 使用动态导入避免编译错误
@@ -143,40 +199,37 @@ class DeepLinkOAuthService {
     String apiBaseUrl, {
     String? inviteCode,
   }) async {
-    // 生成 state 参数（防CSRF）
     final state = _generateState();
-    
-    // 获取当前 Web 应用的 origin
     final origin = _getWebOrigin();
     final redirectUri = '$origin/oauth/callback';
-    
-    // 构建企业级 OAuth URL
-    var loginUrl = '$apiBaseUrl/api/v1/auth/$provider/login'
+
+    // 🚀 安全处理 BaseUrl：去掉末尾多余的斜杠，防止拼出双斜杠 (//)
+    final cleanBaseUrl = apiBaseUrl.endsWith('/')
+        ? apiBaseUrl.substring(0, apiBaseUrl.length - 1)
+        : apiBaseUrl;
+
+    // 🚀 核心修改：去掉 /api/v1，匹配 Nginx 的 ^~ /auth/ 规则
+    var loginPath =
+        '/auth/$provider/login'
         '?state=${Uri.encodeComponent(state)}'
         '&redirect_uri=${Uri.encodeComponent(redirectUri)}';
-    
-    // 添加邀请码（如果有）
+
     if (inviteCode != null && inviteCode.isNotEmpty) {
-      loginUrl += '&inviteCode=${Uri.encodeComponent(inviteCode)}';
+      loginPath += '&inviteCode=${Uri.encodeComponent(inviteCode)}';
     }
+
+    final loginUrl = cleanBaseUrl + loginPath;
 
     if (kDebugMode) {
       debugPrint('[DeepLinkOAuthService] Web OAuth URL: $loginUrl');
-      debugPrint('[DeepLinkOAuthService] State: $state');
-      debugPrint('[DeepLinkOAuthService] Redirect URI: $redirectUri');
     }
 
-    // 存储 state 到 sessionStorage（供回调验证）
     if (kIsWeb) {
       try {
         _storeStateInSession(provider, state);
       } catch (e) {
         debugPrint('[DeepLinkOAuthService] Failed to store state: $e');
       }
-    }
-
-    // 企业级做法：当前窗口跳转（非新标签页）
-    if (kIsWeb) {
       try {
         _redirectToUrl(loginUrl);
       } catch (e) {
@@ -184,13 +237,10 @@ class DeepLinkOAuthService {
       }
     }
 
-    // Web 端无法使用 Deep Link 回调，等待后端重定向回来
-    // 后端会将 token 存入 cookie 并重定向到 /dashboard
-    // 这里返回一个空的 Map，实际登录由后端 cookie 处理
     await Future.delayed(const Duration(seconds: 2));
     throw DeepLinkOAuthException(
       'Web OAuth initiated. Please check your browser for completion.\n'
-      'If not redirected automatically, please refresh the page.'
+      'If not redirected automatically, please refresh the page.',
     );
   }
 
@@ -200,38 +250,101 @@ class DeepLinkOAuthService {
     String apiBaseUrl, {
     String? inviteCode,
   }) async {
-    // 确保 Deep Link 监听已初始化
     initialize();
-
-    // 创建 Completer 等待登录结果
     _loginCompleter = Completer<Map<String, String>>();
 
     try {
-      // 构建回调 URL
       final callback = 'joymini://oauth/callback';
-      var loginUrl = '$apiBaseUrl/api/v1/auth/$provider/login?callback=${Uri.encodeComponent(callback)}';
 
-      // 添加邀请码（如果有）
+      // 🚀 安全处理 BaseUrl
+      final cleanBaseUrl = apiBaseUrl.endsWith('/')
+          ? apiBaseUrl.substring(0, apiBaseUrl.length - 1)
+          : apiBaseUrl;
+
+      // 🚀 核心修改：去掉 /api/v1
+      var loginPath =
+          '/auth/$provider/login?callback=${Uri.encodeComponent(callback)}';
+
       if (inviteCode != null && inviteCode.isNotEmpty) {
-        loginUrl += '&inviteCode=${Uri.encodeComponent(inviteCode)}';
+        loginPath += '&inviteCode=${Uri.encodeComponent(inviteCode)}';
       }
 
+      final loginUrl = cleanBaseUrl + loginPath;
+
+      // 🚨 照妖镜：打印准备发射的完整 URL
       if (kDebugMode) {
-        debugPrint('[DeepLinkOAuthService] Mobile OAuth URL: $loginUrl');
+        debugPrint('\n====================================');
+        debugPrint('🚀 [DeepLinkOAuth] 准备发射的完整 URL:');
+        debugPrint(loginUrl);
+        debugPrint('====================================\n');
       }
 
-      // 启动外部浏览器进行 OAuth（华为设备兼容性更好）
       final uri = Uri.parse(loginUrl);
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
 
-      if (!launched) {
-        throw DeepLinkOAuthException('Failed to launch OAuth URL');
+      // 🛡️ 关键修复：在打开 OAuth URL 前，暂时取消 app_links 监听
+      // 防止 Android 系统将 URL 发送回应用
+      if (_deepLinkSubscription != null) {
+        debugPrint('🛡️ [DeepLinkOAuth] 暂时取消 app_links 监听，防止 URL 被错误捕获');
+        _deepLinkSubscription!.pause();
       }
 
-      // 等待 Deep Link 回调（超时60秒）
+      try {
+        // 首先检查 URL 是否可以打开
+        final canLaunch = await canLaunchUrl(uri);
+        if (!canLaunch) {
+          debugPrint('❌ [DeepLinkOAuth] canLaunchUrl 返回 false！URL: $loginUrl');
+          throw DeepLinkOAuthException(
+            'Cannot launch OAuth URL. Check URL format.',
+          );
+        }
+
+        debugPrint('✅ [DeepLinkOAuth] canLaunchUrl 返回 true，准备打开 URL');
+
+        // 使用 inAppBrowserView 模式（更好的用户体验，减少上下文切换）
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.inAppBrowserView,
+        );
+
+        // 🚨 如果发射失败，尝试备用方案
+        if (!launched) {
+          debugPrint('❌ [DeepLinkOAuth] inAppBrowserView 模式失败！URL: $loginUrl');
+          debugPrint('❌ [DeepLinkOAuth] 尝试使用 externalApplication 模式...');
+
+          // 尝试使用 externalApplication 模式作为备用方案
+          final launchedExternal = await launchUrl(
+            uri,
+            mode: LaunchMode.externalApplication,
+          );
+
+          if (!launchedExternal) {
+            debugPrint('❌ [DeepLinkOAuth] externalApplication 也失败了！');
+            debugPrint('❌ [DeepLinkOAuth] 尝试使用 platformDefault 模式...');
+
+            // 最后尝试 platformDefault 模式
+            final launchedDefault = await launchUrl(
+              uri,
+              mode: LaunchMode.platformDefault,
+            );
+
+            if (!launchedDefault) {
+              debugPrint('❌ [DeepLinkOAuth] 所有模式都失败了！');
+              throw DeepLinkOAuthException(
+                'Failed to launch OAuth URL. Check URL format or device browser availability.',
+              );
+            }
+          }
+        }
+
+        debugPrint('✅ [DeepLinkOAuth] URL 已成功打开，等待 Deep Link 回调...');
+      } finally {
+        // 恢复 app_links 监听，等待真正的 Deep Link 回调
+        if (_deepLinkSubscription != null) {
+          debugPrint('🛡️ [DeepLinkOAuth] 恢复 app_links 监听，等待 Deep Link 回调');
+          _deepLinkSubscription!.resume();
+        }
+      }
+
       final result = await _loginCompleter!.future.timeout(
         const Duration(seconds: 60),
         onTimeout: () {
@@ -256,11 +369,18 @@ class DeepLinkOAuthService {
     String apiBaseUrl, {
     String? inviteCode,
   }) async {
-    // 企业级做法：平台检测 + 差异实现
     if (kIsWeb) {
-      return _webLoginWithProvider(provider, apiBaseUrl, inviteCode: inviteCode);
+      return _webLoginWithProvider(
+        provider,
+        apiBaseUrl,
+        inviteCode: inviteCode,
+      );
     } else {
-      return _mobileLoginWithProvider(provider, apiBaseUrl, inviteCode: inviteCode);
+      return _mobileLoginWithProvider(
+        provider,
+        apiBaseUrl,
+        inviteCode: inviteCode,
+      );
     }
   }
 

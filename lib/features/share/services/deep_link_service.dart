@@ -50,6 +50,18 @@ class DeepLinkService {
       return;
     }
     
+    // 🛡️ 关键修复：忽略 OAuth 相关的 HTTP/HTTPS URL
+    // 这些 URL 应该由浏览器处理，而不是应用
+    if (uri.scheme == 'https' || uri.scheme == 'http') {
+      final path = uri.path;
+      if (path.contains('/auth/') && (path.contains('/google/login') || 
+                                      path.contains('/facebook/login') || 
+                                      path.contains('/apple/login'))) {
+        debugPrint('JoyMini [DeepLink] Ignoring OAuth login URL: $uri');
+        return;
+      }
+    }
+    
     // 移除老的Firebase OAuth回调URL过滤，使用Deep Link OAuth系统
     // Firebase OAuth回调现在由Deep Link OAuth服务处理
 

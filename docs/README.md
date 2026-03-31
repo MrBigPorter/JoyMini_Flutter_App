@@ -81,6 +81,7 @@ keytool -genkey -v -keystore android/app/upload-keystore.jks -keyalg RSA -keysiz
 
 
 测试
+keytool -genkey -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 keytool -exportcert -alias androiddebugkey -keystore android/app/debug.keystore | openssl sha1 -binary | openssl base64
 (密码默认固定为：android)
 ```
