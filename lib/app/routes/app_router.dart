@@ -295,12 +295,9 @@ class AppRouter {
               });
             }
             
-            // Show loading indicator while processing
-            return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
+            // 返回空白页面，不显示额外的loading
+            // GlobalOAuthHandler已经处理了全局loading
+            return const SizedBox.shrink();
           },
         ),
 
@@ -583,17 +580,23 @@ class AppRouter {
         // Firebase OAuth回调现在由Deep Link OAuth服务处理
 
         // 拦截原生协议
-        if (uri.scheme == 'joymini' && uri.host == 'product') {
-          final pid = uri.pathSegments.isNotEmpty
-              ? uri.pathSegments.first
-              : uri.queryParameters['pid'];
-          if (pid != null) {
-            final gid =
-                uri.queryParameters['groupId'] ?? uri.queryParameters['gid'];
-            // 这里重定向后，GoRouter 会直接去目的地，DeepLinkService 就会被上面的时间锁拦住
-            return gid != null
-                ? '/product-detail/$pid?groupId=$gid'
-                : '/product-detail/$pid';
+        if (uri.scheme == 'joymini') {
+          if (uri.host == 'product') {
+            final pid = uri.pathSegments.isNotEmpty
+                ? uri.pathSegments.first
+                : uri.queryParameters['pid'];
+            if (pid != null) {
+              final gid =
+                  uri.queryParameters['groupId'] ?? uri.queryParameters['gid'];
+              // 这里重定向后，GoRouter 会直接去目的地，DeepLinkService 就会被上面的时间锁拦住
+              return gid != null
+                  ? '/product-detail/$pid?groupId=$gid'
+                  : '/product-detail/$pid';
+            }
+          } else if (uri.host == 'oauth') {
+            // 处理 joymini://oauth/callback 回调
+            // 重定向到 /oauth/callback 路由，让路由处理器处理 token
+            return '/oauth/callback${uri.query.isNotEmpty ? '?${uri.query}' : ''}';
           }
         }
 

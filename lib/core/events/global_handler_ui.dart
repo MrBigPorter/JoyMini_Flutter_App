@@ -33,7 +33,7 @@ extension GlobalHandlerUIExtension on _GlobalHandlerState {
                 height: 32.w,
                 child: CircularProgressIndicator(
                   strokeWidth: 3.w,
-                  valueColor: AlwaysStoppedAnimation<Color>(context.utilityBrand500),
+                  valueColor: AlwaysStoppedAnimation<Color>(context.bgBrandPrimary),
                 ),
               ),
               SizedBox(height: 8.h),

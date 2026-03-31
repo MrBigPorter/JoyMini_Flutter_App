@@ -19,8 +19,27 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   void initState() {
     super.initState();
 
+    // 添加页面返回监听
+    if (isAppRouterReady) {
+      appRouter.routeInformationProvider.addListener(_onRouteChanged);
+    }
+
     // 移除老OAuth Provider重置逻辑，Deep Link OAuth不需要
     _checkForOAuthRecovery();
+  }
+
+  void _onRouteChanged() {
+    if (!mounted) return;
+    
+    final currentPath = appRouter.routeInformationProvider.value.uri.path;
+    if (currentPath != '/login' && _socialOauthInFlight) {
+      // 如果离开登录页但OAuth仍在进行中，取消OAuth并重置状态
+      debugPrint('[LoginPage] Route changed away from login, cancelling OAuth');
+      DeepLinkOAuthService.cancelLogin();
+      if (mounted) {
+        setState(() => _socialOauthInFlight = false);
+      }
+    }
   }
 
   Future<void> _checkForOAuthRecovery() async {
@@ -252,6 +271,16 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   @override
   void dispose() {
+    // 取消所有进行中的 OAuth 登录
+    DeepLinkOAuthService.cancelLogin();
+    // 确保按钮 loading 状态被重置
+    if (_socialOauthInFlight) {
+      _socialOauthInFlight = false;
+    }
+    // 移除路由监听
+    if (isAppRouterReady) {
+      appRouter.routeInformationProvider.removeListener(_onRouteChanged);
+    }
     cd.dispose();
     super.dispose();
   }

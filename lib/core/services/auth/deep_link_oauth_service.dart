@@ -394,15 +394,21 @@ class DeepLinkOAuthService {
     DeepLinkOAuthServiceWeb.redirectToUrl(url);
   }
 
-  /// 取消登录
+  /// 取消登录（用户主动取消或页面销毁）
   static void cancelLogin() {
     if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
+      if (kDebugMode) {
+        debugPrint('[DeepLinkOAuthService] Cancelling pending OAuth login');
+      }
       _loginCompleter!.completeError(
         DeepLinkOAuthException('Login cancelled by user'),
       );
       _loginCompleter = null;
     }
   }
+
+  /// 获取当前是否正在进行 OAuth 登录
+  static bool get isOAuthInProgress => _loginCompleter != null && !_loginCompleter!.isCompleted;
 
   /// 销毁资源
   static void dispose() {
