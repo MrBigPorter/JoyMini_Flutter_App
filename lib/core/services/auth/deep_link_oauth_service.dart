@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// 条件导入 Web 平台实现
 import 'deep_link_oauth_service_web_stub.dart'
     if (dart.library.html) 'deep_link_oauth_service_web.dart';
+import 'oauth_web_view_page.dart';
 
 /// OAuth Deep Link 异常
 class DeepLinkOAuthException implements Exception {
@@ -19,6 +21,96 @@ class DeepLinkOAuthException implements Exception {
   String toString() => message;
 }
 
+/// 内嵌 OAuth 浏览器
+/// 在我们自己的 WebView 里跑 OAuth 流程，拦截 joymini:// 回调后主动关闭，
+/// 彻底解决「授权完成后浏览器页面残留」的问题。
+class _OAuthInAppBrowser extends InAppBrowser {
+  final Completer<Map<String, String>> completer;
+  bool _handled = false;
+
+  _OAuthInAppBrowser({required this.completer});
+
+  /// 检测到 joymini://oauth/callback 时提取 token 并关闭浏览器
+  bool _interceptOAuthUrl(dynamic rawUrl) {
+    Uri? uri;
+    if (rawUrl is Uri) {
+      uri = rawUrl;
+    } else if (rawUrl is WebUri) {
+      uri = Uri.tryParse(rawUrl.toString());
+    } else if (rawUrl is String) {
+      uri = Uri.tryParse(rawUrl);
+    }
+
+    if (uri == null) return false;
+    if (uri.scheme != 'joymini' || uri.host != 'oauth') return false;
+    if (_handled || completer.isCompleted) return false;
+
+    _handled = true;
+    final token = uri.queryParameters['token'];
+    final refreshToken = uri.queryParameters['refreshToken'];
+
+    // 关闭浏览器（我们自己的 WebView，直接 close() 可靠）
+    close().catchError((_) {});
+
+    if (token != null && token.isNotEmpty) {
+      if (kDebugMode) {
+        debugPrint('[OAuthBrowser] ✅ Token received, closing browser');
+      }
+      completer.complete({'token': token, 'refreshToken': refreshToken ?? ''});
+    } else {
+      completer.completeError(
+        DeepLinkOAuthException('No token found in OAuth callback URL'),
+      );
+    }
+    return true;
+  }
+
+  /// shouldOverrideUrlLoading 是最可靠的拦截点：
+  /// WebView 试图跳转到 joymini:// 时，在加载前就被我们捕获
+  @override
+  Future<NavigationActionPolicy?> shouldOverrideUrlLoading(
+    NavigationAction navigationAction,
+  ) async {
+    final url = navigationAction.request.url;
+    if (kDebugMode) {
+      debugPrint('[OAuthBrowser] shouldOverrideUrlLoading: $url');
+    }
+    if (url != null && url.scheme == 'joymini') {
+      _interceptOAuthUrl(url);
+      return NavigationActionPolicy.CANCEL;
+    }
+    return NavigationActionPolicy.ALLOW;
+  }
+
+  /// onLoadStart 作为双重保险（部分 Android 版本顺序不同）
+  @override
+  void onLoadStart(Uri? url) {
+    if (kDebugMode) debugPrint('[OAuthBrowser] onLoadStart: $url');
+    _interceptOAuthUrl(url);
+  }
+
+  /// onLoadError 兜底：WKWebView（iOS）在遇到自定义 scheme 时
+  /// 可能先触发错误事件，在这里同样尝试提取 token
+  @override
+  void onLoadError(Uri? url, int code, String message) {
+    if (kDebugMode) {
+      debugPrint('[OAuthBrowser] onLoadError: $url  code=$code  msg=$message');
+    }
+    _interceptOAuthUrl(url);
+  }
+
+  /// 用户手动关闭浏览器（按返回键 / 点 X）
+  @override
+  void onExit() {
+    if (kDebugMode) debugPrint('[OAuthBrowser] onExit - user closed browser');
+    if (!completer.isCompleted) {
+      completer.completeError(
+        DeepLinkOAuthException('Login cancelled by user'),
+      );
+    }
+  }
+}
+
 /// 后端统一 Deep Link OAuth 登录服务
 /// 支持 Google、Facebook、Apple 三种 Provider
 class DeepLinkOAuthService {
@@ -28,6 +120,8 @@ class DeepLinkOAuthService {
   static StreamSubscription<Uri>? _deepLinkSubscription;
   static Completer<Map<String, String>>? _loginCompleter;
   static bool _initialized = false;
+  // 当前活跃的 InAppBrowser（用于 cancelLogin 时关闭）
+  static _OAuthInAppBrowser? _activeBrowser;
 
   static bool get canShowGoogleButton => true;
 
@@ -97,6 +191,8 @@ class DeepLinkOAuthService {
       if (token != null &&
           _loginCompleter != null &&
           !_loginCompleter!.isCompleted) {
+        // 注：InAppBrowser 流程里这里不会触发（InAppBrowser 内部已拦截）
+        // 这里作为 app_links 回退兜底（比如用外部浏览器打开的情况）
         _loginCompleter!.complete({
           'token': token,
           'refreshToken': refreshToken ?? '',
@@ -104,7 +200,7 @@ class DeepLinkOAuthService {
 
         if (kDebugMode) {
           debugPrint(
-            '[DeepLinkOAuthService] OAuth token received: ${token.substring(0, 20)}...',
+            '[DeepLinkOAuthService] OAuth token received via app_links: ${token.substring(0, 20)}...',
           );
         }
       } else if (kDebugMode) {
@@ -130,27 +226,31 @@ class DeepLinkOAuthService {
   }
 
   /// 使用 Google 登录
+  /// [context] 不为空时使用 Flutter 原生页面（推荐，有返回键 + 刘海适配）
   static Future<Map<String, String>> loginWithGoogle({
     required String apiBaseUrl,
     String? inviteCode,
+    BuildContext? context,
   }) async {
-    return _loginWithProvider('google', apiBaseUrl, inviteCode: inviteCode);
+    return _loginWithProvider('google', apiBaseUrl, inviteCode: inviteCode, context: context);
   }
 
   /// 使用 Facebook 登录
   static Future<Map<String, String>> loginWithFacebook({
     required String apiBaseUrl,
     String? inviteCode,
+    BuildContext? context,
   }) async {
-    return _loginWithProvider('facebook', apiBaseUrl, inviteCode: inviteCode);
+    return _loginWithProvider('facebook', apiBaseUrl, inviteCode: inviteCode, context: context);
   }
 
   /// 使用 Apple 登录
   static Future<Map<String, String>> loginWithApple({
     required String apiBaseUrl,
     String? inviteCode,
+    BuildContext? context,
   }) async {
-    return _loginWithProvider('apple', apiBaseUrl, inviteCode: inviteCode);
+    return _loginWithProvider('apple', apiBaseUrl, inviteCode: inviteCode, context: context);
   }
 
   /// 生成安全的随机 state 参数（防CSRF）
@@ -203,12 +303,12 @@ class DeepLinkOAuthService {
     final origin = _getWebOrigin();
     final redirectUri = '$origin/oauth/callback';
 
-    // 🚀 安全处理 BaseUrl：去掉末尾多余的斜杠，防止拼出双斜杠 (//)
+    //安全处理 BaseUrl：去掉末尾多余的斜杠，防止拼出双斜杠 (//)
     final cleanBaseUrl = apiBaseUrl.endsWith('/')
         ? apiBaseUrl.substring(0, apiBaseUrl.length - 1)
         : apiBaseUrl;
 
-    // 🚀 核心修改：去掉 /api/v1，匹配 Nginx 的 ^~ /auth/ 规则
+    //核心修改：去掉 /api/v1，匹配 Nginx 的 ^~ /auth/ 规则
     var loginPath =
         '/auth/$provider/login'
         '?state=${Uri.encodeComponent(state)}'
@@ -245,120 +345,85 @@ class DeepLinkOAuthService {
   }
 
   /// 移动端 OAuth 登录
+  /// - 有 context：推 OAuthWebViewPage（有返回键 / 刘海适配，推荐）
+  /// - 无 context：降级到 InAppBrowser（兼容旧调用）
   static Future<Map<String, String>> _mobileLoginWithProvider(
     String provider,
     String apiBaseUrl, {
     String? inviteCode,
+    BuildContext? context,
   }) async {
-    initialize();
-    _loginCompleter = Completer<Map<String, String>>();
+    final cleanBaseUrl = apiBaseUrl.endsWith('/')
+        ? apiBaseUrl.substring(0, apiBaseUrl.length - 1)
+        : apiBaseUrl;
 
-    try {
-      final callback = 'joymini://oauth/callback';
+    var loginPath =
+        '/auth/$provider/login?callback=${Uri.encodeComponent('joymini://oauth/callback')}';
 
-      // 🚀 安全处理 BaseUrl
-      final cleanBaseUrl = apiBaseUrl.endsWith('/')
-          ? apiBaseUrl.substring(0, apiBaseUrl.length - 1)
-          : apiBaseUrl;
+    if (inviteCode != null && inviteCode.isNotEmpty) {
+      loginPath += '&inviteCode=${Uri.encodeComponent(inviteCode)}';
+    }
 
-      // 🚀 核心修改：去掉 /api/v1
-      var loginPath =
-          '/auth/$provider/login?callback=${Uri.encodeComponent(callback)}';
+    final loginUrl = cleanBaseUrl + loginPath;
 
-      if (inviteCode != null && inviteCode.isNotEmpty) {
-        loginPath += '&inviteCode=${Uri.encodeComponent(inviteCode)}';
-      }
+    if (kDebugMode) {
+      debugPrint('\n====================================');
+      debugPrint(' [DeepLinkOAuth] OAuth URL: $loginUrl');
+      debugPrint('   方式: ${(context != null) ? "Flutter 页面" : "InAppBrowser"}');
+      debugPrint('====================================\n');
+    }
 
-      final loginUrl = cleanBaseUrl + loginPath;
-
-      // 🚨 照妖镜：打印准备发射的完整 URL
-      if (kDebugMode) {
-        debugPrint('\n====================================');
-        debugPrint('🚀 [DeepLinkOAuth] 准备发射的完整 URL:');
-        debugPrint(loginUrl);
-        debugPrint('====================================\n');
-      }
-
-      final uri = Uri.parse(loginUrl);
-
-      // 🛡️ 关键修复：在打开 OAuth URL 前，暂时取消 app_links 监听
-      // 防止 Android 系统将 URL 发送回应用
-      if (_deepLinkSubscription != null) {
-        debugPrint('🛡️ [DeepLinkOAuth] 暂时取消 app_links 监听，防止 URL 被错误捕获');
-        _deepLinkSubscription!.pause();
-      }
-
-      try {
-        // 首先检查 URL 是否可以打开
-        final canLaunch = await canLaunchUrl(uri);
-        if (!canLaunch) {
-          debugPrint('❌ [DeepLinkOAuth] canLaunchUrl 返回 false！URL: $loginUrl');
-          throw DeepLinkOAuthException(
-            'Cannot launch OAuth URL. Check URL format.',
-          );
-        }
-
-        debugPrint('✅ [DeepLinkOAuth] canLaunchUrl 返回 true，准备打开 URL');
-
-        // 使用 inAppBrowserView 模式（更好的用户体验，减少上下文切换）
-        final launched = await launchUrl(
-          uri,
-          mode: LaunchMode.inAppBrowserView,
-        );
-
-        // 🚨 如果发射失败，尝试备用方案
-        if (!launched) {
-          debugPrint('❌ [DeepLinkOAuth] inAppBrowserView 模式失败！URL: $loginUrl');
-          debugPrint('❌ [DeepLinkOAuth] 尝试使用 externalApplication 模式...');
-
-          // 尝试使用 externalApplication 模式作为备用方案
-          final launchedExternal = await launchUrl(
-            uri,
-            mode: LaunchMode.externalApplication,
-          );
-
-          if (!launchedExternal) {
-            debugPrint('❌ [DeepLinkOAuth] externalApplication 也失败了！');
-            debugPrint('❌ [DeepLinkOAuth] 尝试使用 platformDefault 模式...');
-
-            // 最后尝试 platformDefault 模式
-            final launchedDefault = await launchUrl(
-              uri,
-              mode: LaunchMode.platformDefault,
-            );
-
-            if (!launchedDefault) {
-              debugPrint('❌ [DeepLinkOAuth] 所有模式都失败了！');
-              throw DeepLinkOAuthException(
-                'Failed to launch OAuth URL. Check URL format or device browser availability.',
-              );
-            }
-          }
-        }
-
-        debugPrint('✅ [DeepLinkOAuth] URL 已成功打开，等待 Deep Link 回调...');
-      } finally {
-        // 恢复 app_links 监听，等待真正的 Deep Link 回调
-        if (_deepLinkSubscription != null) {
-          debugPrint('🛡️ [DeepLinkOAuth] 恢复 app_links 监听，等待 Deep Link 回调');
-          _deepLinkSubscription!.resume();
-        }
-      }
-
-      final result = await _loginCompleter!.future.timeout(
-        const Duration(seconds: 60),
-        onTimeout: () {
-          throw DeepLinkOAuthException('OAuth timeout after 60 seconds');
-        },
+    // ── 优先：Flutter 原生页面（有 AppBar 关闭按钮 + SafeArea 刘海适配）──
+    if (context != null && context.mounted) {
+      final result = await Navigator.of(context).push<Map<String, String>?>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => OAuthWebViewPage(loginUrl: loginUrl, provider: provider),
+        ),
       );
 
-      return result;
+      if (result != null) return result;
+      throw DeepLinkOAuthException('Login cancelled by user');
+    }
+
+    // ── 降级：InAppBrowser（context 不可用时的兜底）────────────────────────
+    _loginCompleter = Completer<Map<String, String>>();
+    try {
+      final browser = _OAuthInAppBrowser(completer: _loginCompleter!);
+      _activeBrowser = browser;
+
+      await browser.openUrlRequest(
+        urlRequest: URLRequest(url: WebUri(loginUrl)),
+        settings: InAppBrowserClassSettings(
+          browserSettings: InAppBrowserSettings(
+            hideUrlBar: true,
+            hideToolbarTop: defaultTargetPlatform != TargetPlatform.iOS,
+            hideProgressBar: false,
+          ),
+          webViewSettings: InAppWebViewSettings(
+            useShouldOverrideUrlLoading: true,
+            javaScriptEnabled: true,
+            userAgent:
+                'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+          ),
+        ),
+      );
+
+      return await _loginCompleter!.future.timeout(
+        const Duration(seconds: 120),
+        onTimeout: () {
+          browser.close().catchError((_) {});
+          throw DeepLinkOAuthException('OAuth timeout after 120 seconds');
+        },
+      );
     } catch (e) {
       if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
         _loginCompleter!.completeError(e);
       }
       rethrow;
     } finally {
+      _activeBrowser = null;
       _loginCompleter = null;
     }
   }
@@ -368,19 +433,12 @@ class DeepLinkOAuthService {
     String provider,
     String apiBaseUrl, {
     String? inviteCode,
+    BuildContext? context,
   }) async {
     if (kIsWeb) {
-      return _webLoginWithProvider(
-        provider,
-        apiBaseUrl,
-        inviteCode: inviteCode,
-      );
+      return _webLoginWithProvider(provider, apiBaseUrl, inviteCode: inviteCode);
     } else {
-      return _mobileLoginWithProvider(
-        provider,
-        apiBaseUrl,
-        inviteCode: inviteCode,
-      );
+      return _mobileLoginWithProvider(provider, apiBaseUrl, inviteCode: inviteCode, context: context);
     }
   }
 
@@ -396,6 +454,10 @@ class DeepLinkOAuthService {
 
   /// 取消登录（用户主动取消或页面销毁）
   static void cancelLogin() {
+    // 关闭 InAppBrowser（如果还开着）
+    _activeBrowser?.close().catchError((_) {});
+    _activeBrowser = null;
+
     if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
       if (kDebugMode) {
         debugPrint('[DeepLinkOAuthService] Cancelling pending OAuth login');
@@ -409,6 +471,9 @@ class DeepLinkOAuthService {
 
   /// 获取当前是否正在进行 OAuth 登录
   static bool get isOAuthInProgress => _loginCompleter != null && !_loginCompleter!.isCompleted;
+
+  /// 是否正在使用 InAppBrowser 降级模式（决定生命周期 Observer 是否需要自动取消）
+  static bool get isInAppBrowserMode => _activeBrowser != null;
 
   /// 销毁资源
   static void dispose() {

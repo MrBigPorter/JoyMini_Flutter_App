@@ -40,24 +40,22 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   void handleLifecycleChange(AppLifecycleState state) {
     if (!_socialOauthInFlight || _isSuccessRedirecting) return;
 
+    // Flutter 页面模式：OAuth 页面就在 Navigator 栈里，
+    // 用户切换 App 再回来仍可继续完成授权，不需要自动取消
+    // （降级 InAppBrowser 模式才需要自动取消）
+    if (!DeepLinkOAuthService.isInAppBrowserMode) return;
+
     if (state == AppLifecycleState.paused) {
-      // App 进入后台，记录标记（OAuth 浏览器已打开）
       _appWentToBackground = true;
       _cancelAfterResumeTimer?.cancel();
-      debugPrint('[LoginPage] App went to background during OAuth, will check on resume');
+      debugPrint('[LoginPage] App went to background during OAuth (InAppBrowser mode)');
     } else if (state == AppLifecycleState.resumed && _appWentToBackground) {
-      // App 从后台恢复，用户可能关闭了浏览器/取消了授权
       _appWentToBackground = false;
       _cancelAfterResumeTimer?.cancel();
-      // 给 3 秒 grace period 等待 deep link 回调
-      // 如果 3 秒内收到 deep link → 登录成功，timer 会被取消
-      // 如果 3 秒内没有 deep link → 用户取消了，自动清除 loading
       _cancelAfterResumeTimer = Timer(const Duration(seconds: 3), () {
         if (!mounted || !_socialOauthInFlight || _isSuccessRedirecting) return;
-        debugPrint('[LoginPage] No deep link after resume, user likely cancelled OAuth');
+        debugPrint('[LoginPage] No deep link after resume, auto-cancelling OAuth');
         DeepLinkOAuthService.cancelLogin();
-        // cancelLogin 会触发 completeError → catch 块 → finally 块 setState
-        // 这里加一道保险：直接重置（防止 completer 已释放的边缘情况）
         if (mounted && _socialOauthInFlight && !_isSuccessRedirecting) {
           setState(() {
             _socialOauthInFlight = false;
@@ -185,13 +183,13 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       final result = await DeepLinkOAuthService.loginWithGoogle(
         apiBaseUrl: OAuthConfig.apiBaseUrl,
         inviteCode: _currentInviteCode(),
+        context: context, // 传 context → 使用 Flutter 页面（有返回键 + 刘海适配）
       );
 
       if (!mounted) return;
 
-      // Deep Link OAuth 直接使用后端返回的 Luna Token，不调用 Firebase API
       _isSuccessRedirecting = true;
-      _cancelAfterResumeTimer?.cancel(); // 成功时取消 grace timer
+      _cancelAfterResumeTimer?.cancel();
       await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
       if (mounted) setState(() => _socialOauthInFlight = false);
@@ -223,13 +221,13 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       final result = await DeepLinkOAuthService.loginWithFacebook(
         apiBaseUrl: OAuthConfig.apiBaseUrl,
         inviteCode: _currentInviteCode(),
+        context: context,
       );
 
       if (!mounted) return;
 
-      // Deep Link OAuth 直接使用后端返回的 Luna Token，不调用 Firebase API
       _isSuccessRedirecting = true;
-      _cancelAfterResumeTimer?.cancel(); // 成功时取消 grace timer
+      _cancelAfterResumeTimer?.cancel();
       await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
       if (mounted) setState(() => _socialOauthInFlight = false);
@@ -261,13 +259,13 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       final result = await DeepLinkOAuthService.loginWithApple(
         apiBaseUrl: OAuthConfig.apiBaseUrl,
         inviteCode: _currentInviteCode(),
+        context: context,
       );
 
       if (!mounted) return;
 
-      // Deep Link OAuth 直接使用后端返回的 Luna Token，不调用 Firebase API
       _isSuccessRedirecting = true;
-      _cancelAfterResumeTimer?.cancel(); // 成功时取消 grace timer
+      _cancelAfterResumeTimer?.cancel();
       await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
       if (mounted) setState(() => _socialOauthInFlight = false);
