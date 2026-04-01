@@ -43,6 +43,7 @@ jobs:
   shorebird-patch:
     needs: preflight-reminder
     runs-on: self-hosted # Utilizing your local MacBook Air Runner
+    timeout-minutes: 30   # patch 比 full build 轻，30 分钟足够
     steps:
       # ================= Step 1: Initialization =================
       - name: 1. Checkout Code
@@ -57,9 +58,34 @@ jobs:
           if [[ "${{ github.event.inputs.environment }}" == "prod" ]]; then
             echo "ENV_TAG=[PROD]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
+            echo "IS_PROD=true" >> $GITHUB_ENV
           else
             echo "ENV_TAG=[TEST]" >> $GITHUB_ENV
             echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
+            echo "IS_PROD=false" >> $GITHUB_ENV
+          fi
+
+      # ================= Step 2.5: Restore Credentials =================
+      # hotfix patch 同样需要 google-services.json，否则 Android 构建报错
+      - name: 🔐 2.5. Restore Build Credentials
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+          echo "${{ secrets.LOCAL_PROPERTIES }}" > local.properties
+
+          if [[ "${{ env.IS_PROD }}" == "true" ]]; then
+            echo '${{ secrets.IOS_G_SERVICES_PROD }}' > ios/Runner/GoogleService-Info.plist
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+            echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}" > android/key.properties
+            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}"      >> android/key.properties
+            echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}"            >> android/key.properties
+            echo "storeFile=upload-keystore.jks"                         >> android/key.properties
+          else
+            echo '${{ secrets.IOS_G_SERVICES_TEST }}' > ios/Runner/GoogleService-Info.plist
+            echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
+            echo "storePassword=android"           > android/key.properties
+            echo "keyPassword=android"            >> android/key.properties
+            echo "keyAlias=androiddebugkey"       >> android/key.properties
+            echo "storeFile=debug.keystore"       >> android/key.properties
           fi
 
       # ================= Step 3: FVM & Flutter Setup =================
@@ -110,13 +136,14 @@ jobs:
       - name: 🧹 7. Smart Workspace Cleanup
         if: always()
         run: |
-          echo "Cleaning heavy build artifacts..."
-          
-          # [优化点]: 删除巨大的最终产物目录，保住你 Mac 的硬盘空间
+          echo "Cleaning credentials and heavy build artifacts..."
+          rm -f android/app/google-services.json
+          rm -f android/app/upload-keystore.jks
+          rm -f android/app/debug.keystore
+          rm -f android/key.properties
+          rm -f local.properties
           rm -rf build/app/outputs/
           rm -rf build/ios/ipa/
           rm -rf build/ios/archive/
-          
-          # Restore any local changes made during build to keep the runner clean
           git checkout -- .
           echo "✅ Cleanup complete. Freed GBs without losing build cache."
