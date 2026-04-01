@@ -43,15 +43,20 @@ class GlobalOAuthHandler {
 
   /// 处理Google OAuth回调
   /// 可以从任何地方调用，不依赖页面context
+  ///
+  /// [showGlobalLoading] 为 true 时显示全局遮罩。
+  /// 从登录页按钮触发时传 false（页面本身已有 loading）；
+  /// 从 recovery / 静默流程触发时传 true（默认）。
   static Future<void> handleGoogleOAuthCallback({
     required String idToken,
     String? inviteCode,
+    bool showGlobalLoading = true,
   }) async {
     await _processGoogleOAuthToken(
       idToken: idToken,
       inviteCode: inviteCode,
       navigateAfterSuccess: true,
-      showGlobalLoading: true,
+      showGlobalLoading: showGlobalLoading,
     );
   }
 
