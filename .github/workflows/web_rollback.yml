@@ -81,7 +81,7 @@ jobs:
           fi
 
       - name: 2. Checkout Target Ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.target_ref }}
           fetch-depth: 0

@@ -47,7 +47,7 @@ jobs:
     steps:
       # ================= Step 1: Initialization =================
       - name: 1. Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           clean: true
 

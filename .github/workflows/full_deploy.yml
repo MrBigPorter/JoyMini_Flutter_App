@@ -69,7 +69,7 @@ jobs:
     steps:
       # ================= Phase 1: Secure Checkout =================
       - name: 1. Checkout Code (Preserve Cache)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           clean: false
 
