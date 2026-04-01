@@ -45,12 +45,22 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
     _oauthRecoveryStarted = true;
 
+    // ── Web 优先：检查 Firebase 重定向结果 ──────────────────────────────────
+    // 当 signInWithPopup 在移动浏览器 / PWA / 弹窗拦截场景下 fallback 为重定向
+    // 模式时，页面会重新加载，signInWithPopup 的 Promise 已丢失。
+    // 必须调用 getRedirectResult() 才能取回凭证，否则页面停在 login 啥也不做。
+    if (kIsWeb) {
+      final handled = await _checkWebRedirectResult();
+      if (handled) return; // 已处理，不再执行下面的 native 恢复
+    }
+
+    // ── Native（iOS/Android）恢复：检查内存中缓存的 token ─────────────────
     // 只有存在可恢复 token 时才显示 busy，避免无 token 时页面闪一下 loading
     final hasRecoverableGoogleToken = OAuthStateManager.hasValidIdToken(
       'google',
     );
 
-    // 立即显示过渡中的忙碌状态，避免出现“晚一拍”的视觉延迟
+    // 立即显示过渡中的忙碌状态，避免出现"晚一拍"的视觉延迟
     if (mounted && hasRecoverableGoogleToken) {
       setState(() {
         _socialOauthInFlight = true;
@@ -69,6 +79,97 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
           _socialOauthInFlight = false;
         });
       }
+    }
+  }
+
+  /// Web 专用：检查 Firebase 重定向结果并完成登录流程。
+  ///
+  /// 适用场景：移动浏览器 / PWA / 弹窗被拦截，Firebase 内部将
+  /// signInWithPopup 降级为 redirect 模式，页面重载后 signInWithPopup 的
+  /// Promise 已丢失，必须调用此方法取回凭证。
+  ///
+  /// Returns true if a redirect result was found (processed or errored),
+  /// false if no redirect result was pending.
+  Future<bool> _checkWebRedirectResult() async {
+    try {
+      debugPrint('[LoginPageLogic] [Web] Checking Firebase redirect result...');
+
+      final authResult =
+          await FirebaseOauthSignInService.getWebRedirectAuthResult();
+
+      if (!mounted) return false;
+
+      if (authResult == null) {
+        debugPrint('[LoginPageLogic] [Web] No redirect result pending');
+        return false;
+      }
+
+      debugPrint(
+        '[LoginPageLogic] [Web] Redirect result found! '
+        'provider=${authResult.providerId}',
+      );
+
+      // 有重定向结果，立即进入加载态
+      setState(() => _socialOauthInFlight = true);
+      _isSuccessRedirecting = true;
+
+      switch (authResult.providerId) {
+        case 'facebook.com':
+          // Facebook web redirect → Firebase ID Token 路径
+          final apiResult = await ref
+              .read(authLoginFacebookCtrlProvider.notifier)
+              .run((
+                idToken: authResult.idToken,
+                accessToken: null,
+                userId: null,
+                inviteCode: _currentInviteCode(),
+              ));
+          if (mounted) {
+            await _syncLoginTokens(
+              apiResult.tokens.accessToken,
+              apiResult.tokens.refreshToken,
+            );
+          }
+
+        case 'apple.com':
+          // Apple web redirect → Firebase ID Token 路径
+          final apiResult = await ref
+              .read(authLoginAppleCtrlProvider.notifier)
+              .run((
+                idToken: authResult.idToken,
+                inviteCode: _currentInviteCode(),
+              ));
+          if (mounted) {
+            await _syncLoginTokens(
+              apiResult.tokens.accessToken,
+              apiResult.tokens.refreshToken,
+            );
+          }
+
+        default:
+          // Google（或未知 provider，默认走 Google 处理器）
+          // showGlobalLoading: false — 登录页自身 _socialOauthInFlight 已提供反馈
+          await GlobalOAuthHandler.handleGoogleOAuthCallback(
+            idToken: authResult.idToken,
+            showGlobalLoading: false,
+          );
+      }
+
+      debugPrint(
+        '[LoginPageLogic] [Web] Redirect OAuth login completed successfully',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[LoginPageLogic] [Web] Redirect result processing failed: $e');
+      _isSuccessRedirecting = false;
+      if (mounted) {
+        setState(() => _socialOauthInFlight = false);
+        if (e is! OauthCancelledException) {
+          _handleOauthError(e);
+        }
+      }
+      // 返回 true：已检测到 redirect 结果（即使处理失败），阻止重复 native 恢复
+      return true;
     }
   }
 

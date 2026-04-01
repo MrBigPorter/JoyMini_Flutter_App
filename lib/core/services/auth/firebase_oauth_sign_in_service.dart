@@ -100,24 +100,33 @@ class FirebaseOauthSignInService {
   /// Google Sign-In with automatic backend processing
   /// Uses GlobalOAuthHandler to handle the entire flow
   /// This is the recommended method for Native platforms
-  static Future<void> signInWithGoogleAndProcess() async {
+  ///
+  /// [showGlobalLoading] controls the full-screen loading overlay.
+  /// Defaults to false because callers (e.g. login page button) typically
+  /// manage their own loading state. Set to true only for silent/recovery flows.
+  static Future<void> signInWithGoogleAndProcess({
+    bool showGlobalLoading = false,
+  }) async {
     try {
       _log('Starting Google OAuth with automatic processing...');
-      
+
       // Get ID Token from Firebase
       final idToken = await signInWithGoogle();
-      
+
       if (idToken == null) {
         _log('Google sign-in failed: no token returned');
         throw StateError('Google sign-in failed: no token returned');
       }
 
       _log('Google sign-in successful, processing with GlobalOAuthHandler...');
-      
+
       // Use GlobalOAuthHandler to process the callback
       // This handles backend API call, token sync, and navigation
-      await GlobalOAuthHandler.handleGoogleOAuthCallback(idToken: idToken);
-      
+      await GlobalOAuthHandler.handleGoogleOAuthCallback(
+        idToken: idToken,
+        showGlobalLoading: showGlobalLoading,
+      );
+
       _log('Google OAuth processing completed successfully');
     } catch (e) {
       _log('Google OAuth processing failed: $e');
@@ -283,6 +292,54 @@ class FirebaseOauthSignInService {
       rethrow;
     } catch (e) {
       _log('Apple sign-in error: $e');
+      rethrow;
+    }
+  }
+
+  /// Web only: Retrieve pending redirect authentication result.
+  ///
+  /// Must be called on page load to complete redirect-based OAuth flows.
+  /// This handles the case where [signInWithPopup] internally falls back to
+  /// redirect mode (mobile browsers, PWA, popup blockers, etc.).
+  ///
+  /// Returns null if there is no pending redirect result.
+  static Future<({String providerId, String idToken})?> getWebRedirectAuthResult() async {
+    if (!kIsWeb) return null;
+
+    try {
+      if (!FirebaseService.isInitialized) {
+        await FirebaseService.initialize();
+      }
+
+      _log('Checking for pending web redirect result...');
+      final credential = await FirebaseAuth.instance.getRedirectResult();
+      final user = credential.user;
+
+      if (user == null) {
+        _log('No pending redirect result');
+        return null;
+      }
+
+      final idToken = await user.getIdToken();
+      if (idToken == null) {
+        _log('Redirect result: failed to get ID token from user');
+        return null;
+      }
+
+      final providerId = credential.additionalUserInfo?.providerId ?? 'google.com';
+      _log('Redirect result found: provider=$providerId idToken.length=${idToken.length}');
+      return (providerId: providerId, idToken: idToken);
+    } on FirebaseAuthException catch (e) {
+      _log('Redirect result FirebaseAuthException: ${e.code} - ${e.message}');
+      // User cancelled or popup races — not a real error
+      if (e.code == 'popup-closed-by-user' ||
+          e.code == 'cancelled-popup-request' ||
+          e.code == 'user-cancelled') {
+        return null;
+      }
+      rethrow;
+    } catch (e) {
+      _log('Redirect result unexpected error: $e');
       rethrow;
     }
   }
