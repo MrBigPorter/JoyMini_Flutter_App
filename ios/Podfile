@@ -41,88 +41,39 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
 
     target.build_configurations.each do |config|
-          # 这是一个防止覆盖的保险写法
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+      # 防止 GCC_PREPROCESSOR_DEFINITIONS 被覆盖
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = ['$(inherited)']
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_CAMERA=1'
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_MICROPHONE=1'
 
-          # 开启相机权限支持
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_CAMERA=1'
+      # 强制所有 Pods 最低 iOS 13.0
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
 
-          # 如果你需要麦克风，把这个也加上
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_MICROPHONE=1'
+      # 绕过 Swift 6 严格检查
+      config.build_settings['SWIFT_VERSION'] = '5.0'
 
-          #1. 强制所有 Pods 目标至少为 13.0，消除所有警告
-          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      # 禁用无关警告
+      config.build_settings['GCC_WARN_64_TO_32_BIT_CONVERSION'] = 'NO'
 
-           #  2. 绕过 Swift 6 的严格检查
-           config.build_settings['SWIFT_VERSION'] = '5.0'
-
-           # 3. 禁用死代码剥离警告
-           config.build_settings['GCC_WARN_64_TO_32_BIT_CONVERSION'] = 'NO'
-
-           # 4. 【核心修复】Xcode 26 / iOS 26 actool "IBSimDeviceTypeiPad3x" 错误根治方案
-           #
-           # 根本原因：TARGETED_DEVICE_FAMILY = "1,2"（Universal）会让 actool 以
-           # --target-device iphone --target-device ipad 两个参数编译 xcassets。
-           # Xcode 26 的 actool 在编译 iPad 变体时查询 iOS 26.4 模拟器 Runtime，
-           # 但该 Runtime 中不存在 "iPad-3x" 设备类型，导致构建失败。
-           #
-           # 修复：将所有 Pod 目标设为 iPhone Only（"1"），Pod 资源包无需 iPad 特化编译。
-           # 运行时 iOS 会自动选取最优分辨率（2x），不影响 iPad 上的实际显示。
-           next if target.name == 'Pods-Runner' || target.name == 'Pods-RunnerTests'
-           if config.build_settings['TARGETED_DEVICE_FAMILY'] == '1,2' ||
-              config.build_settings['TARGETED_DEVICE_FAMILY'] == '2'
-             config.build_settings['TARGETED_DEVICE_FAMILY'] = '1'
-           end
-
-           # 5. 修复 flutter_inappwebview_ios storyboard 编译问题
-           # 跳过 Interface Builder storyboard 编译，避免 Xcode 26 执行上下文错误
-           if target.name == 'flutter_inappwebview_ios'
-             config.build_settings['IBSC_MODULE'] = nil
-           end
-         end
-  end
-
-  # ─────────────────────────────────────────────────────────────────────────
-  # 【根治方案】Xcode 26 / iOS 26 "IBSimDeviceTypeiPad3x" 构建失败彻底修复
-  #
-  # 根本原因（三层）：
-  #   1. xcassets Contents.json 中含有 "idiom":"universal" + "scale":"3x"
-  #      → actool 尝试生成 iPad-3x 变体
-  #   2. TARGETED_DEVICE_FAMILY = "1,2" (Universal)
-  #      → actool 以 --target-device ipad 参数运行
-  #   3. 物理 @3x.png 文件存在于 xcassets imageset 目录中
-  #      → Xcode 26 的 actool 扫描物理文件，无论 Contents.json 如何声明，
-  #        都会尝试为 ALL 设备类型生成 3x 变体（包括不存在的 iPad-3x）
-  #
-  # 修复方案（三层对应）：
-  #   1. 将 Contents.json 中所有 3x 条目从 idiom:"universal" 改为 "iphone"
-  #      → 后来升级为直接删除 3x 条目（更彻底）
-  #   2. TARGETED_DEVICE_FAMILY 强制设为 "1"（iPhone Only）
-  #   3. 物理删除 xcassets 中所有 @3x.png 文件
-  #      → 彻底断绝 actool 触发 iPad-3x 查询的路径
-  #
-  # 影响评估：这些图片均为小尺寸 toolbar/icon，视觉上 @2x 与 @3x 无明显差别
-  # ─────────────────────────────────────────────────────────────────────────
-  require 'json'
-
-  pods_root = File.join(File.dirname(File.realpath(__FILE__)), 'Pods')
-  total_png_deleted = 0
-  total_json_patched = 0
-
-  # ── 步骤 A：删除所有 Pod xcassets 中的 @3x PNG 文件 ──────────────────────
-  Dir.glob(File.join(pods_root, '**', '*@3x.png')).each do |png_file|
-    next unless png_file.include?('.xcassets')
-    begin
-      File.delete(png_file)
-      total_png_deleted += 1
-      rel = png_file.sub(pods_root + '/', '')
-      puts "[Podfile patch] Deleted @3x: #{rel}"
-    rescue => e
-      puts "[Podfile patch] Warning: could not delete #{png_file}: #{e.message}"
+      # ─────────────────────────────────────────────────────────────────
+      # 【根治】Xcode 26 IBSimDeviceTypeiPad3x 构建失败
+      #
+      # Xcode 26 的 actool/ibtool 在 TARGETED_DEVICE_FAMILY 包含 iPad(2) 时，
+      # 会枚举 iOS 26.4 runtime 所有 iPad 设备类型（含未发布的 iPad@3x），
+      # 找不到对应模拟器则崩溃。无条件强制为 iPhone Only("1") 可彻底规避。
+      # ─────────────────────────────────────────────────────────────────
+      config.build_settings['TARGETED_DEVICE_FAMILY'] = '1'
     end
   end
 
-  # ── 步骤 B：更新 Contents.json，删除 3x 条目（而非仅改 idiom）───────────
+  # ─────────────────────────────────────────────────────────────────────
+  # 【补丁】修复 DKPhotoGallery / DKImagePickerController xcassets 中
+  # 含有 universal@3x 条目触发 IBSimDeviceTypeiPad3x 的问题
+  # ─────────────────────────────────────────────────────────────────────
+  require 'json'
+
+  pods_root = File.join(File.dirname(File.realpath(__FILE__)), 'Pods')
+
   Dir.glob(File.join(pods_root, '**', 'Contents.json')).each do |contents_file|
     begin
       raw  = File.read(contents_file)
@@ -130,18 +81,20 @@ post_install do |installer|
       images = data['images']
       next unless images.is_a?(Array)
 
-      new_images = images.reject { |img| img['scale'] == '3x' }
-      next if new_images.length == images.length  # no change
+      changed = false
+      images.each do |img|
+        if img['idiom'] == 'universal' && img['scale'] == '3x'
+          img['idiom'] = 'iphone'
+          changed = true
+        end
+      end
 
-      data['images'] = new_images
-      File.write(contents_file, JSON.pretty_generate(data))
-      total_json_patched += 1
-      rel = contents_file.sub(pods_root + '/', '')
-      puts "[Podfile patch] Removed 3x entries: #{rel}"
+      if changed
+        File.write(contents_file, JSON.pretty_generate(data))
+        puts "[Podfile patch] Fixed universal@3x -> iphone@3x: #{contents_file.sub(pods_root + '/', '')}"
+      end
     rescue => e
-      puts "[Podfile patch] Warning: could not patch #{contents_file}: #{e.message}"
+      puts "[Podfile patch] Warning: #{contents_file}: #{e.message}"
     end
   end
-
-  puts "[Podfile patch] Done — deleted #{total_png_deleted} @3x PNG files, updated #{total_json_patched} Contents.json files."
 end

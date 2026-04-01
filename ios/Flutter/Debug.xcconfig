@@ -1,2 +1,7 @@
 #include? "Generated.xcconfig"
 #include? "../Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+
+// Xcode 26 fix: Skip App Store deployment (thinned) asset catalog compilation.
+// This prevents ibtoold from validating against IBSimDeviceTypeiPad3x (iOS 26.4),
+// which does not have a matching CoreSimulator device, causing error code 74.
+ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT = YES

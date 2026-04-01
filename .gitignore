@@ -118,4 +118,4 @@ build/
 
 # FVM Version Cache
 .fvm/
-/build/
+/build
