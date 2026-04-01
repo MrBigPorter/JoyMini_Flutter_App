@@ -146,7 +146,7 @@ dependencies:
   file_picker: ^10.3.10
   open_filex: ^4.7.0
   geolocator: ^14.0.2
-  map_launcher: ^4.4.3
+  map_launcher: ^4.5.0
   geocoding: ^4.0.0
   native_dio_adapter: ^1.5.1
   crypto: ^3.0.7
