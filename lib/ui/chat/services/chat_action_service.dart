@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cross_file/cross_file.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,7 +75,7 @@ class ChatActionService {
         await step.execute(ctx, this);
       }
       debugPrint("Pipeline Success: ${ctx.initialMsg.id}");
-    } catch (e, st) {
+    } catch (e) {
       debugPrint("Pipeline Crashed: $e");
       final failedMsg = ctx.initialMsg.copyWith(status: MessageStatus.failed);
       await repo.saveOrUpdate(failedMsg);
@@ -225,34 +225,30 @@ class ChatActionService {
     ]);
   }
 
-  Future<void> sendFile([PlatformFile? pFile]) async {
+  Future<void> sendFile() async {
     try {
-      PlatformFile? fileToUse = pFile;
+      // file_selector 使用 UIDocumentPickerViewController（iOS 原生），无 DKImagePickerController 依赖
+      const typeGroup = XTypeGroup(
+        label: 'documents',
+        extensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'rar', 'txt', 'apk'],
+      );
+      final XFile? picked = await openFile(acceptedTypeGroups: [typeGroup]);
+      if (picked == null) return; // 用户取消
 
-      if (fileToUse == null) {
-        final result = await FilePicker.platform.pickFiles(
-          allowMultiple: false,
-          type: FileType.custom,
-          allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'rar', 'txt', 'apk'],
-          withData: kIsWeb,
-          withReadStream: !kIsWeb,
-        );
-        if (result == null || result.files.isEmpty) return;
-        fileToUse = result.files.first;
-      }
-
-      final fileName = fileToUse.name;
-      final fileSize = fileToUse.size;
-      final fileExt = fileToUse.extension ?? (fileName.contains('.') ? fileName.split('.').last : 'bin');
+      final fileName = picked.name;
+      final fileExt = fileName.contains('.') ? fileName.split('.').last : 'bin';
 
       XFile xFile;
+      int fileSize;
+
       if (kIsWeb) {
-        if (fileToUse.bytes == null) return;
-        final blobUrl = WebBlobUrl.fromBytes(fileToUse.bytes!);
-        xFile = XFile(blobUrl, name: fileName, bytes: fileToUse.bytes!);
+        final bytes = await picked.readAsBytes();
+        final blobUrl = WebBlobUrl.fromBytes(bytes);
+        xFile = XFile(blobUrl, name: fileName, bytes: bytes);
+        fileSize = bytes.length;
       } else {
-        if (fileToUse.path == null) return;
-        xFile = XFile(fileToUse.path!, name: fileName);
+        xFile = XFile(picked.path, name: fileName);
+        fileSize = await File(picked.path).length();
       }
 
       final msg = _msg.file(
