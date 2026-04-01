@@ -16,6 +16,9 @@ rm -rf .flutter-plugins-dependencies
 # 建议加上这句，清理旧版 pub 缓存配置
 rm -f .packages
 
+echo "🍏 [Xcode 26 fix] 清理遗留的 iOS 构建产物（防止 Xcode 26 删除权限错误）..."
+rm -rf build/ios/ 2>/dev/null || true
+
 echo "🤖 [3/6] 正在清理 Android 专属顽固缓存..."
 rm -rf android/.gradle/
 rm -rf android/app/build/

@@ -68,13 +68,16 @@ post_install do |installer|
 
   # ─────────────────────────────────────────────────────────────────────
   # 【补丁】修复 DKPhotoGallery / DKImagePickerController xcassets 中
-  # 含有 universal@3x 条目触发 IBSimDeviceTypeiPad3x 的问题
+  # universal idiom 触发 Xcode 26 IBSimDeviceTypeiPad3x 的问题
+  #
+  # Xcode 26 的 actool 在任何情况下遇到 universal idiom 时都会尝试枚举 iPad 设备，
+  # 因此将所有 universal（无论是否含3x）统一改为 iphone，彻底杜绝 iPad 设备枚举。
   # ─────────────────────────────────────────────────────────────────────
   require 'json'
 
   pods_root = File.join(File.dirname(File.realpath(__FILE__)), 'Pods')
 
-  Dir.glob(File.join(pods_root, '**', 'Contents.json')).each do |contents_file|
+  Dir.glob(File.join(pods_root, '**', '*.imageset', 'Contents.json')).each do |contents_file|
     begin
       raw  = File.read(contents_file)
       data = JSON.parse(raw)
@@ -82,16 +85,23 @@ post_install do |installer|
       next unless images.is_a?(Array)
 
       changed = false
+      # 遍历所有 image 条目
       images.each do |img|
-        if img['idiom'] == 'universal' && img['scale'] == '3x'
+        # 将 universal 统一改为 iphone（杜绝 iPad 设备枚举）
+        if img['idiom'] == 'universal'
           img['idiom'] = 'iphone'
+          changed = true
+        end
+        # 删除 3x 条目（iPhone Only 项目不需要，避免触发 IBSimDeviceTypeiPad3x）
+        if img['scale'] == '3x' && img['idiom'] == 'iphone'
+          images.delete(img)
           changed = true
         end
       end
 
       if changed
-        File.write(contents_file, JSON.pretty_generate(data))
-        puts "[Podfile patch] Fixed universal@3x -> iphone@3x: #{contents_file.sub(pods_root + '/', '')}"
+        File.write(contents_file, JSON.pretty_generate(data) + "\n")
+        puts "[Podfile patch] Fixed xcassets: #{contents_file.sub(pods_root + '/', '')}"
       end
     rescue => e
       puts "[Podfile patch] Warning: #{contents_file}: #{e.message}"
