@@ -93,7 +93,7 @@ dependencies:
   flutter_widget_from_html: ^0.17.1
   reactive_forms: 17.0.1           # 🔙 退回 v17
   reactive_forms_annotations: 5.0.0
-  share_plus: ^12.0.1
+  share_plus: ^12.0.2
   qr_flutter: ^4.1.0
   screenshot: ^3.0.0
   path_provider: ^2.1.5
