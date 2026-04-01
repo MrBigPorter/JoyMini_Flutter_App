@@ -100,24 +100,33 @@ class FirebaseOauthSignInService {
   /// Google Sign-In with automatic backend processing
   /// Uses GlobalOAuthHandler to handle the entire flow
   /// This is the recommended method for Native platforms
-  static Future<void> signInWithGoogleAndProcess() async {
+  ///
+  /// [showGlobalLoading] controls the full-screen loading overlay.
+  /// Defaults to false because callers (e.g. login page button) typically
+  /// manage their own loading state. Set to true only for silent/recovery flows.
+  static Future<void> signInWithGoogleAndProcess({
+    bool showGlobalLoading = false,
+  }) async {
     try {
       _log('Starting Google OAuth with automatic processing...');
-      
+
       // Get ID Token from Firebase
       final idToken = await signInWithGoogle();
-      
+
       if (idToken == null) {
         _log('Google sign-in failed: no token returned');
         throw StateError('Google sign-in failed: no token returned');
       }
 
       _log('Google sign-in successful, processing with GlobalOAuthHandler...');
-      
+
       // Use GlobalOAuthHandler to process the callback
       // This handles backend API call, token sync, and navigation
-      await GlobalOAuthHandler.handleGoogleOAuthCallback(idToken: idToken);
-      
+      await GlobalOAuthHandler.handleGoogleOAuthCallback(
+        idToken: idToken,
+        showGlobalLoading: showGlobalLoading,
+      );
+
       _log('Google OAuth processing completed successfully');
     } catch (e) {
       _log('Google OAuth processing failed: $e');
