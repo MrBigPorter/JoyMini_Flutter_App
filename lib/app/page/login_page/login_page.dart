@@ -42,7 +42,25 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 // 混入 Logic，使用 UI extension 中的 buildUI
-class _LoginPageState extends ConsumerState<LoginPage> with LoginPageLogic {
+class _LoginPageState extends ConsumerState<LoginPage>
+    with LoginPageLogic, WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState(); // 调用 LoginPageLogic.initState
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose(); // 调用 LoginPageLogic.dispose
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    handleLifecycleChange(state);
+  }
+
   @override
   Widget build(BuildContext context) {
     return buildUI(context);

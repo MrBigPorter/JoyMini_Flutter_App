@@ -214,7 +214,7 @@ extension LoginPageUI on _LoginPageState {
                                     SizedBox(height: 16.h),
                                   ],
 
-                                  if (showAppleButton) ...[
+                                   if (showAppleButton) ...[
                                     Button(
                                       width: double.infinity,
                                       height: 48.h,
@@ -225,6 +225,24 @@ extension LoginPageUI on _LoginPageState {
                                       child: Text('login.oauth.apple'.tr()),
                                     ),
                                     SizedBox(height: 16.h),
+                                  ],
+
+                                  // ─── OAuth 取消按钮（loading 期间显示） ───
+                                  if (_socialOauthInFlight) ...[
+                                    SizedBox(height: 4.h),
+                                    Center(
+                                      child: TextButton(
+                                        onPressed: cancelOAuth,
+                                        child: Text(
+                                          'login.oauth.cancel'.tr(),
+                                          style: TextStyle(
+                                            fontSize: context.textSm,
+                                            color: context.textTertiary600,
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ],
 
                                 ],

@@ -225,6 +225,7 @@
   "login.oauth.google": "Continue with Google",
   "login.oauth.facebook": "Continue with Facebook",
   "login.oauth.apple": "Continue with Apple",
+  "login.oauth.cancel": "Cancel",
   "by-registering-you-indicate-that-you-have-read-and-agreed-to-the": "By registering, you confirm that you have read and agree to the",
   "privacy-policy": "Privacy Policy",
   "common.loading": "Loading",
