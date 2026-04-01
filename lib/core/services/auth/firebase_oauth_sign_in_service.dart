@@ -287,6 +287,54 @@ class FirebaseOauthSignInService {
     }
   }
 
+  /// Web only: Retrieve pending redirect authentication result.
+  ///
+  /// Must be called on page load to complete redirect-based OAuth flows.
+  /// This handles the case where [signInWithPopup] internally falls back to
+  /// redirect mode (mobile browsers, PWA, popup blockers, etc.).
+  ///
+  /// Returns null if there is no pending redirect result.
+  static Future<({String providerId, String idToken})?> getWebRedirectAuthResult() async {
+    if (!kIsWeb) return null;
+
+    try {
+      if (!FirebaseService.isInitialized) {
+        await FirebaseService.initialize();
+      }
+
+      _log('Checking for pending web redirect result...');
+      final credential = await FirebaseAuth.instance.getRedirectResult();
+      final user = credential.user;
+
+      if (user == null) {
+        _log('No pending redirect result');
+        return null;
+      }
+
+      final idToken = await user.getIdToken();
+      if (idToken == null) {
+        _log('Redirect result: failed to get ID token from user');
+        return null;
+      }
+
+      final providerId = credential.additionalUserInfo?.providerId ?? 'google.com';
+      _log('Redirect result found: provider=$providerId idToken.length=${idToken.length}');
+      return (providerId: providerId, idToken: idToken);
+    } on FirebaseAuthException catch (e) {
+      _log('Redirect result FirebaseAuthException: ${e.code} - ${e.message}');
+      // User cancelled or popup races — not a real error
+      if (e.code == 'popup-closed-by-user' ||
+          e.code == 'cancelled-popup-request' ||
+          e.code == 'user-cancelled') {
+        return null;
+      }
+      rethrow;
+    } catch (e) {
+      _log('Redirect result unexpected error: $e');
+      rethrow;
+    }
+  }
+
   /// Sign out from Firebase
   static Future<void> signOut() async {
     try {
