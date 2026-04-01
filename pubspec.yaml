@@ -134,7 +134,7 @@ dependencies:
   sembast: ^3.8.5
   sembast_web: ^2.4.4
   idb_shim: ^2.7.1+2
-  record: ^5.1.0 # 建议使用最新稳定版
+  record: ^6.2.0 # 建议使用最新稳定版
   just_audio: ^0.10.5
   connectivity_plus: ^7.0.0
   image: ^4.7.2
