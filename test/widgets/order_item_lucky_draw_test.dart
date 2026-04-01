@@ -15,6 +15,19 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
   }
 
+  /// Helper teardown that flushes flutter_animate timers before disposing
+  /// the widget tree.  We deliberately avoid pumpAndSettle here because the
+  /// luckyDrawOrderTicketProvider schedules a 60-second keepAlive timer via
+  /// cacheFor(), which would cause pumpAndSettle to time out waiting for it.
+  /// Instead we pump past all animation durations with a fixed-length advance,
+  /// then replace the tree.
+  Future<void> safeDispose(WidgetTester tester) async {
+    // Advance past flutter_animate chain: fadeIn(400ms)+slideY(400ms)+delay(200ms)+shimmer(1500ms) ≈ 2100ms
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  }
+
   Widget wrap({
     required Widget child,
     required LuckyDrawFetchOrderTicket fetchOrderTicket,
@@ -72,11 +85,7 @@ void main() {
   testWidgets('does not show lucky draw action when order has no ticket', (
     tester,
   ) async {
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
-    });
+    addTearDown(() => safeDispose(tester));
     await pumpMobileViewport(tester);
 
     await tester.pumpWidget(
@@ -87,17 +96,17 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(); // flush provider future & flutter_animate timer
 
     expect(find.text('Draw Now'), findsNothing);
     expect(find.text('Claim Prize'), findsNothing);
+
+    // Advance past all flutter_animate timers before teardown.
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('shows Draw Now when the order ticket is unused', (tester) async {
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
-    });
+    addTearDown(() => safeDispose(tester));
     await pumpMobileViewport(tester);
 
     await tester.pumpWidget(
@@ -117,17 +126,16 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(); // flush provider future & flutter_animate timer
 
     expect(find.text('Draw Now'), findsOneWidget);
     expect(find.text('Draw Ready'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('shows drawn prize instead of claim for used tickets', (tester) async {
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
-    });
+    addTearDown(() => safeDispose(tester));
     await pumpMobileViewport(tester);
 
     await tester.pumpWidget(
@@ -154,10 +162,12 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(); // flush provider future & flutter_animate timer
 
     expect(find.text('Draw Now'), findsNothing);
     expect(find.text('Claim Prize'), findsNothing);
     expect(find.textContaining('Coins Reward'), findsWidgets);
+
+    await tester.pump(const Duration(seconds: 3));
   });
 }
-
