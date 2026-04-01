@@ -1,31 +1,38 @@
 #!/bin/bash
 
-# 给脚本加权限: chmod +x fix_android.sh
+# 终端跑这最后的大招，慎用！会删除所有项目的 Gradle 缓存
+# rm -rf ~/.gradle/caches/
 
-echo "💀 Killing Gradle & Java processes..."
-# 安卓构建本质是 Java 进程，卡住通常是因为 Gradle 守护进程死锁
-# 这一步非常重要，否则删文件会提示“Device or resource busy”
+echo "💀 [1/4] Killing Gradle, Java, and Dart processes..."
+# 1. 先赋予权限，防止静默失败
+chmod +x android/gradlew 2>/dev/null
+# 2. 温柔地停止 Gradle 守护进程
 ./android/gradlew --stop 2>/dev/null
+# 3. 物理超度所有可能锁文件的僵尸进程
 killall -9 java 2>/dev/null
+killall -9 dart 2>/dev/null
 
-echo "🧹 Cleaning Flutter cache..."
-flutter clean
-flutter pub get
+echo "🧨 [2/4] Nuking Android & Flutter build cache (Bypassing locks)..."
+# 核心秘诀：先暴力删，再 flutter clean，绝对不卡！
+rm -rf build/
+rm -rf .dart_tool/
 
-echo "🧨 Nuking Android build cache..."
 cd android || exit
-
-# 1. 删除项目下的 .gradle (这是 Gradle 的本地配置缓存，删了不疼)
+# 删除项目级的 Gradle 配置缓存（经常导致莫名其妙的编译失败）
 rm -rf .gradle
-
-# 2. 删除 App 的构建产物
+# 删除原生的构建产物
 rm -rf app/build
 rm -rf build
-
-# 3. 这里的 clean 是让 Gradle 自己再清理一遍，确保干净
-echo "🔄 Running Gradle clean..."
-./gradlew clean
-
 cd ..
 
-echo "✅ Android environment fixed! First build will be slower."
+echo "🧹 [3/4] Resetting Flutter Environment..."
+#flutter clean
+flutter pub get
+
+echo "🔄 [4/4] Running Gradle clean..."
+cd android || exit
+# 让 Gradle 自己再过一遍，确保没有遗漏
+./gradlew clean
+cd ..
+
+echo "✅ Android environment fixed! 喝口水，第一次打包会去下载依赖，请耐心等待。"
