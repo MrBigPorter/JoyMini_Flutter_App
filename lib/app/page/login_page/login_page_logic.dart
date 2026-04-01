@@ -148,8 +148,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
         default:
           // Google（或未知 provider，默认走 Google 处理器）
+          // showGlobalLoading: false — 登录页自身 _socialOauthInFlight 已提供反馈
           await GlobalOAuthHandler.handleGoogleOAuthCallback(
             idToken: authResult.idToken,
+            showGlobalLoading: false,
           );
       }
 
