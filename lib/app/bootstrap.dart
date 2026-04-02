@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -34,30 +33,26 @@ class AppBootstrap {
   /// 1. 系统级初始化 (System Level)
   /// 处理所有不需要 Riverpod 参与的基础设施
   static Future<void> initSystem() async {
-    // Web URL 策略
+    // 同步配置（顺序无关，毫秒级）
     if (kIsWeb) usePathUrlStrategy();
     GoRouter.optionURLReflectsImperativeAPIs = true;
-
-    // Flutter 绑定
     WidgetsFlutterBinding.ensureInitialized();
 
-    // 资源与本地化
-    await AssetManager.init();
-    await EasyLocalization.ensureInitialized();
-
-    await ApiCacheManager.init();
-
-
-    // 网络层
-    await Http.init();
-
-    // 错误捕获配置
+    // 先设置错误处理器，确保后续并行任务中的错误都能被捕获
     _setupErrorHandlers();
 
-    //  核心优化：推迟 Firebase 初始化！
-    await _setupFirebase();
-    // 改用 Future.microtask 把它扔到后台队列，让 App 瞬间把 UI 跑起来！
-   // Future.microtask(() => _setupFirebase());
+    // 并行异步初始化 — 五项核心任务相互独立，同时启动
+    // Firebase 必须与其他服务并行等待完成，否则 runApp 后 fcmInitProvider
+    // 访问 FirebaseMessaging.instance 会触发 [core/no-app] 崩溃。
+    await Future.wait([
+      AssetManager.init(),
+      EasyLocalization.ensureInitialized(),
+      ApiCacheManager.init(),
+      Http.init(),
+      _setupFirebase(), // 与其他服务并行，不增加串行时间；runApp 前 Firebase 必须就绪
+    ]);
+
+    // DeepLink 初始化依赖其他服务就绪，放并行任务完成后（fire-and-forget）
     DeepLinkService().init();
   }
 
@@ -124,8 +119,9 @@ class AppBootstrap {
 
   static Future<void> _setupFirebase() async {
     try {
-      // Use FirebaseService to ensure proper initialization tracking
-      await FirebaseService.initialize();
+      // 加 10 秒超时：弱网/离线时 Firebase init 可能无限挂起，导致 Splash 卡死
+      await FirebaseService.initialize()
+          .timeout(const Duration(seconds: 10));
 
       //  核心修改：只有在【非 Web】平台才注册这个后台处理函数
       if (!kIsWeb) {
@@ -134,7 +130,8 @@ class AppBootstrap {
 
       debugPrint("[Firebase] Core initialized.");
     } catch (e) {
-      debugPrint("[Firebase] Init failed: $e");
+      // 超时或失败均不崩溃，App 在无 Firebase 状态下继续运行
+      debugPrint("[Firebase] Init failed or timed out: $e");
     }
   }
 }

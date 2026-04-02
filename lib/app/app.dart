@@ -8,7 +8,6 @@ import 'package:flutter_app/core/events/global_handler.dart';
 import 'package:flutter_app/core/providers/app_router_provider.dart';
 import 'package:flutter_app/core/providers/fcm_service_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import '../../theme/theme_provider.dart';
@@ -69,8 +68,11 @@ class _MyAppState extends ConsumerState<MyApp> {
       locale: context.locale,
       scrollBehavior: const _NoScrollbarBehavior(),
       builder: (context, child) {
+        // ThemeData 已设置 fontFamily: 'Inter'（本地字体），此处直接继承，
+        // 无需 GoogleFonts.inter()，避免网络字体校验延迟。
         final content = DefaultTextStyle.merge(
-          style: GoogleFonts.inter(
+          style: const TextStyle(
+            fontFamily: 'Inter',
             fontSize: 14,
             height: 1.2,
             fontWeight: FontWeight.w400,
