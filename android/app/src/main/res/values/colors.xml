@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light mode splash background — must match pubspec.yaml flutter_native_splash color -->
+    <color name="splash_background">#f5f5f5</color>
+</resources>
+

@@ -33,7 +33,19 @@ migrate_working_dir/
 
 # build outputs
 /build/
+# 屏蔽所有构建产物
 **/build/
+**/.dart_tool/
+**/ios/.symlinks/
+**/ios/Pods/
+**/ios/DerivedData/
+
+# 重点：精准爆破 Xcode 的哈希垃圾
+**/XCBuildData/
+**/TARGET@*
+**/PROJECT@*
+**/WORKSPACE@*
+**/*.hash=*
 
 # 文档生成
 **/doc/api/
@@ -113,8 +125,6 @@ ios/Runner/GoogleService-Info-*.plist
 .env*
 local.properties
 
-# 编译产物 (节省仓库空间)
-build/
 
 # FVM Version Cache
 .fvm/

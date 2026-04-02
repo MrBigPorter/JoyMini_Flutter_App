@@ -10,6 +10,7 @@ import '../../chat/repository/message_repository.dart';
 import '../../chat/providers/conversation_provider.dart';
 import '../../chat/providers/chat_group_provider.dart';
 import '../models/conversation.dart';
+import '../services/database/local_database_service.dart';
 
 /// Global Provider initialized at App startup to process background chat signals
 final chatEventProcessorProvider = Provider<ChatEventProcessor>((ref) {
@@ -45,6 +46,14 @@ class ChatEventProcessor {
     final repo = ref.read(messageRepositoryProvider);
 
     if (myId == null) return;
+
+    // DB 初始化守卫：appStartup 后台运行的前 ~200ms 内，DB 可能尚未就绪。
+    // 此时跳过，避免数据写入错误的 guest.db 文件。
+    // Socket 连接建立通常需要 500ms+，DB init 仅需 50-200ms，实际触发概率极低。
+    if (LocalDatabaseService.currentUserId == null) {
+      debugPrint('[ChatEventProcessor] DB not ready, skipping event: ${event.type}');
+      return;
+    }
 
     // Scenario: User invited to a new group (local database currently lacks this record)
     if (event.type == SocketEvents.conversationAdded) {

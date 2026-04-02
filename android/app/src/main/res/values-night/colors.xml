@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark mode splash background — must match pubspec.yaml flutter_native_splash color_dark -->
+    <color name="splash_background">#13161b</color>
+</resources>
+
