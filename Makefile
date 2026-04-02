@@ -1,12 +1,12 @@
 # 这样你点击 TASK EXPLORER 里的按钮就能跑了
 dev:
-	fvm flutter run --dart-define-from-file=dev.json
+	fvm flutter run --dart-define-from-file=lib/core/config/env/dev.json
 
 test:
-	fvm flutter run --dart-define-from-file=test.json
+	fvm flutter run --dart-define-from-file=lib/core/config/env/test.json
 
 prod:
-	fvm flutter run --dart-define-from-file=prod.json
+	fvm flutter run --dart-define-from-file=lib/core/config/env/prod.json
 
 # ─────────────────────────────────────────────
 # 快速清理（用 rm -rf 替代 flutter clean，快 50-100 倍）
