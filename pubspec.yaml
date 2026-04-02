@@ -194,6 +194,23 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/images/app_icon.png"
 
+flutter_native_splash:
+  # Light mode: app background color
+  color: "#f5f5f5"
+  # Dark mode: app background color
+  color_dark: "#13161b"
+  # Center logo image
+  image: assets/images/logo.png
+  image_dark: assets/images/logo.png
+  # Fill the entire screen (hides status bar during splash)
+  fullscreen: true
+  # Android 12+ adaptive splash
+  android_12:
+    color: "#f5f5f5"
+    color_dark: "#13161b"
+    image: assets/images/logo.png
+    image_dark: assets/images/logo.png
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
