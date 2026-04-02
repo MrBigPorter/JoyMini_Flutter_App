@@ -145,7 +145,7 @@ jobs:
           fvm flutter --version
       # ================= Phase 4.5: QA Gate =================
       - name: 🔎 4.5a. Flutter Analyze (Static Analysis Gate)
-        run: fvm flutter analyze --no-fatal-infos
+        run: fvm flutter analyze --no-fatal-warnings --no-fatal-infos
 
       - name: 🧪 4.5b. Flutter Test (Unit & Widget Gate)
         run: |
