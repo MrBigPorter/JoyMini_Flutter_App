@@ -24,6 +24,10 @@ class LocalDatabaseService {
   // Restore: Keep the original initialization
   static Completer<Database> _dbCompleter = Completer<Database>();
 
+  /// DB 是否已为指定用户完成初始化。
+  /// 为 null 表示尚未初始化，可用于外部做竞态防护判断。
+  static String? get currentUserId => _currentUserId;
+
   // Stores
   static final _messageStore = stringMapStoreFactory.store('messages');
   static final _detailStore = stringMapStoreFactory.store('conversation_details');

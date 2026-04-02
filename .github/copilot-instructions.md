@@ -6,6 +6,72 @@
 
 ---
 
+# Lucky Flutter App 核心规则索引
+
+# 1. 引导指令
+每次对话开始，请立即读取并严格遵守以下路径中的项目规范和任务进度：
+- 核心指令文件: .github/copilot-instructions.md
+- 快速启动指南: docs/AI_QUICK_START.md
+
+# 2. 技术栈约束 (Phase F1)
+- 状态管理: 必须使用 Riverpod。
+- 路由系统: 必须使用 GoRouter。
+- 语言要求: 严禁出现韩文，仅限中英文回复与注释。
+
+# 3. 自动化任务
+- 任务追踪: 完成任务后，更新 .github/copilot-instructions.md 中的 [ ] 状态。
+- 生成代码: 修改模型后必须执行 build_runner。
+
+# 4. AI 行为规则
+## 4.1 决策框架
+### 可自主执行的任务：
+- ✅ 明确原因的 Bug 修复
+- ✅ 文档更新
+- ✅ UI 样式调整
+- ✅ 依赖版本更新
+- ✅ 代码格式化
+
+### 需要询问用户的任务：
+- ❓ 架构变更
+- ❓ 新功能实现
+- ❓ 安全相关修改
+- ❓ 影响核心流程的性能优化
+- ❓ 数据库结构变更
+
+### 必须使用完整沟通协议的任务：
+- 📋 所有"重大变更"（详见 docs/AI_COLLABORATION_WORKFLOW.md）
+- 📋 影响多个模块的变更
+- 📋 回滚策略不明确的变更
+- 📋 涉及金融/支付的变更
+
+## 4.2 响应风格
+- 保持直接和技术性
+- 避免对话性填充词
+- 始终包含 task_progress 检查列表
+- 记录命令执行结果
+
+## 4.3 错误处理
+- 首先检查 docs/ERROR_PATTERNS.md
+- 检查 DEBUG_NOTES/ 目录
+- 如果是新错误，记录解决方案供未来参考
+- 永远不要假设成功，必须验证
+
+## 4.4 代码质量标准
+- 遵循 analysis_options.yaml 规则
+- 使用有意义的变量名
+- 复杂业务逻辑添加注释
+- 函数保持在 50 行以内
+- 金额字段必须使用 JsonNumConverter.toDouble
+- build() 方法内业务逻辑不超过 3 行
+- 禁止硬编码颜色/尺寸，使用生成的设计令牌
+
+## 4.5 测试要求
+- 新功能：最少 1 个 Unit + 1 个 Widget 测试
+- Bug 修复：必须添加回归测试
+- 模型变更：必须测试 fromJson/toJson
+- 提交前运行：fvm flutter analyze && fvm flutter test
+
+
 ## 🎯 Current Task (Start every conversation here)
 
 **Phase**: Phase F1 — Flutter Commercial Loop Closure  
@@ -223,6 +289,13 @@
 - [x] **Auth navigation control**: Added optional `navigate` parameter to `AuthNotifier.login()` to prevent double-navigation during processing-page flow.
 - [x] **Login page fallback de-duplication**: Updated login recovery behavior to avoid duplicate recovery when processing page is active.
 - [x] **Regression tests updated**: Extended `test/widgets/login_page_oauth_test.dart` for updated recovery return behavior and processing-page loading rendering.
+
+**New Iteration — App Startup Optimization Phase 1 (2026-04-02)**:
+- [x] **Splash Timing Control**: Enabled `flutter_native_splash` `preserve()`/`remove()` in `main.dart`; added `flutter_native_splash:` config to `pubspec.yaml`; generated native Android/iOS/Web assets. Eliminates black/white screen gap between system Splash and Flutter first frame.
+- [x] **Removed GoogleFonts.inter() redundancy**: Replaced `GoogleFonts.inter()` in `app.dart` builder with `const TextStyle(fontFamily: 'Inter')`. `ThemeData` already uses local Inter font; this eliminates unnecessary network font validation on first frame.
+- [x] **initSystem Parallelization**: Refactored `AppBootstrap.initSystem()` to use `Future.wait` for Firebase/EasyLocalization/ApiCacheManager/Http/AssetManager in parallel. Estimated 100-300ms reduction in startup time.
+- [x] **runApp 前移 + 预热后台化**: Removed data barrier `await` from `main.dart`; `appStartupProvider` now runs in background via `unawaited()`. Added `LocalDatabaseService.currentUserId` getter and DB-ready guard in `ChatEventProcessor` to prevent race-condition writes to guest.db. Chat pre-warming preserved; first-frame delay eliminated (300ms–1s gain).
+- [x] **Fixed Firebase [core/no-app] crash**: Moved `_setupFirebase()` back into `Future.wait` (runs in parallel with other services, zero serial-time cost). Root cause: `unawaited()` background init created a race window where `fcmInitProvider` → `FcmService` → `FirebaseMessaging.instance` was called before Firebase was ready.
 
 **New Iteration — Unified Error Handler Implementation (Completed 2026-03-29)**:
 - [x] **Error pattern analysis**: Analyzed 228+ error handling patterns across codebase.

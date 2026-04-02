@@ -23,7 +23,7 @@ echo "✅ 物理文件已抹除"
 echo "🔄 [3/4] 重置 Flutter 环境..."
 # 因为大文件已经被我们手动删了，这一步会瞬间完成，绝对不可能卡住
 #flutter clean
-flutter pub get
+fvm flutter pub get
 echo "✅ Flutter 依赖拉取完成"
 
 echo "📦 [4/4] 重新构建 iOS Pods..."
