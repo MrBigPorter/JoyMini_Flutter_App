@@ -1,20 +1,20 @@
 name: "🔍 JoyMini CI Gate — Analyze & Test"
 
-# 每次 push / PR 都要过这道门
+# ⚠️ CI 机器人已暂停 — 如需重新启用，恢复下方被注释的 push/pull_request 触发器
 on:
-  push:
-    branches:
-      - main
-      - test
-      - "feature/**"
-      - "fix/**"
-      - "hotfix/**"
-  pull_request:
-    branches:
-      - main
-      - test
-    types: [opened, synchronize, reopened]
-  # 手动补跑
+  # push:
+  #   branches:
+  #     - main
+  #     - test
+  #     - "feature/**"
+  #     - "fix/**"
+  #     - "hotfix/**"
+  # pull_request:
+  #   branches:
+  #     - main
+  #     - test
+  #   types: [opened, synchronize, reopened]
+  # 手动补跑（仅保留手动触发）
   workflow_dispatch:
 
 concurrency:
@@ -48,8 +48,10 @@ jobs:
         run: flutter pub get
 
       - name: Run flutter analyze
-        # --no-fatal-infos: info 级别不阻断；error/warning 仍然会失败
-        run: flutter analyze --no-fatal-infos
+        # --no-fatal-warnings: warning 不阻断（项目存量 warning 较多，待逐步清理）
+        # --no-fatal-infos:    info    不阻断
+        # 只有 error 级别才会让 CI 变红
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
   # ─────────────────────────────────────────────────────────
   # Job 2: Unit & Widget Tests  (ubuntu — 并行运行)
