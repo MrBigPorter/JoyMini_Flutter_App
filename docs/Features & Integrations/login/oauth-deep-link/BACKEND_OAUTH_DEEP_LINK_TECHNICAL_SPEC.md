@@ -340,39 +340,39 @@ sessionStorage.removeItem(`oauth_state_${provider}`);
 ### 开发环境 (deploy/.env.dev)
 ```env
 # Google OAuth
-GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID_REDACTED
-GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET_REDACTED
+GOOGLE_CLIENT_ID=xxxx
+GOOGLE_CLIENT_SECRET=xxxx
 GOOGLE_REDIRECT_URI=https://dev-api.joyminis.com/auth/google/callback
 
 # Facebook OAuth
 FACEBOOK_APP_ID=1659905501858558
-FACEBOOK_APP_SECRET=7b5a730eaa1e205de2a5af90dae775aa
+FACEBOOK_APP_SECRET=MASKED_SECRET
 FACEBOOK_REDIRECT_URI=https://dev-api.joyminis.com/auth/facebook/callback
 
 # Apple OAuth (需要真实配置)
 APPLE_CLIENT_ID=your-apple-client-id
 APPLE_TEAM_ID=your-apple-team-id
-APPLE_KEY_ID=your-apple-key-id
-APPLE_PRIVATE_KEY=your-apple-private-key
+APPLE_KEY_ID=your-key-id
+APPLE_PRIVATE_KEY=MASKED_PRIVATE_KEY
 APPLE_REDIRECT_URI=https://dev-api.joyminis.com/auth/apple/callback
 ```
 
 ### 生产环境 (deploy/.env.prod)
 ```env
 # Google OAuth
-GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID_PROD_REDACTED
+GOOGLE_CLIENT_ID=xxxx
 GOOGLE_REDIRECT_URI=https://api.joyminis.com/auth/google/callback
 
 # Facebook OAuth
 FACEBOOK_APP_ID=1659905501858558
-FACEBOOK_APP_SECRET=7b5a730eaa1e205de2a5af90dae775aa
+FACEBOOK_APP_SECRET=MASKED_SECRET
 FACEBOOK_REDIRECT_URI=https://api.joyminis.com/auth/facebook/callback
 
 # Apple OAuth (需要真实配置)
 APPLE_CLIENT_ID=com.joyminis.app
 APPLE_TEAM_ID=your-team-id
 APPLE_KEY_ID=your-key-id
-APPLE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----
+APPLE_PRIVATE_KEY=MASKED_PRIVATE_KEY
 APPLE_REDIRECT_URI=https://api.joyminis.com/auth/apple/callback
 ```
 
