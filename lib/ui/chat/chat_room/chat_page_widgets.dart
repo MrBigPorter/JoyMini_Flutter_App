@@ -143,61 +143,66 @@ PreferredSizeWidget _buildAppBar(
       ],
     ),
     actions: [
-      // 1. Video Call Button
-      IconButton(
-        icon: Icon(Icons.videocam, color: context.textPrimary900, size: 24.sp),
-        onPressed: () {
-          if (isGroup) {
-            // Group video calls currently not supported
-            return;
-          }
-          if (targetUserId == null) {
-            // Target user not found
-            return;
-          }
-          // Resolve full avatar URL to ensure CallPage renders correctly
-          final avatarUrl = detail?.avatar != null
-              ? UrlResolver.resolveImage(context, displayAvatar)
-              : null;
+      // Call buttons are hidden for customer-service conversations
+      // (type SUPPORT or BUSINESS) — agents do not support WebRTC calls.
+      if (detail?.type != ConversationType.support &&
+          detail?.type != ConversationType.business) ...[
+        // 1. Video Call Button
+        IconButton(
+          icon: Icon(Icons.videocam, color: context.textPrimary900, size: 24.sp),
+          onPressed: () {
+            if (isGroup) {
+              // Group video calls currently not supported
+              return;
+            }
+            if (targetUserId == null) {
+              // Target user not found
+              return;
+            }
+            // Resolve full avatar URL to ensure CallPage renders correctly
+            final avatarUrl = detail?.avatar != null
+                ? UrlResolver.resolveImage(context, displayAvatar)
+                : null;
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CallPage(
-                targetId: targetUserId,
-                targetName: displayName,
-                targetAvatar: avatarUrl,
-                isVideo: true, // Enable camera
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CallPage(
+                  targetId: targetUserId,
+                  targetName: displayName,
+                  targetAvatar: avatarUrl,
+                  isVideo: true, // Enable camera
+                ),
               ),
-            ),
-          );
-        },
-      ),
-
-      // 2. Voice Call Button
-      IconButton(
-        icon: Icon(
-          Icons.call,
-          color: context.textPrimary900,
-          size: 22.sp,
+            );
+          },
         ),
-        onPressed: () {
-          if (isGroup) return;
-          if (targetUserId == null) return;
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CallPage(
-                targetId: targetUserId,
-                targetName: displayName,
-                targetAvatar: displayAvatar,
-                isVideo: false, // Voice-only mode
+        // 2. Voice Call Button
+        IconButton(
+          icon: Icon(
+            Icons.call,
+            color: context.textPrimary900,
+            size: 22.sp,
+          ),
+          onPressed: () {
+            if (isGroup) return;
+            if (targetUserId == null) return;
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CallPage(
+                  targetId: targetUserId,
+                  targetName: displayName,
+                  targetAvatar: displayAvatar,
+                  isVideo: false, // Voice-only mode
+                ),
               ),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        ),
+      ],
 
       // 3. More Actions (Profile/Settings)
       IconButton(
