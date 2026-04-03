@@ -159,53 +159,20 @@ extension GlobalHandlerSocketExtension on _GlobalHandlerState {
     // 【核心修改点 2】：确保初始化监听
     _initCallKitListener();
 
-    service.socket?.on(SocketEvents.callInvite, (data) async {
-      debugPrint(" [SOCKET_RAW] 收到原始呼叫信令: $data");
-      if (!mounted) return;
-      if (data is Map) data['type'] = SocketEvents.callInvite;
-
-      final currentStatus = ref.read(callStateMachineProvider).status;
-
-      await CallDispatcher.instance.dispatch(
-        data,
-        onNotify: (event) {
-          ref.read(callStateMachineProvider.notifier).onIncomingInvite(event);
-          //  核心防御 2：严禁重复弹窗！
-          // 只有当页面目前是空闲状态，才允许向栈顶压入 UI，杜绝 Web DOM 节点渲染崩溃
-          if (kIsWeb && currentStatus == CallStatus.idle) {
-            debugPrint(" [Web] 触发网页端自带来电 UI 跳转...");
-            final navigator = NavHub.key.currentState;
-            navigator?.push(
-              MaterialPageRoute(
-                builder: (_) => CallPage(
-                  targetId: event.senderId, // 从 event 里提取呼叫方信息
-                  targetName: event.senderName,
-                  targetAvatar: event.senderAvatar,
-                  isVideo: event.isVideo,
-                ),
-              ),
-            );
-          }
-        },
-      );
+    // Fix 2: Subscribe to future socket-ready events so that whenever the
+    // underlying IO.Socket is (re-)created and connects, we immediately
+    // re-register the direct call_invite / call_end listeners on the live
+    // socket instance.  This handles the race where init() is async and the
+    // socket doesn't exist yet when _subscribeToSocket is first invoked.
+    _socketConnectSub = service.onConnected.listen((_) {
+      if (mounted) {
+        debugPrint('🔌 [GlobalSocket] Socket connected — re-registering call listeners');
+        _registerCallListeners(service);
+      }
     });
 
-    service.socket?.on(SocketEvents.callEnd, (data) async {
-      if (!mounted) return;
-      if (data is Map) data['type'] = SocketEvents.callEnd;
-      await CallDispatcher.instance.dispatch(
-        data,
-        onNotify: (event) {
-          //  核心防误杀护盾 2：网络传来的挂断，也必须核对身份！
-          final currentSessionId = ref.read(callStateMachineProvider).sessionId;
-          if (currentSessionId == event.sessionId) {
-            ref.read(callStateMachineProvider.notifier).hangUp(emitEvent: false);
-          } else {
-            debugPrint(" [GlobalSocket] 收到旧电话 (${event.sessionId}) 的挂断信令，保护新通话 ($currentSessionId) 免遭误杀！");
-          }
-        },
-      );
-    });
+    // Also attempt immediate registration in case the socket is already live.
+    _registerCallListeners(service);
 
     _contactApplySub = service.contactApplyStream.listen((data) {
       if (!mounted) return;
@@ -265,6 +232,80 @@ extension GlobalHandlerSocketExtension on _GlobalHandlerState {
     });
   }
 
+  /// Registers (or re-registers) the direct socket listeners for call signaling
+  /// events.  Safe to call multiple times — always removes stale handlers first.
+  ///
+  /// Must be called:
+  ///   1. In [_subscribeToSocket] (if socket already exists), AND
+  ///   2. Every time [SocketService.onConnected] fires (new IO.Socket instance).
+  void _registerCallListeners(SocketService service) {
+    // Remove stale handlers to avoid duplicate callbacks on re-registration.
+    service.socket?.off(SocketEvents.callInvite);
+    service.socket?.off(SocketEvents.callEnd);
+
+    if (service.socket == null) {
+      debugPrint('🔌 [GlobalSocket] socket is null — call listeners deferred until onConnected');
+      return;
+    }
+
+    debugPrint('🔌 [GlobalSocket] Registering call_invite / call_end listeners');
+
+    service.socket!.on(SocketEvents.callInvite, (data) async {
+      debugPrint(" [SOCKET_RAW] 收到原始呼叫信令: $data");
+      if (!mounted) return;
+      if (data is Map) data['type'] = SocketEvents.callInvite;
+
+      final currentStatus = ref.read(callStateMachineProvider).status;
+
+      await CallDispatcher.instance.dispatch(
+        data,
+        onNotify: (event) {
+          // Step 1: Store SDP & caller info in state machine.
+          // showIncomingCall is triggered inside CallDispatcher._handleInvite
+          // (before onNotify fires) so that the FCM background path — which
+          // calls dispatch() without an onNotify — also gets the native screen.
+          // We only need to sync state here.
+          ref.read(callStateMachineProvider.notifier).onIncomingInvite(event);
+
+          // Step 2: Web — push CallPage directly (no native call screen).
+          //  核心防御 2：严禁重复弹窗！
+          // 只有当页面目前是空闲状态，才允许向栈顶压入 UI，杜绝 Web DOM 节点渲染崩溃
+          if (kIsWeb && currentStatus == CallStatus.idle) {
+            debugPrint(" [Web] 触发网页端自带来电 UI 跳转...");
+            final navigator = NavHub.key.currentState;
+            navigator?.push(
+              MaterialPageRoute(
+                builder: (_) => CallPage(
+                  targetId: event.senderId,
+                  targetName: event.senderName,
+                  targetAvatar: event.senderAvatar,
+                  isVideo: event.isVideo,
+                ),
+              ),
+            );
+          }
+        },
+      );
+    });
+
+    service.socket!.on(SocketEvents.callEnd, (data) async {
+      if (!mounted) return;
+      if (data is Map) data['type'] = SocketEvents.callEnd;
+      await CallDispatcher.instance.dispatch(
+        data,
+        onNotify: (event) {
+          //  核心防误杀护盾 2：网络传来的挂断，也必须核对身份！
+          final currentSessionId = ref.read(callStateMachineProvider).sessionId;
+          if (currentSessionId == event.sessionId) {
+            ref.read(callStateMachineProvider.notifier).hangUp(emitEvent: false);
+          } else {
+            debugPrint(" [GlobalSocket] 收到旧电话 (${event.sessionId}) 的挂断信令，保护新通话 ($currentSessionId) 免遭误杀！");
+          }
+        },
+      );
+    });
+  }
+
   void _showLuckyDrawTicketNotification(Map<String, dynamic> data) {
     // badge +1
     ref.read(luckyDrawUnreadCountProvider.notifier).update((n) => n + 1);
@@ -309,6 +350,10 @@ extension GlobalHandlerSocketExtension on _GlobalHandlerState {
     _contactAcceptSub?.cancel();
     _groupEventSub?.cancel();
     _luckyDrawSub?.cancel();
+    // Fix 2: Cancel the onConnected subscription to avoid stale callbacks
+    // when switching to a new SocketService instance.
+    _socketConnectSub?.cancel();
+    _socketConnectSub = null;
     _cachedSocketService?.socket?.off(SocketEvents.callInvite);
     _cachedSocketService?.socket?.off(SocketEvents.callEnd);
   }
