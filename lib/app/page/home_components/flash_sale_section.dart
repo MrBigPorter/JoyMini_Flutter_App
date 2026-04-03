@@ -249,14 +249,23 @@ class _HomeCountdownState extends State<_HomeCountdown> {
 // ---------------------------------------------------------------------------
 // Mini product card for horizontal scroll in home section
 // ---------------------------------------------------------------------------
-class _MiniProductCard extends StatelessWidget {
+class _MiniProductCard extends ConsumerWidget {
   final FlashSaleProductItem item;
   final bool sessionEnded;
 
   const _MiniProductCard({required this.item, required this.sessionEnded});
 
+  void _prefetchAndNavigate(BuildContext context, WidgetRef ref) {
+    ref.read(flashSaleProductDetailProvider(item.id));
+    final coverUrl = item.product.treasureCoverImg;
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      precacheImage(NetworkImage(coverUrl), context);
+    }
+    appRouter.push('/flash-sale/products/${item.id}');
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isSoldOut = item.isSoldOut;
     final isUnavailable = isSoldOut || sessionEnded;
     final flashPrice = double.tryParse(item.flashPrice) ?? 0.0;
@@ -265,7 +274,7 @@ class _MiniProductCard extends StatelessWidget {
     return GestureDetector(
       onTap: isUnavailable
           ? null
-          : () => appRouter.push('/flash-sale/products/${item.id}'),
+          : () => _prefetchAndNavigate(context, ref),
       child: Container(
         width: 115.w,
         decoration: BoxDecoration(

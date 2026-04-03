@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/app/routes/app_router.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
+import 'package:flutter_app/components/skeleton.dart';
 import 'package:flutter_app/components/swiper_banner.dart';
 import 'package:flutter_app/core/models/flash_sale.dart';
 import 'package:flutter_app/core/providers/flash_sale_provider.dart';
@@ -405,7 +405,7 @@ class _BottomBar extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Loading skeleton
+// Loading skeleton — mirrors the detail page layout so perceived load is instant
 // ---------------------------------------------------------------------------
 class _DetailSkeleton extends StatelessWidget {
   const _DetailSkeleton();
@@ -413,8 +413,83 @@ class _DetailSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BaseScaffold(
-      title: 'Flash Sale',
-      body: const Center(child: CupertinoActivityIndicator()),
+      title: '⚡ Flash Sale',
+      body: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Banner image placeholder
+            Skeleton.react(
+              width: double.infinity,
+              height: 280,
+              borderRadius: BorderRadius.zero,
+            ),
+            SizedBox(height: 12.h),
+            // Price + countdown row placeholder
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Container(
+                height: 80.h,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                padding: EdgeInsets.all(14.w),
+                child: Row(
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Skeleton.react(width: 120.w, height: 28.h, borderRadius: BorderRadius.circular(6.r)),
+                        SizedBox(height: 6.h),
+                        Skeleton.react(width: 80.w, height: 14.h, borderRadius: BorderRadius.circular(4.r)),
+                      ],
+                    ),
+                    const Spacer(),
+                    Skeleton.react(width: 90.w, height: 40.h, borderRadius: BorderRadius.circular(6.r)),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 12.h),
+            // Stock bar placeholder
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Skeleton.react(width: 140.w, height: 18.h, borderRadius: BorderRadius.circular(4.r)),
+            ),
+            SizedBox(height: 16.h),
+            // Title placeholder
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Skeleton.react(width: double.infinity, height: 22.h, borderRadius: BorderRadius.circular(4.r)),
+            ),
+            SizedBox(height: 8.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Skeleton.react(width: 200.w, height: 16.h, borderRadius: BorderRadius.circular(4.r)),
+            ),
+            SizedBox(height: 24.h),
+            // Description placeholder lines
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Column(
+                children: List.generate(
+                  5,
+                  (i) => Padding(
+                    padding: EdgeInsets.only(bottom: 10.h),
+                    child: Skeleton.react(
+                      width: i == 4 ? 160.w : double.infinity,
+                      height: 14.h,
+                      borderRadius: BorderRadius.circular(4.r),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -442,7 +517,7 @@ class _ErrorBody extends StatelessWidget {
           SizedBox(height: 16.h),
           ElevatedButton.icon(
             onPressed: onRetry,
-            icon: const Icon(CupertinoIcons.refresh),
+            icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
           ),
         ],

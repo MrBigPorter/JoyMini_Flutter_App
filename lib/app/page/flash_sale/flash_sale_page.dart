@@ -269,15 +269,29 @@ class _CountdownChips extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 // Product card in the grid
+// ConsumerWidget so we can pre-warm the detail provider on tap before the
+// route transition begins — avoids the blank skeleton on slow connections.
 // ---------------------------------------------------------------------------
-class _ProductCard extends StatelessWidget {
+class _ProductCard extends ConsumerWidget {
   final FlashSaleProductItem item;
   final bool sessionEnded;
 
   const _ProductCard({required this.item, required this.sessionEnded});
 
+  void _prefetchAndNavigate(BuildContext context, WidgetRef ref) {
+    // 1. Warm the detail provider so the API call is in-flight during route push.
+    ref.read(flashSaleProductDetailProvider(item.id));
+    // 2. Pre-warm cover image into the Flutter image cache.
+    final coverUrl = item.product.treasureCoverImg;
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      precacheImage(NetworkImage(coverUrl), context);
+    }
+    // 3. Navigate.
+    appRouter.push('/flash-sale/products/${item.id}');
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isSoldOut = item.isSoldOut;
     final isUnavailable = isSoldOut || sessionEnded;
     final flashPrice = double.tryParse(item.flashPrice) ?? 0.0;
@@ -289,7 +303,7 @@ class _ProductCard extends StatelessWidget {
     return GestureDetector(
       onTap: isUnavailable
           ? null
-          : () => appRouter.push('/flash-sale/products/${item.id}'),
+          : () => _prefetchAndNavigate(context, ref),
       child: Container(
         decoration: BoxDecoration(
           color: context.bgPrimary,
@@ -392,7 +406,7 @@ class _ProductCard extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: isUnavailable
                           ? null
-                          : () => appRouter.push('/flash-sale/products/${item.id}'),
+                          : () => _prefetchAndNavigate(context, ref),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isUnavailable ? Colors.grey.shade300 : Colors.red,
                         foregroundColor: isUnavailable ? Colors.grey.shade600 : Colors.white,
