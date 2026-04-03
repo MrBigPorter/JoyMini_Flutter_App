@@ -5,24 +5,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/app/routes/app_router.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
+import 'package:flutter_app/components/swiper_banner.dart';
 import 'package:flutter_app/core/models/flash_sale.dart';
 import 'package:flutter_app/core/providers/flash_sale_provider.dart';
-import 'package:flutter_app/ui/img/app_image.dart';
+import 'package:flutter_app/ui/html/product_html_content.dart';
+import 'package:flutter_app/ui/img/optimized_image.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 
 // ---------------------------------------------------------------------------
 // Flash Sale Product Detail Page
 // Route: /flash-sale/products/:id  (id = flashSaleProductId)
-//
-// States to handle:
-//   • Loading  → Skeleton
-//   • Error    → Retry
-//   • Ended    → "Flash Sale Ended" disabled CTA
-//   • Sold Out → "Sold Out" disabled CTA
-//   • Normal   → "Buy Now" → navigate to /payment?flashSaleProductId=...&treasureId=...
 // ---------------------------------------------------------------------------
 class FlashSaleProductPage extends ConsumerWidget {
   final String flashSaleProductId;
@@ -47,12 +41,8 @@ class FlashSaleProductPage extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Full detail body once data is loaded
-// ---------------------------------------------------------------------------
 class _DetailBody extends StatefulWidget {
   final FlashSaleProductDetail detail;
-
   const _DetailBody({required this.detail});
 
   @override
@@ -94,9 +84,8 @@ class _DetailBodyState extends State<_DetailBody> {
   bool get _canBuy => !_isEnded && !_isSoldOut;
 
   void _goToCheckout() {
-    final treasureId = widget.detail.treasureId;
     appRouter.push(
-      '/payment?treasureId=$treasureId&flashSaleProductId=${widget.detail.id}&isGroupBuy=false',
+      '/payment?treasureId=${widget.detail.treasureId}&flashSaleProductId=${widget.detail.id}&isGroupBuy=false',
     );
   }
 
@@ -108,6 +97,9 @@ class _DetailBodyState extends State<_DetailBody> {
     final images = detail.product.mainImageList.isNotEmpty
         ? detail.product.mainImageList
         : [detail.product.treasureCoverImg ?? ''];
+    final int discountPct = (originalPrice > 0 && flashPrice < originalPrice)
+        ? ((1 - flashPrice / originalPrice) * 100).round()
+        : 0;
 
     return BaseScaffold(
       title: '⚡ Flash Sale',
@@ -115,47 +107,45 @@ class _DetailBodyState extends State<_DetailBody> {
         canBuy: _canBuy,
         isEnded: _isEnded,
         isSoldOut: _isSoldOut,
+        discountPct: discountPct,
         onBuy: _goToCheckout,
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Hero image
-            AppCachedImage(
-              images.first,
-              width: double.infinity,
-              height: 280.w,
-              fit: BoxFit.cover,
-            ),
-
+            // 顶部图片：多图轮播，单图优化加载
+            if (images.length > 1)
+              SwiperBanner(
+                width: 1.sw,
+                height: 280.w,
+                borderRadius: 0,
+                banners: images,
+              )
+            else
+              OptimizedImageFactory.banner(
+                url: images.first,
+                width: 1.sw,
+                height: 280.w,
+                borderRadius: BorderRadius.zero,
+              ),
             SizedBox(height: 12.h),
-
-            // Price + countdown row
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: _PriceCountdownRow(
                 flashPrice: flashPrice,
                 originalPrice: originalPrice,
+                discountPct: discountPct,
                 remaining: _remaining,
                 isEnded: _isEnded,
               ),
             ),
-
             SizedBox(height: 12.h),
-
-            // Stock bar
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
-              child: _StockBar(
-                flashStock: detail.flashStock,
-                isSoldOut: _isSoldOut,
-              ),
+              child: _StockBar(flashStock: detail.flashStock, isSoldOut: _isSoldOut),
             ),
-
             SizedBox(height: 16.h),
-
-            // Product name
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Text(
@@ -163,176 +153,38 @@ class _DetailBodyState extends State<_DetailBody> {
                 style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: context.textPrimary900),
               ),
             ),
-
             if (detail.product.productName != null && detail.product.productName!.isNotEmpty) ...[
               SizedBox(height: 4.h),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.w),
-                child: Text(
-                  detail.product.productName!,
-                  style: TextStyle(fontSize: 13.sp, color: context.textSecondary700),
-                ),
+                child: Text(detail.product.productName!, style: TextStyle(fontSize: 13.sp, color: context.textSecondary700)),
               ),
             ],
-
             SizedBox(height: 16.h),
-
-            // Description
             if (detail.product.desc != null && detail.product.desc!.isNotEmpty) ...[
               _SectionDivider(title: 'Description'),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                child: _buildHtmlContent(detail.product.desc!),
+                child: ProductHtmlContent(
+                  html: detail.product.desc!,
+                  textStyle: TextStyle(fontSize: 13.sp, color: context.textSecondary700, height: 1.6),
+                ),
               ),
             ],
-
-            // Rules
             if (detail.product.ruleContent != null && detail.product.ruleContent!.isNotEmpty) ...[
               _SectionDivider(title: 'Rules'),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                child: _buildHtmlContent(detail.product.ruleContent!),
+                child: ProductHtmlContent(
+                  html: detail.product.ruleContent!,
+                  textStyle: TextStyle(fontSize: 13.sp, color: context.textSecondary700, height: 1.6),
+                ),
               ),
             ],
-
-            // Image gallery
-            if (images.length > 1) ...[
-              _SectionDivider(title: 'Photos'),
-              ...images.map((url) => Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8.r),
-                      child: AppCachedImage(url, width: double.infinity, fit: BoxFit.fitWidth),
-                    ),
-                  )),
-            ],
-
             SizedBox(height: 120.h),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildHtmlContent(String html) {
-    return RepaintBoundary(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: constraints.maxWidth),
-            child: _buildHtmlWidget(
-              html,
-              maxWidth: constraints.maxWidth,
-              allowBlockScroll: true,
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildHtmlWidget(
-    String html, {
-    required double maxWidth,
-    required bool allowBlockScroll,
-  }) {
-    return HtmlWidget(
-      html,
-      textStyle: TextStyle(
-        fontSize: 13.sp,
-        color: context.textSecondary700,
-        height: 1.6,
-      ),
-      buildAsync: true,
-      customWidgetBuilder: allowBlockScroll
-          ? (element) {
-              final tag = element.localName;
-              if (tag == 'table' || tag == 'pre') {
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const ClampingScrollPhysics(),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: maxWidth),
-                    child: _buildHtmlWidget(
-                      element.outerHtml,
-                      maxWidth: maxWidth,
-                      allowBlockScroll: false,
-                    ),
-                  ),
-                );
-              }
-              return null;
-            }
-          : null,
-      customStylesBuilder: (element) {
-        final tag = element.localName;
-        final inlineStyle =
-            (element.attributes['style'] ?? '').toLowerCase();
-
-        if (inlineStyle.contains('display:flex')) {
-          return {
-            'display': 'block',
-            'max-width': '100%',
-            'width': '100%',
-            'word-break': 'break-word',
-            'overflow-wrap': 'anywhere',
-          };
-        }
-
-        if (inlineStyle.contains('white-space:nowrap')) {
-          return {
-            'white-space': 'normal',
-            'word-break': 'break-word',
-            'overflow-wrap': 'anywhere',
-          };
-        }
-
-        if (const {
-          'p',
-          'div',
-          'span',
-          'li',
-          'a',
-          'strong',
-          'em',
-          'td',
-          'th',
-        }.contains(tag)) {
-          return {
-            'white-space': 'normal',
-            'word-break': 'break-word',
-            'overflow-wrap': 'anywhere',
-            'max-width': '100%',
-          };
-        }
-
-        if (tag == 'img') {
-          return {
-            'display': 'block',
-            'max-width': '100%',
-            'height': 'auto',
-          };
-        }
-
-        if (tag == 'table') {
-          return {
-            'max-width': '100%',
-            'width': '100%',
-            'table-layout': 'fixed',
-          };
-        }
-
-        if (tag == 'pre' || tag == 'code') {
-          return {
-            'white-space': 'pre-wrap',
-            'word-break': 'break-word',
-            'overflow-wrap': 'anywhere',
-            'max-width': '100%',
-          };
-        }
-
-        return null;
-      },
     );
   }
 }
@@ -343,12 +195,14 @@ class _DetailBodyState extends State<_DetailBody> {
 class _PriceCountdownRow extends StatelessWidget {
   final double flashPrice;
   final double originalPrice;
+  final int discountPct;
   final Duration remaining;
   final bool isEnded;
 
   const _PriceCountdownRow({
     required this.flashPrice,
     required this.originalPrice,
+    required this.discountPct,
     required this.remaining,
     required this.isEnded,
   });
@@ -375,7 +229,6 @@ class _PriceCountdownRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Flash price
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -384,12 +237,19 @@ class _PriceCountdownRow extends StatelessWidget {
                   Icon(Icons.bolt, color: isEnded ? Colors.grey : Colors.red, size: 20.w),
                   Text(
                     FormatHelper.formatCurrency(flashPrice),
-                    style: TextStyle(
-                      fontSize: 24.sp,
-                      fontWeight: FontWeight.w900,
-                      color: isEnded ? Colors.grey : Colors.red,
-                    ),
+                    style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.w900, color: isEnded ? Colors.grey : Colors.red),
                   ),
+                  if (discountPct > 0 && !isEnded) ...[
+                    SizedBox(width: 8.w),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                      decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4.r)),
+                      child: Text(
+                        '$discountPct% OFF',
+                        style: TextStyle(fontSize: 10.sp, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               if (originalPrice > flashPrice)
@@ -405,14 +265,10 @@ class _PriceCountdownRow extends StatelessWidget {
             ],
           ),
           const Spacer(),
-          // Countdown or Ended badge
           if (isEnded)
             Container(
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade400,
-                borderRadius: BorderRadius.circular(20.r),
-              ),
+              decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(20.r)),
               child: Text('Ended', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.sp)),
             )
           else
@@ -423,10 +279,7 @@ class _PriceCountdownRow extends StatelessWidget {
                 SizedBox(height: 4.h),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(6.r),
-                  ),
+                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6.r)),
                   child: Text(
                     _fmt(remaining),
                     style: TextStyle(
@@ -466,11 +319,7 @@ class _StockBar extends StatelessWidget {
         SizedBox(width: 6.w),
         Text(
           isSoldOut ? 'Sold Out' : '$flashStock left in stock',
-          style: TextStyle(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w600,
-            color: isSoldOut ? Colors.grey : Colors.orange.shade700,
-          ),
+          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: isSoldOut ? Colors.grey : Colors.orange.shade700),
         ),
       ],
     );
@@ -506,12 +355,14 @@ class _BottomBar extends StatelessWidget {
   final bool canBuy;
   final bool isEnded;
   final bool isSoldOut;
+  final int discountPct;
   final VoidCallback onBuy;
 
   const _BottomBar({
     required this.canBuy,
     required this.isEnded,
     required this.isSoldOut,
+    required this.discountPct,
     required this.onBuy,
   });
 
@@ -521,7 +372,9 @@ class _BottomBar extends StatelessWidget {
         ? 'Sold Out'
         : isEnded
             ? 'Flash Sale Ended'
-            : '⚡ Buy Now (Flash Price)';
+            : discountPct > 0
+                ? '⚡ Buy Now · Save $discountPct%'
+                : '⚡ Buy Now (Flash Price)';
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
@@ -597,4 +450,3 @@ class _ErrorBody extends StatelessWidget {
     );
   }
 }
-

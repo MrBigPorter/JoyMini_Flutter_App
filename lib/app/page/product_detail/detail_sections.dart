@@ -1,20 +1,15 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/ui/img/app_image.dart';
+
 import 'package:flutter_app/ui/img/optimized_image.dart';
-import 'package:flutter_app/utils/image/performance_monitor.dart';
 import 'package:flutter_countdown_timer/flutter_countdown_timer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-
-// --- Core Dependencies ---
+import 'package:flutter_app/ui/html/product_html_content.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/skeleton.dart';
 import 'package:flutter_app/components/swiper_banner.dart';
@@ -893,13 +888,12 @@ class _DetailContentSectionState extends State<DetailContentSection>
             SizedBox(height: 16.h),
 
             // 【修复 P2】用 IndexedStack 替代 AnimatedSize + setState 切换。
-            // 两个 Tab 的 HtmlWidget 同时存活，切换时无需重新解析 HTML，零重建开销。
-            // ConstrainedBox 替代 AnimatedSize，高度由内容自然撑开。
+            // 两个 Tab 的内容同时存活，切换时无需重建，零重建开销。
             IndexedStack(
               index: _currentIndex,
               children: [
-                _buildHtmlContent(widget.desc ?? 'common.no_data'.tr()),
-                _buildHtmlContent(widget.ruleContent ?? 'common.no_data'.tr()),
+                ProductHtmlContent(html: widget.desc ?? 'common.no_data'.tr()),
+                ProductHtmlContent(html: widget.ruleContent ?? 'common.no_data'.tr()),
               ],
             ),
           ],
@@ -908,111 +902,5 @@ class _DetailContentSectionState extends State<DetailContentSection>
     );
   }
 
-  Widget _buildHtmlContent(String html) {
-    return RepaintBoundary(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: constraints.maxWidth),
-            child: _buildHtmlWidget(
-              html,
-              maxWidth: constraints.maxWidth,
-              allowBlockScroll: true,
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildHtmlWidget(
-    String html, {
-    required double maxWidth,
-    required bool allowBlockScroll,
-  }) {
-    return HtmlWidget(
-      html,
-      textStyle: TextStyle(fontSize: 13.sp),
-      buildAsync: true,
-      customWidgetBuilder: allowBlockScroll
-          ? (element) {
-              final tag = element.localName;
-              if (tag == 'table' || tag == 'pre') {
-                // Only oversized blocks can scroll horizontally.
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const ClampingScrollPhysics(),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: maxWidth),
-                    child: _buildHtmlWidget(
-                      element.outerHtml,
-                      maxWidth: maxWidth,
-                      allowBlockScroll: false,
-                    ),
-                  ),
-                );
-              }
-              return null;
-            }
-          : null,
-      customStylesBuilder: (element) {
-        final tag = element.localName;
-        final inlineStyle = (element.attributes['style'] ?? '').toLowerCase();
-
-        if (inlineStyle.contains('display:flex')) {
-          return {
-            'display': 'block',
-            'max-width': '100%',
-            'width': '100%',
-            'word-break': 'break-word',
-            'overflow-wrap': 'anywhere',
-          };
-        }
-
-        if (inlineStyle.contains('white-space:nowrap')) {
-          return {
-            'white-space': 'normal',
-            'word-break': 'break-word',
-            'overflow-wrap': 'anywhere',
-          };
-        }
-
-        if (const {'p', 'div', 'span', 'li', 'a', 'strong', 'em', 'td', 'th'}.contains(tag)) {
-          return {
-            'white-space': 'normal',
-            'word-break': 'break-word',
-            'overflow-wrap': 'anywhere',
-            'max-width': '100%',
-          };
-        }
-
-        if (tag == 'img') {
-          return {
-            'display': 'block',
-            'max-width': '100%',
-            'height': 'auto',
-          };
-        }
-
-        if (tag == 'table') {
-          return {
-            'max-width': '100%',
-            'width': '100%',
-            'table-layout': 'fixed',
-          };
-        }
-
-        if (tag == 'pre' || tag == 'code') {
-          return {
-            'white-space': 'pre-wrap',
-            'word-break': 'break-word',
-            'overflow-wrap': 'anywhere',
-            'max-width': '100%',
-          };
-        }
-
-        return null;
-      },
-    );
-  }
 }
+
