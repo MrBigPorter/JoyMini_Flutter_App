@@ -47,29 +47,28 @@ class Ending extends StatelessWidget {
               final item = list![index];
               final animationDelay = ((index % 5) * 30).ms;
 
-              //  核心修复：必须加上 AspectRatio！
-              // 它把无底洞一样的水平列表宽度，强制约束成了与高度对应的有限数值！
               return AspectRatio(
                 aspectRatio: 165 / 380,
                 child: ProductItem(
                   data: item,
                 ),
               )
+                  // 【修复 P3】flipH 需要 perspective matrix（3D transform），GPU 开销最高。
+                  // 改为 slideX（普通位移），视觉效果相近，GPU 压力大幅降低。
                   .animate(delay: animationDelay)
                   .fadeIn(duration: 400.ms, curve: Curves.easeOut)
-                  .flipH(
-                begin: -0.15,
-                end: 0,
-                duration: 450.ms,
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.center,
-              )
+                  .slideX(
+                    begin: -0.12,
+                    end: 0,
+                    duration: 450.ms,
+                    curve: Curves.easeOutCubic,
+                  )
                   .scale(
-                begin: const Offset(0.95, 0.95),
-                end: const Offset(1, 1),
-                duration: 450.ms,
-                curve: Curves.easeOut,
-              );
+                    begin: const Offset(0.95, 0.95),
+                    end: const Offset(1, 1),
+                    duration: 450.ms,
+                    curve: Curves.easeOut,
+                  );
             },
           ),
         ),

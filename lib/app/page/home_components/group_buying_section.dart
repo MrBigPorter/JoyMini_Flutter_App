@@ -1,19 +1,17 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_app/ui/img/app_image.dart';
+import 'package:flutter_app/ui/img/optimized_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flutter_app/core/models/product_list_item.dart';
 import 'package:flutter_app/theme/design_tokens.g.dart';
-import 'package:flutter_app/utils/media/remote_url_builder.dart';
 import 'package:flutter_app/app/routes/app_router.dart';
 import 'package:flutter_app/core/providers/index.dart';
 
 import '../../../features/share/models/share_content.dart';
 import '../../../features/share/services/app_share_manager.dart';
-import '../../../utils/media/url_resolver.dart';
 
 // ==============================================================================
 // 1. 主区域组件: GroupBuyingSection 
@@ -138,17 +136,15 @@ class GroupBuyingCard extends ConsumerWidget {
         : [];
 
     return GestureDetector(
-      //  核心优化：外层点击卡片跳转时，增加 await 等待路由返回
       onTap: () async {
+        // 【修复 P2】去掉无条件强制刷新。
+        // 购买成功时由订单成功页设置 homeNeedsRefreshProvider = true，home_page 统一响应。
+        // 用户只是"看了一眼"返回不应触发 API 请求。
         await appRouter.pushNamed(
           'productDetail',
-          pathParameters: {'id': item.treasureId ?? ''},
+          pathParameters: {'id': item.treasureId},
           queryParameters: {'autoOpenGroup': isJoined ? 'false' : 'true'},
         );
-
-        //  用户返回首页后，静默触发刷新
-        ref.read(homeGroupBuyingProvider.notifier).forceRefresh();
-        ref.read(homeTreasuresProvider.notifier).forceRefresh();
       },
       child: Container(
         width: 300.w, // 固定卡片宽度
@@ -255,30 +251,14 @@ class GroupBuyingCard extends ConsumerWidget {
   // --- 子组件提取 ---
 
   Widget _buildProductImage(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12.r),
+      child: OptimizedImageFactory.product(
+        // 【修复】统一走 OptimizedImage，与 ProductItem / FlashSale 共用同一套缓存
+        url: item.treasureCoverImg ?? '',
+        width: 90.w,
+        height: 110.w,
         borderRadius: BorderRadius.circular(12.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12.r),
-        child:AppCachedImage(
-          // 【核心修复】：统一使用 UrlResolver 加上 166 宽度！
-          UrlResolver.resolveImage(
-              context,
-              item.treasureCoverImg,
-              logicalWidth: 166
-          ),
-          width: 90.w,
-          height: 110.w,
-          fit: BoxFit.cover,
-        ),
       ),
     );
   }
@@ -353,15 +333,12 @@ class GroupBuyingCard extends ConsumerWidget {
             ),
           );
         } else {
-          // --- 状态B：未加入 -> 拦截等待跳转详情页 ---
+          // --- 状态B：未加入 -> 跳转详情页（返回后由 homeNeedsRefreshProvider 驱动刷新）
           await appRouter.pushNamed(
             'productDetail',
-            pathParameters: {'id': item.treasureId ?? ''},
+            pathParameters: {'id': item.treasureId},
             queryParameters: {'autoOpenGroup': 'true'},
           );
-
-          //  从详情页返回后，静默触发刷新
-          ref.read(homeGroupBuyingProvider.notifier).forceRefresh();
         }
       },
       child: Container(

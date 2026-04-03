@@ -8,10 +8,9 @@ import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/render_countdown.dart';
 import 'package:flutter_app/ui/bubble_progress.dart';
 import 'package:flutter_app/ui/button/index.dart';
-import 'package:flutter_app/ui/img/app_image.dart';
+import 'package:flutter_app/ui/img/optimized_image.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 import 'package:flutter_app/core/models/index.dart';
-import 'package:flutter_app/utils/media/remote_url_builder.dart';
 
 class SpecialArea extends StatelessWidget {
   final List<ProductListItem>? list;
@@ -109,12 +108,12 @@ class SpecialArea extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppCachedImage(
-              RemoteUrlBuilder.fitAbsoluteUrl(item.treasureCoverImg ?? ''),
+            // 【修复】统一走 OptimizedImageFactory，消除双重 CDN 处理，与其他组件共享缓存
+            OptimizedImageFactory.product(
+              url: item.treasureCoverImg ?? '',
               width: 80.w,
               height: 80.w,
-              fit: BoxFit.cover,
-              radius: BorderRadius.circular(8.r),
+              borderRadius: BorderRadius.circular(8.r),
             ),
             SizedBox(width: 10.w),
             Expanded(

@@ -32,6 +32,7 @@ import 'package:flutter_app/ui/modal/sheet/radix_sheet.dart';
 import 'package:flutter_app/ui/toast/radix_toast.dart';
 
 import 'package:flutter_app/core/store/auth/auth_provider.dart';
+import 'package:flutter_app/core/providers/socket_provider.dart';
 import 'package:flutter_app/features/share/models/share_content.dart';
 import 'package:flutter_app/features/share/services/app_share_manager.dart';
 
@@ -530,19 +531,44 @@ class GroupSection extends ConsumerStatefulWidget {
 }
 
 class _GroupSectionState extends ConsumerState<GroupSection> {
-  Timer? _refreshTimer;
+  StreamSubscription<Map<String, dynamic>>? _groupUpdateSub;
+  Timer? _fallbackTimer;
+  Timer? _debounceTimer; // 防抖，合并短时间内多次推送
 
   @override
   void initState() {
     super.initState();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      ref.invalidate(groupsPreviewProvider(widget.treasureId));
+
+    _groupUpdateSub = ref
+        .read(socketServiceProvider)
+        .groupUpdateStream
+        .listen(_handleGroupUpdate);
+
+    // 兜底定时器：2 分钟一次，防 WebSocket 断线时数据长时间不更新
+    _fallbackTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (mounted) ref.invalidate(groupsPreviewProvider(widget.treasureId));
+    });
+  }
+
+  /// 处理 group_update 推送：
+  /// 1. 按 treasureId 过滤，只响应当前商品的团更新
+  /// 2. 500ms 防抖，短时间内多次推送合并成一次 invalidate
+  void _handleGroupUpdate(Map<String, dynamic> data) {
+    // 如果后端推送了 treasureId，则只处理匹配的商品
+    final String? eventTreasureId = data['treasureId'] as String?;
+    if (eventTreasureId != null && eventTreasureId != widget.treasureId) return;
+
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) ref.invalidate(groupsPreviewProvider(widget.treasureId));
     });
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _groupUpdateSub?.cancel();
+    _fallbackTimer?.cancel();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -865,13 +891,16 @@ class _DetailContentSectionState extends State<DetailContentSection>
               ],
             ),
             SizedBox(height: 16.h),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOutCubic,
-              alignment: Alignment.topCenter,
-              child: _currentIndex == 0
-                  ? _buildHtmlContent(widget.desc ?? 'common.no_data'.tr())
-                  : _buildHtmlContent(widget.ruleContent ?? 'common.no_data'.tr()),
+
+            // 【修复 P2】用 IndexedStack 替代 AnimatedSize + setState 切换。
+            // 两个 Tab 的 HtmlWidget 同时存活，切换时无需重新解析 HTML，零重建开销。
+            // ConstrainedBox 替代 AnimatedSize，高度由内容自然撑开。
+            IndexedStack(
+              index: _currentIndex,
+              children: [
+                _buildHtmlContent(widget.desc ?? 'common.no_data'.tr()),
+                _buildHtmlContent(widget.ruleContent ?? 'common.no_data'.tr()),
+              ],
             ),
           ],
         ),
