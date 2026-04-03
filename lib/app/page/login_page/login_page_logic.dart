@@ -13,102 +13,22 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   bool _socialOauthInFlight = false;
   bool _isSuccessRedirecting = false;
   bool _oauthCancelled = false;
-  bool _oauthRecoveryStarted = false;
-
-  /// 记录 App 是否在 OAuth 等待期间进入了后台（浏览器打开）
-  bool _appWentToBackground = false;
-  Timer? _cancelAfterResumeTimer;
 
   @override
   void initState() {
     super.initState();
-
-    // 注意：WidgetsBinding.instance.addObserver 由 _LoginPageState 负责
-    // 添加页面返回监听
     if (isAppRouterReady) {
       appRouter.routeInformationProvider.addListener(_onRouteChanged);
     }
-
-    // 移除老OAuth Provider重置逻辑，Deep Link OAuth不需要
-    _checkForOAuthRecovery();
   }
 
-  /// 由 _LoginPageState.didChangeAppLifecycleState 调用
-  /// 监听 App 生命周期变化
-  /// - paused：App 进入后台（OAuth 浏览器打开时发生）
-  /// - resumed：App 回到前台（用户关闭浏览器时发生）
-  void handleLifecycleChange(AppLifecycleState state) {
-    if (!_socialOauthInFlight || _isSuccessRedirecting) return;
-
-    // Flutter 页面模式：OAuth 页面就在 Navigator 栈里，
-    // 用户切换 App 再回来仍可继续完成授权，不需要自动取消
-    // （降级 InAppBrowser 模式才需要自动取消）
-    if (!DeepLinkOAuthService.isInAppBrowserMode) return;
-
-    if (state == AppLifecycleState.paused) {
-      _appWentToBackground = true;
-      _cancelAfterResumeTimer?.cancel();
-      debugPrint('[LoginPage] App went to background during OAuth (InAppBrowser mode)');
-    } else if (state == AppLifecycleState.resumed && _appWentToBackground) {
-      _appWentToBackground = false;
-      _cancelAfterResumeTimer?.cancel();
-      _cancelAfterResumeTimer = Timer(const Duration(seconds: 3), () {
-        if (!mounted || !_socialOauthInFlight || _isSuccessRedirecting) return;
-        debugPrint('[LoginPage] No deep link after resume, auto-cancelling OAuth');
-        DeepLinkOAuthService.cancelLogin();
-        if (mounted && _socialOauthInFlight && !_isSuccessRedirecting) {
-          setState(() {
-            _socialOauthInFlight = false;
-            _oauthCancelled = true;
-          });
-        }
-      });
-    }
-  }
-
-  /// 用户主动点击"取消"按钮
-  void cancelOAuth() {
-    _cancelAfterResumeTimer?.cancel();
-    DeepLinkOAuthService.cancelLogin();
-    if (mounted && _socialOauthInFlight && !_isSuccessRedirecting) {
-      setState(() {
-        _socialOauthInFlight = false;
-        _oauthCancelled = true;
-      });
-    }
-  }
-
+  /// 路由监听：如果用户在 OAuth 进行中被 deep link 带离登录页，重置 loading 状态
   void _onRouteChanged() {
     if (!mounted) return;
-    
     final currentPath = appRouter.routeInformationProvider.value.uri.path;
     if (currentPath != '/login' && _socialOauthInFlight) {
-      // 如果离开登录页但OAuth仍在进行中，取消OAuth并重置状态
-      debugPrint('[LoginPage] Route changed away from login, cancelling OAuth');
-      DeepLinkOAuthService.cancelLogin();
+      debugPrint('[LoginPage] Route changed away from login, resetting OAuth state');
       if (mounted) {
-        setState(() => _socialOauthInFlight = false);
-      }
-    }
-  }
-
-  Future<void> _checkForOAuthRecovery() async {
-    if (!mounted || _oauthRecoveryStarted) return;
-
-    if (isAppRouterReady) {
-      final currentPath = appRouter.routeInformationProvider.value.uri.path;
-      if (currentPath == '/oauth/processing') return;
-    }
-
-    _oauthRecoveryStarted = true;
-
-    // Deep Link OAuth 不需要 Web 重定向恢复逻辑
-    // 所有 OAuth 状态由后端管理，前端只需等待 Deep Link 回调
-
-    try {
-      await GlobalOAuthHandler.checkAndRecoverInterruptedOAuth();
-    } finally {
-      if (mounted && !_isSuccessRedirecting) {
         setState(() => _socialOauthInFlight = false);
       }
     }
@@ -168,9 +88,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   }
 
   Future<void> _syncLoginTokens(String accessToken, String refreshToken) async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     final auth = ref.read(authProvider.notifier);
     await auth.login(accessToken, refreshToken);
   }
@@ -183,13 +101,12 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       final result = await DeepLinkOAuthService.loginWithGoogle(
         apiBaseUrl: OAuthConfig.apiBaseUrl,
         inviteCode: _currentInviteCode(),
-        context: context, // 传 context → 使用 Flutter 页面（有返回键 + 刘海适配）
+        context: context,
       );
 
       if (!mounted) return;
 
       _isSuccessRedirecting = true;
-      _cancelAfterResumeTimer?.cancel();
       await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
       if (mounted) setState(() => _socialOauthInFlight = false);
@@ -227,7 +144,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       if (!mounted) return;
 
       _isSuccessRedirecting = true;
-      _cancelAfterResumeTimer?.cancel();
       await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
       if (mounted) setState(() => _socialOauthInFlight = false);
@@ -265,7 +181,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       if (!mounted) return;
 
       _isSuccessRedirecting = true;
-      _cancelAfterResumeTimer?.cancel();
       await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
       if (mounted) setState(() => _socialOauthInFlight = false);
@@ -324,16 +239,6 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
 
   @override
   void dispose() {
-    // 注意：WidgetsBinding.instance.removeObserver 由 _LoginPageState 负责
-    // 取消 resume 延迟取消计时器
-    _cancelAfterResumeTimer?.cancel();
-    // 取消所有进行中的 OAuth 登录
-    DeepLinkOAuthService.cancelLogin();
-    // 确保按钮 loading 状态被重置
-    if (_socialOauthInFlight) {
-      _socialOauthInFlight = false;
-    }
-    // 移除路由监听
     if (isAppRouterReady) {
       appRouter.routeInformationProvider.removeListener(_onRouteChanged);
     }

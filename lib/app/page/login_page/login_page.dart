@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart'; // 引入动画库
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/core/providers/auth_provider.dart';
@@ -24,14 +24,9 @@ import 'package:flutter_app/core/services/auth/oauth_exception.dart';
 import 'package:flutter_app/core/services/auth/deep_link_oauth_service.dart';
 import 'package:flutter_app/core/config/oauth_config.dart';
 
-// 导入全局appRouter
 import 'package:flutter_app/app/routes/app_router.dart';
 
-import 'package:flutter_app/core/services/auth/global_oauth_handler.dart';
-
-// 关联 logic 和 ui 文件
 part 'login_page_logic.dart';
-
 part 'login_page_ui.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -41,26 +36,7 @@ class LoginPage extends ConsumerStatefulWidget {
   ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-// 混入 Logic，使用 UI extension 中的 buildUI
-class _LoginPageState extends ConsumerState<LoginPage>
-    with LoginPageLogic, WidgetsBindingObserver {
-  @override
-  void initState() {
-    super.initState(); // 调用 LoginPageLogic.initState
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose(); // 调用 LoginPageLogic.dispose
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    handleLifecycleChange(state);
-  }
-
+class _LoginPageState extends ConsumerState<LoginPage> with LoginPageLogic {
   @override
   Widget build(BuildContext context) {
     return buildUI(context);

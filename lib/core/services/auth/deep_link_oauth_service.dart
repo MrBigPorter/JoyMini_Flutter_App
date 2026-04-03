@@ -26,12 +26,17 @@ class DeepLinkOAuthService {
 
   static final AppLinks _appLinks = AppLinks();
   static StreamSubscription<Uri>? _deepLinkSubscription;
-  static Completer<Map<String, String>>? _loginCompleter;
   static bool _initialized = false;
 
   static bool get canShowGoogleButton => true;
   static bool get canShowFacebookButton => true;
-  static bool get canShowAppleButton => true;
+
+  /// Apple Sign-In は Apple プラットフォームと Web のみで表示
+  static bool get canShowAppleButton {
+    if (kIsWeb) return true;
+    return defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+  }
 
   /// 检查后端 OAuth 配置是否正常
   static Future<bool> checkOAuthConfiguration(String apiBaseUrl) async {
@@ -68,18 +73,12 @@ class DeepLinkOAuthService {
     if (kDebugMode) debugPrint('[DeepLinkOAuthService] Received URI: $uri');
 
     if (uri.scheme == 'joymini' && uri.host == 'oauth') {
-      if (kDebugMode) debugPrint('[DeepLinkOAuthService] Processing OAuth Deep Link: $uri');
-      final token = uri.queryParameters['token'];
-      final refreshToken = uri.queryParameters['refreshToken'];
-      if (token != null && _loginCompleter != null && !_loginCompleter!.isCompleted) {
-        _loginCompleter!.complete({'token': token, 'refreshToken': refreshToken ?? ''});
-        if (kDebugMode) {
-          debugPrint('[DeepLinkOAuthService] OAuth token received via app_links: ${token.substring(0, 20)}...');
-        }
-      } else if (kDebugMode) {
-        if (token == null) debugPrint('[DeepLinkOAuthService] No token found in Deep Link');
-        if (_loginCompleter == null) debugPrint('[DeepLinkOAuthService] No login completer found');
-        else if (_loginCompleter!.isCompleted) debugPrint('[DeepLinkOAuthService] Login completer already completed');
+      // WebView flow: OAuthWebViewPage intercepts joymini:// via onNavigationRequest
+      // before it reaches the OS. This listener is a safety net for edge cases
+      // (e.g., external browser fallback) but normally the token is returned
+      // directly via Navigator.pop() in OAuthWebViewPage.
+      if (kDebugMode) {
+        debugPrint('[DeepLinkOAuthService] OS-level joymini:// OAuth callback received (edge case): $uri');
       }
     } else if (uri.scheme != 'https' && uri.scheme != 'http') {
       if (kDebugMode) debugPrint('[DeepLinkOAuthService] Ignoring non-OAuth Deep Link: $uri');
@@ -232,17 +231,14 @@ class DeepLinkOAuthService {
   static void _redirectToUrl(String url) =>
       DeepLinkOAuthServiceWeb.redirectToUrl(url);
 
-  /// 取消登录（用户主动取消或页面销毁）
+  /// 取消登录 — WebView 流程中取消由 OAuthWebViewPage 的 X 按钮处理，
+  /// 此方法保留供将来扩展，当前为空操作。
   static void cancelLogin() {
-    if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
-      if (kDebugMode) debugPrint('[DeepLinkOAuthService] Cancelling pending OAuth login');
-      _loginCompleter!.completeError(DeepLinkOAuthException('Login cancelled by user'));
-      _loginCompleter = null;
-    }
+    if (kDebugMode) debugPrint('[DeepLinkOAuthService] cancelLogin() called (no-op in WebView mode)');
   }
 
-  static bool get isOAuthInProgress =>
-      _loginCompleter != null && !_loginCompleter!.isCompleted;
+  /// WebView 流程中永远没有挂起的 Completer，始终返回 false。
+  static bool get isOAuthInProgress => false;
 
   /// 已废弃：InAppBrowser 已移除，始终返回 false
   static bool get isInAppBrowserMode => false;
@@ -251,6 +247,5 @@ class DeepLinkOAuthService {
     _deepLinkSubscription?.cancel();
     _deepLinkSubscription = null;
     _initialized = false;
-    cancelLogin();
   }
 }

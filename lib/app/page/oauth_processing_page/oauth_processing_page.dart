@@ -32,34 +32,22 @@ class _OauthProcessingPageState extends State<OauthProcessingPage> {
     _started = true;
 
     try {
-      final recovered =
-          await GlobalOAuthHandler.checkAndRecoverInterruptedOAuth(
-            navigateAfterSuccess: false,
-            showGlobalLoading: false,
-          );
-
-      if (!mounted) return;
-
-      if (recovered) {
-        _safeGo('/home');
-        return;
-      }
-
-      // 兜底等待窗口：兼容 Native callback 返回后，signIn Future 仍在后台收尾的场景
+      // Deep Link OAuth 体系下，token 已通过 /oauth/callback 路由写入 authProvider，
+      // 直接轮询认证状态即可，无需 recovery 逻辑。
       final completed = await _waitForCompletionWindow();
       if (!mounted) return;
 
       if (completed) {
         _safeGo('/home');
       } else {
-        RadixToast.error('Google OAuth session expired, please sign in again.');
+        RadixToast.error('OAuth session expired, please sign in again.');
         _safeGo('/login');
       }
     } catch (e) {
       if (!mounted) return;
       final message = e.toString().replaceFirst('Exception: ', '');
       RadixToast.error(
-        message.isEmpty ? 'Google OAuth failed, please try again.' : message,
+        message.isEmpty ? 'OAuth failed, please try again.' : message,
       );
       _safeGo('/login');
     }

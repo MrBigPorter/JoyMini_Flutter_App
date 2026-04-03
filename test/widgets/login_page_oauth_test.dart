@@ -37,7 +37,7 @@ void main() {
       expect(find.text('login.oauth.facebook'), findsOneWidget);
     });
 
-    testWidgets('apple button visibility follows platform support flag', (
+    testWidgets('apple button only shows on Apple platform (iOS/macOS/web)', (
       tester,
     ) async {
       addTearDown(() async {
@@ -50,6 +50,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 20));
 
+      // canShowAppleButton is now platform-gated: iOS/macOS/web only.
+      // In test environment (non-iOS), it should be false → button not present.
       final expected = DeepLinkOAuthService.canShowAppleButton
           ? findsOneWidget
           : findsNothing;

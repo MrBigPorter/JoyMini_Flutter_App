@@ -1,33 +1,6 @@
 part of 'login_page.dart';
 
 extension LoginPageUI on _LoginPageState {
-  Widget _buildDiagnosticRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 4.h),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.sp,
-                color: context.textTertiary600,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w600,
-              color: value.contains('✅') ? context.bgSuccessPrimary : context.bgWarningPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget buildUI(BuildContext context) {
     final sendEmail = ref.watch(sendEmailCodeCtrlProvider);
     final emailLogin = ref.watch(authLoginEmailCtrlProvider);
@@ -44,8 +17,8 @@ extension LoginPageUI on _LoginPageState {
     final isSocialBtnLoading = _socialOauthInFlight;
 
     // Deep Link OAuth 总是显示所有支持的按钮
-    final showGoogleButton = true;
-    final showFacebookButton = true;
+    final showGoogleButton = DeepLinkOAuthService.canShowGoogleButton;
+    final showFacebookButton = DeepLinkOAuthService.canShowFacebookButton;
     final showAppleButton = DeepLinkOAuthService.canShowAppleButton;
 
     return BaseScaffold(
@@ -214,7 +187,7 @@ extension LoginPageUI on _LoginPageState {
                                     SizedBox(height: 16.h),
                                   ],
 
-                                   if (showAppleButton) ...[
+                                   /*if (showAppleButton) ...[
                                     Button(
                                       width: double.infinity,
                                       height: 48.h,
@@ -225,25 +198,8 @@ extension LoginPageUI on _LoginPageState {
                                       child: Text('login.oauth.apple'.tr()),
                                     ),
                                     SizedBox(height: 16.h),
-                                  ],
+                                  ],*/
 
-                                  // ─── OAuth 取消按钮（loading 期间显示） ───
-                                  if (_socialOauthInFlight) ...[
-                                    SizedBox(height: 4.h),
-                                    Center(
-                                      child: TextButton(
-                                        onPressed: cancelOAuth,
-                                        child: Text(
-                                          'login.oauth.cancel'.tr(),
-                                          style: TextStyle(
-                                            fontSize: context.textSm,
-                                            color: context.textTertiary600,
-                                            decoration: TextDecoration.underline,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
 
                                 ],
                               ),
