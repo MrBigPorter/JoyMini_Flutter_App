@@ -44,6 +44,12 @@ class ChatActionService {
     return null;
   }
 
+  /// Called by SyncStep after a message is successfully delivered to the server.
+  /// Removes the entry from the in-memory path cache to prevent unbounded growth.
+  void cleanupSentMessageCache(String msgId) {
+    _sessionPathCache.remove(msgId);
+  }
+
   ChatMessageFactory get _msg => ChatMessageFactory(conversationId: conversationId);
 
   Future<String> uploadChatFile(XFile file) {
@@ -51,6 +57,9 @@ class ChatActionService {
       file: file,
       module: UploadModule.chat,
       onProgress: (_) {},
+      // Chat module always pre-compresses before upload; skip GlobalUploadService's
+      // internal compression to prevent double-compression (quality loss + wasted CPU).
+      skipCompression: true,
     );
   }
 
@@ -104,11 +113,24 @@ class ChatActionService {
 
   Future<void> sendImage(XFile file) async {
     final XFile processedFile = await ImageCompressionService.compressForUpload(file);
-    Uint8List? quickPreview;
+
+    // Read the file bytes once and reuse for both thumbnail generation and the
+    // BlurHash step in ImageProcessStep. Prevents a second disk read mid-pipeline.
+    Uint8List? fileBytes;
     try {
-      quickPreview = await ImageCompressionService.getTinyThumbnail(processedFile);
+      fileBytes = await processedFile.readAsBytes();
     } catch (e) {
-      debugPrint("Preview generation failed: $e");
+      debugPrint("File read failed: $e");
+    }
+
+    Uint8List? quickPreview;
+    if (fileBytes != null && fileBytes.isNotEmpty) {
+      try {
+        final thumb = await ImageCompressionService.getTinyThumbnailFromBytes(fileBytes);
+        if (thumb.isNotEmpty) quickPreview = thumb;
+      } catch (e) {
+        debugPrint("Preview generation failed: $e");
+      }
     }
 
     final msg = _msg.image(
@@ -125,7 +147,9 @@ class ChatActionService {
     // Immediate save to prevent UI lag
     await repo.saveOrUpdate(msg);
 
-    final ctx = PipelineContext(msg)..sourceFile = processedFile;
+    final ctx = PipelineContext(msg)
+      ..sourceFile = processedFile
+      ..cachedFileBytes = fileBytes; // Passed to ImageProcessStep to avoid re-reading
     await _runPipeline(ctx, [PersistStep(), ImageProcessStep(), UploadStep(), SyncStep()]);
   }
 
@@ -184,10 +208,11 @@ class ChatActionService {
     } else {
       // Mobile Implementation: Dual-layer thumbnail retrieval
       try {
-        quickPreview = await VideoCompress.getByteThumbnail(fileToUse.path, quality: 30);
+        // quality 55: balanced between clarity and file size (was 30 — too blurry for initial preview)
+        quickPreview = await VideoCompress.getByteThumbnail(fileToUse.path, quality: 55);
 
         if (quickPreview == null || quickPreview.isEmpty) {
-          final File thumbFile = await VideoCompress.getFileThumbnail(fileToUse.path, quality: 30);
+          final File thumbFile = await VideoCompress.getFileThumbnail(fileToUse.path, quality: 55);
           if (await thumbFile.exists()) {
             quickPreview = await thumbFile.readAsBytes();
           }

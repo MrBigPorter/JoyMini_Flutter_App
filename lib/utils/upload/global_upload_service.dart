@@ -43,6 +43,9 @@ class GlobalUploadService {
     required UploadModule module,
     required Function(double) onProgress,
     CancelToken? cancelToken,
+    /// Set to true when the caller has already compressed the file (e.g. Chat module).
+    /// Prevents double compression: quality loss and wasted CPU time.
+    bool skipCompression = false,
   }) async {
     XFile fileToUpload = file;
     String? tempCompressedPath;
@@ -50,8 +53,8 @@ class GlobalUploadService {
     onProgress(0.01);
 
     try {
-      // Mobile 图片压缩逻辑 (仅对图片生效)
-      if (!kIsWeb) {
+      // Mobile image compression — skipped when caller has already compressed the file
+      if (!skipCompression && !kIsWeb) {
         final lowerPath = file.path.toLowerCase();
         final isImage =
             lowerPath.endsWith(".jpg") ||

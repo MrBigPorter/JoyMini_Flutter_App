@@ -105,7 +105,9 @@ class _ChatPageState extends ConsumerState<ChatPage> with ChatPageLogic {
             detail,
             isGroup,
             ref,
-            isSyncing: chatState.isInitializing && messages.isEmpty,
+            // Show AppBar spinner whenever syncing, even when messages are visible.
+            // This is WeChat/Telegram style: content shows instantly, spinner signals background sync.
+            isSyncing: chatState.isInitializing,
             onSettingsTap: () {
               if (detail != null) {
                 goToSettingsAndHandleSearch(detail, isGroup);

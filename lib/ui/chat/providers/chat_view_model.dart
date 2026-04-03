@@ -53,8 +53,23 @@ class ChatViewModel extends StateNotifier<ChatListState> {
     _init();
   }
 
-  void _init() {
+  void _init() async {
+    // Step 1: Pre-warm from local DB immediately so the first frame renders real content
+    // instead of an empty skeleton. This eliminates the blank-screen-with-spinner on entry.
+    try {
+      final cached = await _repo.getHistory(
+        conversationId: conversationId,
+        limit: _currentLimit,
+      );
+      if (cached.isNotEmpty && mounted) {
+        state = state.copyWith(messages: cached);
+      }
+    } catch (_) {}
+
+    // Step 2: Subscribe to reactive stream for ongoing real-time updates
     _subscribeToStream();
+
+    // Step 3: Background network sync (WeChat-style: content visible, AppBar spinner indicates sync)
     performIncrementalSync();
   }
 
