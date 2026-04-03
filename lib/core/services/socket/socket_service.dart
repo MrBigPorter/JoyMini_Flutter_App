@@ -55,8 +55,16 @@ abstract class _SocketBase {
   bool get isConnected => _socket != null && _socket!.connected;
 
   final _syncController = StreamController<void>.broadcast();
+  // Broadcast a signal every time the underlying IO.Socket successfully connects
+  // (including auto-reconnects and fresh connections after re-login).
+  final _connectController = StreamController<void>.broadcast();
 
   Stream<void> get onSyncNeeded => _syncController.stream;
+
+  /// Fires whenever the socket transitions to the "connected" state.
+  /// Subscribers (e.g. GlobalHandler) should re-register direct socket listeners
+  /// each time this fires, because a new IO.Socket instance may have been created.
+  Stream<void> get onConnected => _connectController.stream;
 
   void triggerSync() {
     if (!_syncController.isClosed) _syncController.add(null);
@@ -64,6 +72,7 @@ abstract class _SocketBase {
 
   void dispose() {
     _syncController.close();
+    _connectController.close();
   }
 }
 
@@ -240,6 +249,12 @@ class SocketService extends _SocketBase
       // 设置事件监听器
       _socket!.onConnect((_) {
         debugPrint('✅ [SocketService] Connected successfully to server');
+        // Fix 1: Release the init lock so future init() calls (re-login / token
+        // refresh) are not blocked by the guard at the top of init().
+        _isInitializing = false;
+        // Fix 2: Broadcast the connected event so GlobalHandler can (re-)register
+        // direct socket listeners (e.g. call_invite) on the live socket instance.
+        if (!_connectController.isClosed) _connectController.add(null);
         triggerSync();
       });
       
@@ -249,6 +264,9 @@ class SocketService extends _SocketBase
       });
       
       _socket!.onConnectError((data) {
+        // Fix 1: Also release the lock on connection failure so the next
+        // init() call (e.g. after a token refresh) is not silently skipped.
+        _isInitializing = false;
         debugPrint('⚠️ [SocketService] Connection error: $data');
       });
       

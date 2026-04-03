@@ -1,2 +1,6 @@
 #include? "Generated.xcconfig"
 #include? "../Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
+
+// Xcode 26 fix: Skip thinned asset catalog compilation (IBSimDeviceTypeiPad3x bug)
+ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT = YES
+ENABLE_ON_DEMAND_RESOURCES = NO

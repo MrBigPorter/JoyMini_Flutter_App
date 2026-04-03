@@ -1,2 +1,13 @@
 #include? "Generated.xcconfig"
 #include? "../Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+
+// Xcode 26 fix: Disable device-specific asset thinning (CompileAssetCatalogVariant thinned).
+// actool's thinning flags are only passed when BOTH conditions are YES:
+//   Condition = "$(ENABLE_ONLY_ACTIVE_RESOURCES) && $(BUILD_ACTIVE_RESOURCES_ONLY)"
+// Setting BUILD_ACTIVE_RESOURCES_ONLY = NO breaks this condition and prevents ibtoold
+// from trying to create IBSimDeviceTypeiPad3x (iPad4,2) which is incompatible with iOS 26.4.
+ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT = YES
+ASSETCATALOG_FILTER_FOR_DEVICE_MODEL =
+ASSETCATALOG_FILTER_FOR_DEVICE_OS_VERSION =
+ASSETCATALOG_FILTER_FOR_THINNING_DEVICE_CONFIGURATION =
+BUILD_ACTIVE_RESOURCES_ONLY = NO

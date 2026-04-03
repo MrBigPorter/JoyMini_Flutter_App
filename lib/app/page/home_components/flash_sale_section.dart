@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_app/app/routes/app_router.dart';
 import 'package:flutter_app/common.dart';
+import 'package:flutter_app/components/render_countdown.dart';
 import 'package:flutter_app/core/models/flash_sale.dart';
 import 'package:flutter_app/core/providers/flash_sale_provider.dart';
 import 'package:flutter_app/ui/img/optimized_image.dart';
@@ -161,6 +162,8 @@ class _SessionBanner extends ConsumerWidget {
 
 // ---------------------------------------------------------------------------
 // Compact countdown widget for home header
+// 【修复 P2】改订 globalCountdownTick（全局单例心跳），
+// 不再独立创建 Timer.periodic，全页面所有倒计时共享同一个底层 Timer。
 // ---------------------------------------------------------------------------
 class _HomeCountdown extends StatefulWidget {
   final int remainingMs;
@@ -173,20 +176,21 @@ class _HomeCountdown extends StatefulWidget {
 
 class _HomeCountdownState extends State<_HomeCountdown> {
   late Duration _remaining;
-  Timer? _timer;
+  StreamSubscription<DateTime>? _sub;
 
   @override
   void initState() {
     super.initState();
     _remaining = Duration(milliseconds: math.max(0, widget.remainingMs));
     if (_remaining.inSeconds > 0) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      // 订阅全局心跳，与所有 RenderCountdown 共用同一个 Timer
+      _sub = globalCountdownTick.listen((_) {
         if (!mounted) return;
         setState(() {
           if (_remaining.inSeconds > 0) {
             _remaining -= const Duration(seconds: 1);
           } else {
-            _timer?.cancel();
+            _sub?.cancel();
           }
         });
       });
@@ -195,7 +199,7 @@ class _HomeCountdownState extends State<_HomeCountdown> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _sub?.cancel();
     super.dispose();
   }
 
@@ -245,14 +249,23 @@ class _HomeCountdownState extends State<_HomeCountdown> {
 // ---------------------------------------------------------------------------
 // Mini product card for horizontal scroll in home section
 // ---------------------------------------------------------------------------
-class _MiniProductCard extends StatelessWidget {
+class _MiniProductCard extends ConsumerWidget {
   final FlashSaleProductItem item;
   final bool sessionEnded;
 
   const _MiniProductCard({required this.item, required this.sessionEnded});
 
+  void _prefetchAndNavigate(BuildContext context, WidgetRef ref) {
+    ref.read(flashSaleProductDetailProvider(item.id));
+    final coverUrl = item.product.treasureCoverImg;
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      precacheImage(NetworkImage(coverUrl), context);
+    }
+    appRouter.push('/flash-sale/products/${item.id}');
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isSoldOut = item.isSoldOut;
     final isUnavailable = isSoldOut || sessionEnded;
     final flashPrice = double.tryParse(item.flashPrice) ?? 0.0;
@@ -261,7 +274,7 @@ class _MiniProductCard extends StatelessWidget {
     return GestureDetector(
       onTap: isUnavailable
           ? null
-          : () => appRouter.push('/flash-sale/products/${item.id}'),
+          : () => _prefetchAndNavigate(context, ref),
       child: Container(
         width: 115.w,
         decoration: BoxDecoration(

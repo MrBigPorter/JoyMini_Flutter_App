@@ -1,75 +1,158 @@
-# 这样你点击 TASK EXPLORER 里的按钮就能跑了
+# ─── 环境变量 ──────────────────────────────────────────────────────────────────
+DEV  := --dart-define-from-file=lib/core/config/env/dev.json
+TEST := --dart-define-from-file=lib/core/config/env/test.json
+PROD := --dart-define-from-file=lib/core/config/env/prod.json
+
+.PHONY: help \
+        dev test prod \
+        dev-clean test-clean prod-clean \
+        clean gen gen-clean gen-watch analyze \
+        ios-fix ios-nuke android-fix reset \
+        dev-fix test-fix
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 📋  默认目标：展示帮助（直接运行 `make` 不带参数时显示）
+# ══════════════════════════════════════════════════════════════════════════════
+help:
+	@echo ""
+	@echo "┌─────────────────────────────────────────────────────────┐"
+	@echo "│              Flutter Happy App — Makefile                │"
+	@echo "├─────────────────────────────────────────────────────────┤"
+	@echo "│  🚀 正常运行（增量构建，速度快）                          │"
+	@echo "│    make dev          dev 环境运行                        │"
+	@echo "│    make test         test 环境运行                       │"
+	@echo "│    make prod         prod 环境运行                       │"
+	@echo "├─────────────────────────────────────────────────────────┤"
+	@echo "│  🧹 清理后运行（构建失败时首选，比 dev 多 30-60s）        │"
+	@echo "│    make dev-clean    clean + dev 运行                    │"
+	@echo "│    make test-clean   clean + test 运行                   │"
+	@echo "│    make prod-clean   clean + prod 运行                   │"
+	@echo "├─────────────────────────────────────────────────────────┤"
+	@echo "│  🔧 基础工具                                              │"
+	@echo "│    make clean        flutter clean + pub get             │"
+	@echo "│    make gen          build_runner 代码生成                │"
+	@echo "│    make gen-clean    clean + 代码生成（解决 .g.dart 冲突）│"
+	@echo "│    make gen-watch    监听模式代码生成（开发期常驻）         │"
+	@echo "│    make analyze      flutter analyze 静态分析             │"
+	@echo "├─────────────────────────────────────────────────────────┤"
+	@echo "│  🍎 iOS 修复                                              │"
+	@echo "│    make ios-fix      清理 Xcode 脏目录（最快）            │"
+	@echo "│    make ios-nuke     DerivedData + CocoaPods 重装（核弹） │"
+	@echo "├─────────────────────────────────────────────────────────┤"
+	@echo "│  🤖 Android 修复                                          │"
+	@echo "│    make android-fix  清理 Gradle 产物                    │"
+	@echo "├─────────────────────────────────────────────────────────┤"
+	@echo "│  💣 终极重置（全平台失败时使用，约 10 分钟）               │"
+	@echo "│    make reset        所有缓存全清 + Pods 重装              │"
+	@echo "└─────────────────────────────────────────────────────────┘"
+	@echo ""
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🚀  正常运行（增量构建，速度快）
+# ══════════════════════════════════════════════════════════════════════════════
 dev:
-	fvm flutter run --dart-define-from-file=lib/core/config/env/dev.json
+	fvm flutter run $(DEV)
 
 test:
-	fvm flutter run --dart-define-from-file=lib/core/config/env/test.json
+	fvm flutter run $(TEST)
 
 prod:
-	fvm flutter run --dart-define-from-file=lib/core/config/env/prod.json
+	fvm flutter run $(PROD)
 
-# ─────────────────────────────────────────────
-# 快速清理（用 rm -rf 替代 flutter clean，快 50-100 倍）
-# 根因：flutter clean 用 Dart I/O 逐文件删除，在外置 SSD 上几万个小文件会卡死
-# ─────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# 🧹  Clean 后运行 — 构建频繁失败时首选
+#     flutter clean + pub get 能解决 90% 的增量构建问题
+# ══════════════════════════════════════════════════════════════════════════════
+dev-clean: clean
+	fvm flutter run $(DEV)
 
-# 只清 Flutter 构建产物（日常使用）
+test-clean: clean
+	fvm flutter run $(TEST)
+
+prod-clean: clean
+	fvm flutter run $(PROD)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🔧  基础工具
+# ══════════════════════════════════════════════════════════════════════════════
+
+## 彻底清理 + 重新拉依赖
 clean:
-	@echo "🧹 快速清理 Flutter 构建产物..."
-	rm -rf build/ .dart_tool/
-	@echo "✅ 完成 (build/ + .dart_tool/ 已删除)"
-
-# 深度清理：Flutter + iOS Pods（切分支/更新依赖后使用）
-clean-ios:
-	@echo "🧹 深度清理 Flutter + iOS..."
-	killall -9 Xcode xcodebuild Simulator dart ibtoold 2>/dev/null || true
-	rm -rf build/ .dart_tool/ ios/build/ ios/Pods/ ios/.symlinks/ ios/Podfile.lock
-	@echo "✅ 完成，请执行: make pod"
-
-# 重装 Pods
-pod:
-	@echo "📦 重装 iOS Pods..."
-	cd ios && pod install --repo-update
-	@echo "✅ Pod install 完成"
-
-# 完整重建（核弹级，用于死活编不过时）
-rebuild-ios: clean-ios
-	@echo "🔄 重新拉取 Flutter 依赖..."
+	@echo "🧹 flutter clean ..."
+	fvm flutter clean
+	@echo "📦 flutter pub get ..."
 	fvm flutter pub get
-	@echo "📦 重装 iOS Pods..."
-	cd ios && pod install --repo-update
-	@echo "🎉 重建完成！"
+	@echo "✅ clean 完成"
 
-# ─────────────────────────────────────────────
-# 环境健康检查（build 失败时先跑这个排查）
-# ─────────────────────────────────────────────
-health-check:
-	@echo "🩺 Flutter 环境健康检查..."
-	@echo ""
-	@echo "── Flutter 版本 ──"
-	@fvm flutter --version 2>/dev/null | head -1 || echo "❌ FVM flutter 不可用"
-	@echo ""
-	@echo "── build/ 目录大小 ──"
-	@du -sh build/ .dart_tool/ 2>/dev/null || echo "✅ build/ 不存在（已清理）"
-	@echo ""
-	@echo "── pub 依赖状态 ──"
-	@fvm flutter pub deps --no-dev 2>/dev/null | head -3 || echo "⚠️ 需要运行 flutter pub get"
-	@echo ""
-	@echo "── iOS Pods 状态 ──"
-	@if [ -f ios/Podfile.lock ]; then echo "✅ Podfile.lock 存在"; else echo "❌ Podfile.lock 不存在 → 需要 make pod"; fi
-	@if [ -d ios/Pods ]; then echo "✅ Pods/ 目录存在"; else echo "❌ Pods/ 不存在 → 需要 make pod"; fi
-	@echo ""
-	@echo "── FVM 版本锁定 ──"
-	@cat .fvm/fvm_config.json 2>/dev/null || echo "⚠️ 未找到 .fvm/fvm_config.json"
-	@echo ""
-	@echo "🩺 检查完成"
+## 代码生成（riverpod_generator / json_serializable）
+gen:
+	fvm dart run build_runner build --delete-conflicting-outputs
 
-# 新成员/新机器一键初始化
-setup:
-	@echo "🚀 初始化开发环境..."
-	@command -v fvm >/dev/null || (echo "❌ 请先安装 FVM: brew tap leoafarias/fvm && brew install fvm" && exit 1)
-	fvm install
-	fvm flutter pub get
-	cd ios && pod install
-	@echo "✅ 环境初始化完成，可以运行 make dev"
+## Clean 后再做代码生成（出现 .g.dart 文件冲突时使用）
+gen-clean: clean gen
 
+## 持续代码生成（监听文件变更，开发期常驻）
+gen-watch:
+	fvm dart run build_runner watch --delete-conflicting-outputs
+
+## 静态分析
+analyze:
+	fvm flutter analyze
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🍎  iOS 专项修复（按严重程度从轻到重）
+# ══════════════════════════════════════════════════════════════════════════════
+
+## 快速修复：清理 Xcode 遗留脏目录（Xcode 26 bug: "Could not delete Debug-iphoneos"）
+ios-fix:
+	@echo "🍎 清理 Xcode 遗留构建产物..."
+	@rm -rf build/ios/Debug-iphoneos \
+	         build/ios/Debug-iphonesimulator \
+	         build/ios/Release-iphoneos \
+	         build/ios/XCBuildData 2>/dev/null; true
+	@echo "✅ 完成，可以重新 make dev"
+
+## 深度核弹：DerivedData 全清 + CocoaPods 重装（约 5-10 分钟，最后手段）
+ios-nuke: ios-fix clean
+	@echo "💣 iOS 深度清理：删除 DerivedData..."
+	@rm -rf ~/Library/Developer/Xcode/DerivedData 2>/dev/null; true
+	@echo "📦 重装 CocoaPods..."
+	cd ios && pod deintegrate && pod install
+	@echo "✅ iOS 深度清理完成，运行 make dev"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🤖  Android 专项修复
+# ══════════════════════════════════════════════════════════════════════════════
+
+## 清理 Gradle 缓存（出现 "Gradle task assembleDebug failed" 时使用）
+android-fix:
+	@echo "🤖 清理 Android Gradle 产物..."
+	cd android && ./gradlew clean
+	@echo "✅ 完成，可以重新 make dev"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 💣  终极重置 — 所有平台全崩时的最后手段（约 10 分钟）
+# ══════════════════════════════════════════════════════════════════════════════
+reset: clean
+	@echo "💣 终极重置：清理所有平台缓存..."
+	@echo "  🍎 删除 Xcode 脏目录..."
+	@rm -rf build/ios/Debug-iphoneos \
+	         build/ios/Debug-iphonesimulator \
+	         build/ios/Release-iphoneos \
+	         build/ios/XCBuildData 2>/dev/null; true
+	@echo "  🍎 删除 DerivedData..."
+	@rm -rf ~/Library/Developer/Xcode/DerivedData 2>/dev/null; true
+	@echo "  🍎 重装 CocoaPods..."
+	cd ios && pod deintegrate && pod install
+	@echo "  🤖 清理 Gradle..."
+	cd android && ./gradlew clean
+	@echo "✅ 终极重置完成，运行 make dev"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ⏪  旧命令保留（向后兼容）
+# ══════════════════════════════════════════════════════════════════════════════
+dev-fix: ios-fix
+	fvm flutter run $(DEV)
+
+test-fix: ios-fix
+	fvm flutter run $(TEST)

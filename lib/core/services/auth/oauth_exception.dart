@@ -7,3 +7,12 @@ class OauthCancelledException implements Exception {
   @override
   String toString() => message;
 }
+
+/// 通用 OAuth 异常（非取消类）
+class OauthException implements Exception {
+  final String message;
+  OauthException(this.message);
+
+  @override
+  String toString() => message;
+}

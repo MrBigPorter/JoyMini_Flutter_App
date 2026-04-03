@@ -1,15 +1,12 @@
-
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart'; // 引入动画库
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_app/common.dart';
 import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/core/providers/auth_provider.dart';
-import 'package:flutter_app/core/services/auth/firebase_oauth_sign_in_service.dart';
-import 'package:flutter_app/core/services/auth/oauth_state_manager.dart';
 import 'package:flutter_app/core/store/auth/auth_provider.dart';
 import 'package:flutter_app/ui/button/button.dart';
 import 'package:flutter_app/ui/form/index.dart';
@@ -25,15 +22,12 @@ import 'package:flutter_app/ui/toast/radix_toast.dart';
 import 'package:flutter_app/utils/form/validation_messages.dart';
 
 import 'package:flutter_app/core/services/auth/oauth_exception.dart';
+import 'package:flutter_app/core/services/auth/deep_link_oauth_service.dart';
+import 'package:flutter_app/core/config/oauth_config.dart';
 
-// 导入全局appRouter
 import 'package:flutter_app/app/routes/app_router.dart';
 
-import 'package:flutter_app/core/services/auth/global_oauth_handler.dart';
-
-// 关联 logic 和 ui 文件
 part 'login_page_logic.dart';
-
 part 'login_page_ui.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -43,7 +37,6 @@ class LoginPage extends ConsumerStatefulWidget {
   ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-// 混入 Logic，使用 UI extension 中的 buildUI
 class _LoginPageState extends ConsumerState<LoginPage> with LoginPageLogic {
   @override
   Widget build(BuildContext context) {

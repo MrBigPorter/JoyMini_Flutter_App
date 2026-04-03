@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter_app/ui/chat/models/chat_ui_model.dart';
 
@@ -26,6 +28,10 @@ class PipelineContext {
 
   /// Web: In-memory thumbnail file utilized by UploadStep for direct cloud transfer.
   XFile? webThumbFile;
+
+  /// Cached raw bytes of the source image file (populated by sendImage).
+  /// Reused by ImageProcessStep to compute BlurHash without a second disk read.
+  Uint8List? cachedFileBytes;
 
   PipelineContext(this.initialMsg) {
     // Initialize metadata from the initial message state

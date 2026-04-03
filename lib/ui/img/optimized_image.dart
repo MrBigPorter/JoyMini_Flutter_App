@@ -55,17 +55,31 @@ class _OptimizedImageState extends State<OptimizedImage> {
   @override
   void initState() {
     super.initState();
-    
-    // 初始化管理器
     _cacheManager = ImageCacheManager();
     _performanceMonitor = ImagePerformanceMonitor();
-    
+    _setupAndLoad(widget.url);
+  }
+
+  /// 【修复 P1】当父 Widget rebuild 并传入不同的 url 时，重新加载新 URL。
+  /// 没有这个，列表滚动复用或数据刷新会导致显示错误的旧图片。
+  @override
+  void didUpdateWidget(OptimizedImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url ||
+        oldWidget.width != widget.width ||
+        oldWidget.height != widget.height) {
+      _setupAndLoad(widget.url);
+    }
+  }
+
+  /// 生成优化 URL 并开始加载，可安全被 initState / didUpdateWidget 重复调用。
+  void _setupAndLoad(String url) {
     // 生成优化后的URL
-    _optimizedUrl = widget.url;
+    _optimizedUrl = url;
     if (widget.enableResponsive && widget.width != null && widget.width! > 0) {
       try {
         _optimizedUrl = ResponsiveImageService().generateImageUrl(
-          originalUrl: widget.url,
+          originalUrl: url,
           logicalWidth: widget.width!,
           logicalHeight: widget.height ?? widget.width! * 0.75,
           qualityPreset: widget.qualityPreset,
@@ -75,7 +89,12 @@ class _OptimizedImageState extends State<OptimizedImage> {
         debugPrint('[OptimizedImage] Responsive URL generation failed: $e');
       }
     }
-    
+
+    // 重置状态（didUpdateWidget 时清除旧图片）
+    _imageData = null;
+    _hasError = false;
+    _isLoading = false;
+
     // 开始性能监控
     if (widget.enableMonitoring) {
       _startTime = DateTime.now();
@@ -87,13 +106,12 @@ class _OptimizedImageState extends State<OptimizedImage> {
           'width': widget.width,
           'height': widget.height,
           'fit': widget.fit.toString(),
-          'originalUrl': widget.url,
+          'originalUrl': url,
           'optimizedUrl': _optimizedUrl,
         },
       );
     }
-    
-    // 开始加载图片
+
     _loadImage();
   }
 
@@ -212,19 +230,14 @@ class _OptimizedImageState extends State<OptimizedImage> {
   }
 
   /// 默认占位符
+  /// 【修复 P3】原来用 CircularProgressIndicator（动画，GPU开销），
+  /// 现改为静态灰色容器，与 AppCachedImage 的 Shimmer 风格保持一致，
+  /// 瀑布流中 10+ 个同时渲染时不再各自跑独立动画。
   Widget _buildDefaultPlaceholder() {
     return Container(
+      width: widget.width,
+      height: widget.height,
       color: Colors.grey[200],
-      child: Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
-          ),
-        ),
-      ),
     );
   }
 

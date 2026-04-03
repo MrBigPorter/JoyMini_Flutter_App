@@ -40,11 +40,11 @@ class ErrorHandler {
     }
 
     if (error is SocketException) {
-      return '网络连接失败，请检查网络设置';
+      return 'Network connection failed. Please check your network settings';
     }
 
     if (error is TimeoutException) {
-      return '请求超时，请稍后重试';
+      return 'Request timed out. Please try again later';
     }
 
     if (error is DioException) {
@@ -52,15 +52,15 @@ class ErrorHandler {
     }
 
     if (error is FormatException) {
-      return '数据格式错误，请稍后重试';
+      return 'Data format error. Please try again later';
     }
 
     if (error is TypeError) {
-      return '数据处理异常，请稍后重试';
+      return 'Data processing error. Please try again later';
     }
 
     // 默认错误消息
-    return '操作失败，请重试';
+    return 'Operation failed. Please try again';
   }
 
   /// 处理 Dio 错误
@@ -69,19 +69,19 @@ class ErrorHandler {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        return '网络连接超时，请稍后重试';
+        return 'Connection timed out. Please try again later';
       
       case DioExceptionType.connectionError:
-        return '网络连接失败，请检查网络设置';
+        return 'Network connection failed. Please check your network settings';
       
       case DioExceptionType.badResponse:
         return _handleStatusCode(error.response?.statusCode);
       
       case DioExceptionType.cancel:
-        return '请求已取消';
+        return 'Request cancelled';
       
       default:
-        return '网络请求失败，请稍后重试';
+        return 'Network request failed. Please try again later';
     }
   }
 
@@ -89,21 +89,21 @@ class ErrorHandler {
   static String _handleStatusCode(int? statusCode) {
     switch (statusCode) {
       case 400:
-        return '请求参数错误';
+        return 'Invalid request parameters';
       case 401:
-        return '登录已过期，请重新登录';
+        return 'Session expired. Please log in again';
       case 403:
-        return '没有权限执行此操作';
+        return 'Permission denied';
       case 404:
-        return '请求的资源不存在';
+        return 'Resource not found';
       case 500:
-        return '服务器内部错误，请稍后重试';
+        return 'Internal server error. Please try again later';
       case 502:
       case 503:
       case 504:
-        return '服务器繁忙，请稍后重试';
+        return 'Server is busy. Please try again later';
       default:
-        return '请求失败，请稍后重试';
+        return 'Request failed. Please try again later';
     }
   }
 

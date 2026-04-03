@@ -59,6 +59,9 @@ class _GlobalHandlerState extends ConsumerState<GlobalHandler> {
   StreamSubscription? _contactAcceptSub;
   StreamSubscription? _groupEventSub;
   StreamSubscription? _luckyDrawSub;
+  // Fix 2: Tracks the onConnected subscription so we can cancel & re-subscribe
+  // whenever _subscribeToSocket is called with a potentially different service.
+  StreamSubscription? _socketConnectSub;
 
   DateTime? _lastToastTime;
   String? _lastToastKey;

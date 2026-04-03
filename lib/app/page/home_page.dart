@@ -29,30 +29,38 @@ class HomePage extends ConsumerStatefulWidget {
 // Use RouteAware to detect when the user pops back to this screen
 class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver {
 
+  /// 【修复 P0-2】用来防止重复触发预加载的标志
+  bool _hasPreloadedImages = false;
+  /// App 最后一次进入前台的时间，用于 resume 刷新的时间门槛（P2）
+  DateTime? _lastRefreshTime;
+
   @override
   void initState() {
     super.initState();
-    // register this widget as an observer to app lifecycle events
     WidgetsBinding.instance.addObserver(this);
-    
-    // 立即执行首页图片预加载（优化冷启动体验）
+
+    // 只做系统初始化，不在此读 Provider 数据（数据还未到达）
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeAndPreloadImages();
+      _initImageSystem();
     });
   }
 
   @override
   void dispose() {
-    // unregister the observer when the widget is disposed
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // When the app is resumed (e.g., user returns to this page), trigger a refresh
     if (state == AppLifecycleState.resumed) {
-      _silentRefresh();
+      // 【修复 P2】5 分钟内不重复刷新，避免接电话/锁屏后立即触发无意义的 API 并发
+      final now = DateTime.now();
+      if (_lastRefreshTime == null ||
+          now.difference(_lastRefreshTime!) > const Duration(minutes: 5)) {
+        _lastRefreshTime = now;
+        _silentRefresh();
+      }
     }
   }
 
@@ -64,38 +72,21 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     ]);
   }
 
-  /// 初始化并预加载图片
-  /// 1. 初始化图片优化系统
-  /// 2. 预加载静态关键图片
-  /// 3. 预加载首页动态图片
-  Future<void> _initializeAndPreloadImages() async {
+  /// 只负责初始化图片优化系统（不预加载动态数据）
+  Future<void> _initImageSystem() async {
     try {
-      // 1. 初始化图片优化系统
       final imageOptimization = ImageOptimizationInit();
-      
-      // 确保核心组件已初始化
       if (!imageOptimization.isCoreInitialized) {
-        debugPrint('[HomePage] Initializing image optimization core...');
         await imageOptimization.initializeCore();
       }
-      
-      // 完整初始化（需要context）
       if (!imageOptimization.isInitialized) {
-        debugPrint('[HomePage] Initializing image optimization full...');
         await imageOptimization.initialize(context);
       }
-      
-      // 2. 预加载静态关键图片（冷启动优化）
-      debugPrint('[HomePage] Preloading static images for cold start...');
+      // 预加载静态图片（icon/logo 等无需 API 数据）
       await imageOptimization.preloadStaticImages(context);
-      
-      // 3. 预加载首页动态图片
-      debugPrint('[HomePage] Preloading home page dynamic images...');
-      await _preloadHomeImages();
-      
-      debugPrint('[HomePage] All image preloading completed');
+      debugPrint('[HomePage] Image system initialized.');
     } catch (e) {
-      debugPrint('[HomePage] Image initialization and preloading failed: $e');
+      debugPrint('[HomePage] Image system init failed: $e');
     }
   }
 
@@ -115,33 +106,28 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
 
       // 1. 收集轮播图图片（逻辑宽度 375）
       banners.whenData((bannerList) {
-        for (var banner in bannerList) {
-          if (banner.bannerImgUrl != null && banner.bannerImgUrl!.isNotEmpty) {
-            // 【关键修改】必须存转换后的 URL，而不是原图 URL
-            final optimizedUrl = ImageOptimizationInit().generateResponsiveUrl(
-              originalUrl: banner.bannerImgUrl!,
+        for (final banner in bannerList) {
+          if (banner.bannerImgUrl.isNotEmpty) {
+            imageUrls.add(ImageOptimizationInit().generateResponsiveUrl(
+              originalUrl: banner.bannerImgUrl,
               width: 375,
               height: 356,
-            );
-            imageUrls.add(optimizedUrl);
+            ));
           }
         }
       });
 
       // 2. 收集商品图片（逻辑宽度 166）
       treasures.whenData((treasureList) {
-        for (var treasure in treasureList) {
-          if (treasure.treasureResp != null) {
-            for (var product in treasure.treasureResp!) {
-              if (product.treasureCoverImg != null && product.treasureCoverImg!.isNotEmpty) {
-                // 【关键修改】
-                final optimizedUrl = ImageOptimizationInit().generateResponsiveUrl(
-                  originalUrl: product.treasureCoverImg!,
-                  width: 166,
-                  height: 166,
-                );
-                imageUrls.add(optimizedUrl);
-              }
+        for (final treasure in treasureList) {
+          for (final product in treasure.treasureResp ?? []) {
+            final img = product.treasureCoverImg ?? '';
+            if (img.isNotEmpty) {
+              imageUrls.add(ImageOptimizationInit().generateResponsiveUrl(
+                originalUrl: img,
+                width: 166,
+                height: 166,
+              ));
             }
           }
         }
@@ -149,37 +135,31 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
 
       // 3. 收集团购图片（逻辑宽度 166）
       hotGroups.whenData((groupList) {
-        for (var group in groupList) {
-          if (group.treasureCoverImg != null && group.treasureCoverImg!.isNotEmpty) {
-            // 【关键修改】
-            final optimizedUrl = ImageOptimizationInit().generateResponsiveUrl(
-              originalUrl: group.treasureCoverImg!,
+        for (final group in groupList) {
+          final img = group.treasureCoverImg ?? '';
+          if (img.isNotEmpty) {
+            imageUrls.add(ImageOptimizationInit().generateResponsiveUrl(
+              originalUrl: img,
               width: 166,
               height: 166,
-            );
-            imageUrls.add(optimizedUrl);
+            ));
           }
         }
       });
 
-      // 4. 收集Flash Sale图片（逻辑宽度 115）
+      // 4. 收集 Flash Sale 图片（逻辑宽度 115）
       flashSaleSessions.whenData((sessionList) {
         if (sessionList.isNotEmpty) {
-          // 只预加载第一个活跃session的图片
-          final firstSession = sessionList.first;
-          final products = ref.read(flashSaleSessionProductsProvider(firstSession.id));
-          
+          final products = ref.read(flashSaleSessionProductsProvider(sessionList.first.id));
           products.whenData((productData) {
-            for (var productItem in productData.list) {
-              if (productItem.product.treasureCoverImg != null && 
-                  productItem.product.treasureCoverImg!.isNotEmpty) {
-                // Flash Sale卡片宽度115，高度115（正方形）
-                final optimizedUrl = ImageOptimizationInit().generateResponsiveUrl(
-                  originalUrl: productItem.product.treasureCoverImg!,
+            for (final productItem in productData.list) {
+              final img = productItem.product.treasureCoverImg ?? '';
+              if (img.isNotEmpty) {
+                imageUrls.add(ImageOptimizationInit().generateResponsiveUrl(
+                  originalUrl: img,
                   width: 115,
                   height: 115,
-                );
-                imageUrls.add(optimizedUrl);
+                ));
               }
             }
           });
@@ -228,6 +208,19 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     final banners = ref.watch(homeBannerProvider);
     final treasures = ref.watch(homeTreasuresProvider);
     final hotGroups = ref.watch(homeGroupBuyingProvider);
+
+    // 【修复 P0-2】数据就绪后才触发动态预加载，且只触发一次。
+    // 用 addPostFrameCallback 避免在 build 过程中调用异步方法。
+    if (!_hasPreloadedImages) {
+      final hasBanners = banners.hasValue && (banners.value?.isNotEmpty ?? false);
+      final hasTreasures = treasures.hasValue && (treasures.value?.isNotEmpty ?? false);
+      if (hasBanners || hasTreasures) {
+        _hasPreloadedImages = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _preloadHomeImages();
+        });
+      }
+    }
 
     return BaseScaffold(
       showBack: false,

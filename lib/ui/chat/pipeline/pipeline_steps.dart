@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -204,11 +205,22 @@ class VideoProcessStep implements PipelineStep {
 class ImageProcessStep implements PipelineStep {
   @override
   Future<void> execute(PipelineContext ctx, dynamic service) async {
-    final path = ctx.currentAbsolutePath ?? ctx.initialMsg.localPath;
-    if (path == null) return;
+    // Prefer cached bytes from PipelineContext (set by sendImage after the first read).
+    // Falls back to a fresh disk read only when bytes are not available (e.g. resend path).
+    Uint8List? bytes = ctx.cachedFileBytes;
+
+    if (bytes == null) {
+      final path = ctx.currentAbsolutePath ?? ctx.initialMsg.localPath;
+      if (path == null) return;
+      try {
+        bytes = await XFile(path).readAsBytes();
+      } catch (e) {
+        debugPrint("[ImageProcessStep] Failed to read file: $e");
+        return;
+      }
+    }
 
     try {
-      final bytes = await XFile(path).readAsBytes();
       final result = await ThumbBlurHashService.build(bytes);
 
       if (result != null) {
@@ -383,5 +395,10 @@ class SyncStep implements PipelineStep {
 
     // 5) Final repository patch.
     await service.repo.patchFields(ctx.initialMsg.id, updates);
+
+    // 6) Success cleanup: evict this message's local path from the in-memory cache.
+    //    The path is now persisted in the DB so the cache entry is no longer needed.
+    //    Prevents _sessionPathCache from growing unboundedly over the app session.
+    service.cleanupSentMessageCache(ctx.initialMsg.id);
   }
 }

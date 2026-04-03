@@ -41,23 +41,70 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
 
     target.build_configurations.each do |config|
-          # 这是一个防止覆盖的保险写法
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+      # 防止 GCC_PREPROCESSOR_DEFINITIONS 被覆盖
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = ['$(inherited)']
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_CAMERA=1'
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_MICROPHONE=1'
 
-          # 开启相机权限支持
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_CAMERA=1'
+      # 强制所有 Pods 最低 iOS 13.0
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
 
-          # 如果你需要麦克风，把这个也加上
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_MICROPHONE=1'
+      # 绕过 Swift 6 严格检查
+      config.build_settings['SWIFT_VERSION'] = '5.0'
 
-          #1. 强制所有 Pods 目标至少为 13.0，消除所有警告
-          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      # 禁用无关警告
+      config.build_settings['GCC_WARN_64_TO_32_BIT_CONVERSION'] = 'NO'
 
-           #  2. 绕过 Swift 6 的严格检查
-           config.build_settings['SWIFT_VERSION'] = '5.0'
+      # ─────────────────────────────────────────────────────────────────
+      # 【根治】Xcode 26 IBSimDeviceTypeiPad3x 构建失败
+      #
+      # Xcode 26 的 actool/ibtool 在 TARGETED_DEVICE_FAMILY 包含 iPad(2) 时，
+      # 会枚举 iOS 26.4 runtime 所有 iPad 设备类型（含未发布的 iPad@3x），
+      # 找不到对应模拟器则崩溃。无条件强制为 iPhone Only("1") 可彻底规避。
+      # ─────────────────────────────────────────────────────────────────
+      config.build_settings['TARGETED_DEVICE_FAMILY'] = '1'
+    end
+  end
 
-           # 3. 禁用死代码剥离警告
-           config.build_settings['GCC_WARN_64_TO_32_BIT_CONVERSION'] = 'NO'
+  # ─────────────────────────────────────────────────────────────────────
+  # 【补丁】修复 DKPhotoGallery / DKImagePickerController xcassets 中
+  # universal idiom 触发 Xcode 26 IBSimDeviceTypeiPad3x 的问题
+  #
+  # Xcode 26 的 actool 在任何情况下遇到 universal idiom 时都会尝试枚举 iPad 设备，
+  # 因此将所有 universal（无论是否含3x）统一改为 iphone，彻底杜绝 iPad 设备枚举。
+  # ─────────────────────────────────────────────────────────────────────
+  require 'json'
+
+  pods_root = File.join(File.dirname(File.realpath(__FILE__)), 'Pods')
+
+  Dir.glob(File.join(pods_root, '**', '*.imageset', 'Contents.json')).each do |contents_file|
+    begin
+      raw  = File.read(contents_file)
+      data = JSON.parse(raw)
+      images = data['images']
+      next unless images.is_a?(Array)
+
+      changed = false
+      # 遍历所有 image 条目
+      images.each do |img|
+        # 将 universal 统一改为 iphone（杜绝 iPad 设备枚举）
+        if img['idiom'] == 'universal'
+          img['idiom'] = 'iphone'
+          changed = true
         end
+        # 删除 3x 条目（iPhone Only 项目不需要，避免触发 IBSimDeviceTypeiPad3x）
+        if img['scale'] == '3x' && img['idiom'] == 'iphone'
+          images.delete(img)
+          changed = true
+        end
+      end
+
+      if changed
+        File.write(contents_file, JSON.pretty_generate(data) + "\n")
+        puts "[Podfile patch] Fixed xcassets: #{contents_file.sub(pods_root + '/', '')}"
+      end
+    rescue => e
+      puts "[Podfile patch] Warning: #{contents_file}: #{e.message}"
+    end
   end
 end

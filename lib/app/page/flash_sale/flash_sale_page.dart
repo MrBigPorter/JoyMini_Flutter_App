@@ -8,7 +8,7 @@ import 'package:flutter_app/components/base_scaffold.dart';
 import 'package:flutter_app/components/skeleton.dart';
 import 'package:flutter_app/core/models/flash_sale.dart';
 import 'package:flutter_app/core/providers/flash_sale_provider.dart';
-import 'package:flutter_app/ui/img/app_image.dart';
+import 'package:flutter_app/ui/img/optimized_image.dart';
 import 'package:flutter_app/utils/format_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -175,12 +175,6 @@ class _SessionHeaderState extends State<_SessionHeader> {
     super.dispose();
   }
 
-  String _format(Duration d) {
-    final h = d.inHours.toString().padLeft(2, '0');
-    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
-    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$h:$m:$s';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -275,24 +269,41 @@ class _CountdownChips extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 // Product card in the grid
+// ConsumerWidget so we can pre-warm the detail provider on tap before the
+// route transition begins — avoids the blank skeleton on slow connections.
 // ---------------------------------------------------------------------------
-class _ProductCard extends StatelessWidget {
+class _ProductCard extends ConsumerWidget {
   final FlashSaleProductItem item;
   final bool sessionEnded;
 
   const _ProductCard({required this.item, required this.sessionEnded});
 
+  void _prefetchAndNavigate(BuildContext context, WidgetRef ref) {
+    // 1. Warm the detail provider so the API call is in-flight during route push.
+    ref.read(flashSaleProductDetailProvider(item.id));
+    // 2. Pre-warm cover image into the Flutter image cache.
+    final coverUrl = item.product.treasureCoverImg;
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      precacheImage(NetworkImage(coverUrl), context);
+    }
+    // 3. Navigate.
+    appRouter.push('/flash-sale/products/${item.id}');
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isSoldOut = item.isSoldOut;
     final isUnavailable = isSoldOut || sessionEnded;
     final flashPrice = double.tryParse(item.flashPrice) ?? 0.0;
     final originalPrice = double.tryParse(item.product.unitAmount) ?? 0.0;
+    final int discountPct = (originalPrice > 0 && flashPrice < originalPrice)
+        ? ((1 - flashPrice / originalPrice) * 100).round()
+        : 0;
 
     return GestureDetector(
       onTap: isUnavailable
           ? null
-          : () => appRouter.push('/flash-sale/products/${item.id}'),
+          : () => _prefetchAndNavigate(context, ref),
       child: Container(
         decoration: BoxDecoration(
           color: context.bgPrimary,
@@ -311,9 +322,10 @@ class _ProductCard extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.vertical(top: Radius.circular(10.r)),
-                    child: AppCachedImage(
-                      item.product.treasureCoverImg,
-                      fit: BoxFit.cover,
+                    child: OptimizedImageFactory.product(
+                      url: item.product.treasureCoverImg ?? '',
+                      width: (1.sw / 2) - 22.w,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(10.r)),
                     ),
                   ),
                   if (isUnavailable)
@@ -326,6 +338,23 @@ class _ProductCard extends StatelessWidget {
                         child: Text(
                           isSoldOut ? 'Sold Out' : 'Ended',
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14.sp),
+                        ),
+                      ),
+                    ),
+                  // 折扣 badge
+                  if (discountPct > 0 && !isUnavailable)
+                    Positioned(
+                      top: 6.h,
+                      left: 6.w,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                        child: Text(
+                          '$discountPct% OFF',
+                          style: TextStyle(color: Colors.white, fontSize: 9.sp, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -377,7 +406,7 @@ class _ProductCard extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: isUnavailable
                           ? null
-                          : () => appRouter.push('/flash-sale/products/${item.id}'),
+                          : () => _prefetchAndNavigate(context, ref),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isUnavailable ? Colors.grey.shade300 : Colors.red,
                         foregroundColor: isUnavailable ? Colors.grey.shade600 : Colors.white,

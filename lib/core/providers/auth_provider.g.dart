@@ -108,56 +108,5 @@ final authLoginEmailCtrlProvider =
 );
 
 typedef _$AuthLoginEmailCtrl = Notifier<AsyncValue<AuthLoginEmail?>>;
-String _$authLoginGoogleCtrlHash() =>
-    r'898c8c54ee359f468056971bd2e06f405aaef637';
-
-/// See also [AuthLoginGoogleCtrl].
-@ProviderFor(AuthLoginGoogleCtrl)
-final authLoginGoogleCtrlProvider =
-    NotifierProvider<AuthLoginGoogleCtrl, AsyncValue<AuthLoginOauth?>>.internal(
-  AuthLoginGoogleCtrl.new,
-  name: r'authLoginGoogleCtrlProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$authLoginGoogleCtrlHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$AuthLoginGoogleCtrl = Notifier<AsyncValue<AuthLoginOauth?>>;
-String _$authLoginFacebookCtrlHash() =>
-    r'e571ff4547f564bdd15b356c6dbf78ed3db5d8a6';
-
-/// See also [AuthLoginFacebookCtrl].
-@ProviderFor(AuthLoginFacebookCtrl)
-final authLoginFacebookCtrlProvider = NotifierProvider<AuthLoginFacebookCtrl,
-    AsyncValue<AuthLoginOauth?>>.internal(
-  AuthLoginFacebookCtrl.new,
-  name: r'authLoginFacebookCtrlProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$authLoginFacebookCtrlHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$AuthLoginFacebookCtrl = Notifier<AsyncValue<AuthLoginOauth?>>;
-String _$authLoginAppleCtrlHash() =>
-    r'8b6adb1286138946fae6c3892f9d3fe40140694e';
-
-/// See also [AuthLoginAppleCtrl].
-@ProviderFor(AuthLoginAppleCtrl)
-final authLoginAppleCtrlProvider =
-    NotifierProvider<AuthLoginAppleCtrl, AsyncValue<AuthLoginOauth?>>.internal(
-  AuthLoginAppleCtrl.new,
-  name: r'authLoginAppleCtrlProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$authLoginAppleCtrlHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$AuthLoginAppleCtrl = Notifier<AsyncValue<AuthLoginOauth?>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member
