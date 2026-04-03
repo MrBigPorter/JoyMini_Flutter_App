@@ -201,9 +201,17 @@ class _VideoMsgBubbleState extends State<VideoMsgBubble> {
   //   (no play), so by the time the user taps, the controller is ready.
   // ──────────────────────────────────────────────────────────────────────────
 
+  // ── Fix 2 (improved): adaptive debounce
+  //   Fully visible (≥0.85) → 50ms  : new message at bottom, user likely to tap soon
+  //   Partially visible (0.3-0.85) → 250ms : scrolling through history, filter fast scrolls
   void _onVisibilityChanged(VisibilityInfo info) {
     if (info.visibleFraction >= 0.3) {
-      _prewarmTimer ??= Timer(const Duration(milliseconds: 400), _prewarm);
+      if (_prewarmTimer == null) {
+        final delay = info.visibleFraction >= 0.85
+            ? const Duration(milliseconds: 50)
+            : const Duration(milliseconds: 250);
+        _prewarmTimer = Timer(delay, _prewarm);
+      }
     } else {
       _prewarmTimer?.cancel();
       _prewarmTimer = null;
@@ -213,7 +221,7 @@ class _VideoMsgBubbleState extends State<VideoMsgBubble> {
   Future<void> _prewarm() async {
     _prewarmTimer = null;
     if (!mounted) return;
-    if (_controller != null) return; // already have one
+    if (_controller != null) return; // already have one (playing or pre-warmed)
     if (_isPrewarming) return;
     if (widget.message.status == MessageStatus.sending) return; // still uploading
 
@@ -237,9 +245,12 @@ class _VideoMsgBubbleState extends State<VideoMsgBubble> {
     final ctrl = _svc.createController(url); // Fix 1: Range header
     try {
       await ctrl.initialize();
+      // Bug 1 fix: use finally-style logic so _isPrewarming is ALWAYS reset,
+      // even when the controller is discarded due to mount/race conditions.
       if (!mounted || _controller != null) {
-        // Widget gone, or _togglePlay already set a controller — discard
+        // Widget gone, or _togglePlay already set a controller — discard silently
         ctrl.dispose();
+        if (mounted) setState(() => _isPrewarming = false); // ← was missing!
       } else {
         setState(() { _controller = ctrl; _isPrewarming = false; });
         debugPrint('[Video] Pre-warm done: ${widget.message.id}');
@@ -376,19 +387,43 @@ class _VideoMsgBubbleState extends State<VideoMsgBubble> {
                   ),
 
                 // 3. Loading spinner / play button
+                //    States:
+                //    • _isLoading   → spinner (initializing on tap)
+                //    • pre-warmed   → fully-opaque play button + green ready dot
+                //    • not warmed   → semi-transparent play button (default)
                 if (_isLoading)
                   const Center(
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                   )
-                else if (!_isPlaying)
+                else if (!_isPlaying) ...[
+                  // Play button — fully opaque when pre-warmed (ready to play instantly)
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.4),
+                      color: Colors.black.withValues(
+                        alpha: (_controller != null && _controller!.value.isInitialized)
+                            ? 0.72   // pre-warmed: brighter button
+                            : 0.40,  // cold: dimmer button
+                      ),
                       shape: BoxShape.circle,
                     ),
                     padding: const EdgeInsets.all(12),
                     child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 32),
                   ),
+                  // Green ready dot — only shown when pre-warmed (invisible when cold)
+                  if (_controller != null && _controller!.value.isInitialized)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF4CAF50), // Material Green
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
 
                 // 4. Duration label
                 if (!_isPlaying && widget.message.duration != null)
