@@ -5,18 +5,16 @@ extension LoginPageUI on _LoginPageState {
     final sendEmail = ref.watch(sendEmailCodeCtrlProvider);
     final emailLogin = ref.watch(authLoginEmailCtrlProvider);
 
-    // 全局是否处于"忙碌"状态（包含了等待路由跳转的死区时间）
     final isPageBusy = _emailLoginInFlight ||
         _socialOauthInFlight ||
         _isSuccessRedirecting;
 
-    // 独立控制不同按钮的 Loading，谁被点了谁就一直转圈
     final isEmailBtnLoading = emailLogin.isLoading || _emailLoginInFlight;
-    // 社交登录 loading 只依赖本页面的局部标志，避免 keepAlive provider
-    // 的历史 AsyncLoading 状态（热重载中断、上次登录残留）污染按钮状态
-    final isSocialBtnLoading = _socialOauthInFlight;
+    // 各按钮只在自己的 provider 被点击时转圈
+    final isGoogleLoading = _socialOauthInFlight && _socialLoadingProvider == 'google';
+    final isFacebookLoading = _socialOauthInFlight && _socialLoadingProvider == 'facebook';
+    final isAppleLoading = _socialOauthInFlight && _socialLoadingProvider == 'apple';
 
-    // Deep Link OAuth 总是显示所有支持的按钮
     final showGoogleButton = DeepLinkOAuthService.canShowGoogleButton;
     final showFacebookButton = DeepLinkOAuthService.canShowFacebookButton;
     final showAppleButton = DeepLinkOAuthService.canShowAppleButton;
@@ -166,7 +164,7 @@ extension LoginPageUI on _LoginPageState {
                                       width: double.infinity,
                                       height: 48.h,
                                       variant: ButtonVariant.secondary,
-                                      loading: isSocialBtnLoading,
+                                      loading: isGoogleLoading,
                                       onPressed: isPageBusy ? null : _loginWithGoogleOauth,
                                       leading: Icon(Icons.g_mobiledata_rounded, size: 35.sp),
                                       child: Text('login.oauth.google'.tr()),
@@ -179,7 +177,7 @@ extension LoginPageUI on _LoginPageState {
                                       width: double.infinity,
                                       height: 48.h,
                                       variant: ButtonVariant.secondary,
-                                      loading: isSocialBtnLoading,
+                                      loading: isFacebookLoading,
                                       onPressed: isPageBusy ? null : _loginWithFacebookOauth,
                                       leading: const Icon(Icons.facebook_rounded),
                                       child: Text('login.oauth.facebook'.tr()),
@@ -187,18 +185,18 @@ extension LoginPageUI on _LoginPageState {
                                     SizedBox(height: 16.h),
                                   ],
 
-                                   /*if (showAppleButton) ...[
+                                  if (showAppleButton) ...[
                                     Button(
                                       width: double.infinity,
                                       height: 48.h,
                                       variant: ButtonVariant.secondary,
-                                      loading: isSocialBtnLoading,
+                                      loading: isAppleLoading,
                                       onPressed: isPageBusy ? null : _loginWithAppleOauth,
                                       leading: const Icon(Icons.apple_rounded),
                                       child: Text('login.oauth.apple'.tr()),
                                     ),
                                     SizedBox(height: 16.h),
-                                  ],*/
+                                  ],
 
 
                                 ],

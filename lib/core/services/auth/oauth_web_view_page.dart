@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -7,7 +10,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 /// - AppBar 有 X 关闭按钮（Android 同时支持物理返回键）
 /// - SafeArea 自动处理刘海屏 / Dynamic Island
 /// - NavigationDelegate 拦截 joymini:// 回调，pop 返回 token
-/// - 使用官方 webview_flutter（无 storyboard，兼容 iOS 26+）
+/// - 平台感知 User Agent（iOS → Safari，Android → Chrome）
+/// - 5 分钟超时保护，防止用户永久卡在 WebView
 class OAuthWebViewPage extends StatefulWidget {
   final String loginUrl;
   final String provider;
@@ -26,16 +30,34 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
   late final WebViewController _controller;
   int _progress = 0;
   bool _handled = false;
+  Timer? _timeoutTimer;
+
+  /// 根据平台返回合适的 User Agent，避免 iOS 上显示 Android 版 OAuth 页面
+  static String _buildUserAgent() {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
+          'AppleWebKit/605.1.15 (KHTML, like Gecko) '
+          'Version/17.0 Mobile/15E148 Safari/604.1';
+    }
+    // Android / other
+    return 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 '
+        '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
+  }
 
   @override
   void initState() {
     super.initState();
+
+    // 5 分钟超时保护
+    _timeoutTimer = Timer(const Duration(minutes: 5), () {
+      if (!mounted || _handled) return;
+      debugPrint('[OAuthWebViewPage] ⏰ Timeout, closing WebView');
+      Navigator.of(context).pop(null);
+    });
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setUserAgent(
-        'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 '
-        '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-      )
+      ..setUserAgent(_buildUserAgent())
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (progress) {
@@ -55,14 +77,22 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
             return NavigationDecision.navigate;
           },
           onWebResourceError: (WebResourceError error) {
-            debugPrint(
-              '[OAuthWebViewPage] onWebResourceError: ${error.url}  ${error.description}',
-            );
-            if (error.url != null) _interceptUrl(error.url!);
+            // 只拦截 joymini:// 回调 URL 引起的资源错误（自定义协议被 WebView 当作 404）
+            final url = error.url;
+            if (url != null && url.startsWith('joymini://')) {
+              debugPrint('[OAuthWebViewPage] joymini:// resource error (expected): $url');
+              _interceptUrl(url);
+            }
           },
         ),
       )
       ..loadRequest(Uri.parse(widget.loginUrl));
+  }
+
+  @override
+  void dispose() {
+    _timeoutTimer?.cancel();
+    super.dispose();
   }
 
   void _interceptUrl(String rawUrl) {
@@ -76,6 +106,7 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
 
     if (token != null && token.isNotEmpty && mounted) {
       _handled = true;
+      _timeoutTimer?.cancel();
       debugPrint('[OAuthWebViewPage] ✅ Token received, popping page');
       Navigator.of(context).pop(<String, String>{
         'token': token,
@@ -130,7 +161,7 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
                   value: _progress > 0 ? _progress / 100.0 : null,
                   minHeight: 3,
                   color: theme.colorScheme.primary,
-                  backgroundColor: theme.colorScheme.primary.withOpacity(0.15),
+                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
                 ),
               ),
           ],

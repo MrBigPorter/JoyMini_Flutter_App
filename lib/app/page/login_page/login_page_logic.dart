@@ -13,6 +13,8 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   bool _socialOauthInFlight = false;
   bool _isSuccessRedirecting = false;
   bool _oauthCancelled = false;
+  /// 当前正在加载的第三方登录 provider，用于精确控制各按钮的 loading 状态
+  String? _socialLoadingProvider; // 'google' | 'facebook' | 'apple'
 
   @override
   void initState() {
@@ -96,7 +98,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   Future<void> _loginWithGoogleOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     _oauthCancelled = false;
-    setState(() => _socialOauthInFlight = true);
+    setState(() {
+      _socialOauthInFlight = true;
+      _socialLoadingProvider = 'google';
+    });
     try {
       final result = await DeepLinkOAuthService.loginWithGoogle(
         apiBaseUrl: OAuthConfig.apiBaseUrl,
@@ -109,7 +114,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       _isSuccessRedirecting = true;
       await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
-      if (mounted) setState(() => _socialOauthInFlight = false);
+      if (mounted) setState(() { _socialOauthInFlight = false; _socialLoadingProvider = null; });
     } on DeepLinkOAuthException catch (e) {
       if (e.message.contains('cancelled') || e.message.contains('timeout')) {
         _oauthCancelled = true;
@@ -124,7 +129,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
           await Future.delayed(const Duration(milliseconds: 300));
         }
         if (mounted && !_isSuccessRedirecting) {
-          setState(() => _socialOauthInFlight = false);
+          setState(() { _socialOauthInFlight = false; _socialLoadingProvider = null; });
         }
       }
     }
@@ -133,7 +138,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   Future<void> _loginWithFacebookOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     _oauthCancelled = false;
-    setState(() => _socialOauthInFlight = true);
+    setState(() {
+      _socialOauthInFlight = true;
+      _socialLoadingProvider = 'facebook';
+    });
     try {
       final result = await DeepLinkOAuthService.loginWithFacebook(
         apiBaseUrl: OAuthConfig.apiBaseUrl,
@@ -146,7 +154,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       _isSuccessRedirecting = true;
       await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
-      if (mounted) setState(() => _socialOauthInFlight = false);
+      if (mounted) setState(() { _socialOauthInFlight = false; _socialLoadingProvider = null; });
     } on DeepLinkOAuthException catch (e) {
       if (e.message.contains('cancelled') || e.message.contains('timeout')) {
         _oauthCancelled = true;
@@ -161,7 +169,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
           await Future.delayed(const Duration(milliseconds: 300));
         }
         if (mounted && !_isSuccessRedirecting) {
-          setState(() => _socialOauthInFlight = false);
+          setState(() { _socialOauthInFlight = false; _socialLoadingProvider = null; });
         }
       }
     }
@@ -170,7 +178,10 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
   Future<void> _loginWithAppleOauth() async {
     if (_socialOauthInFlight || _isSuccessRedirecting) return;
     _oauthCancelled = false;
-    setState(() => _socialOauthInFlight = true);
+    setState(() {
+      _socialOauthInFlight = true;
+      _socialLoadingProvider = 'apple';
+    });
     try {
       final result = await DeepLinkOAuthService.loginWithApple(
         apiBaseUrl: OAuthConfig.apiBaseUrl,
@@ -183,7 +194,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
       _isSuccessRedirecting = true;
       await _syncLoginTokens(result['token']!, result['refreshToken'] ?? '');
 
-      if (mounted) setState(() => _socialOauthInFlight = false);
+      if (mounted) setState(() { _socialOauthInFlight = false; _socialLoadingProvider = null; });
     } on DeepLinkOAuthException catch (e) {
       if (e.message.contains('cancelled') || e.message.contains('timeout')) {
         _oauthCancelled = true;
@@ -198,7 +209,7 @@ mixin LoginPageLogic on ConsumerState<LoginPage> {
           await Future.delayed(const Duration(milliseconds: 300));
         }
         if (mounted && !_isSuccessRedirecting) {
-          setState(() => _socialOauthInFlight = false);
+          setState(() { _socialOauthInFlight = false; _socialLoadingProvider = null; });
         }
       }
     }

@@ -117,7 +117,7 @@ class _OauthProcessingPageState extends State<OauthProcessingPage> {
               'This may take a few seconds',
               style: TextStyle(
                 fontSize: 12.sp,
-                color: context.textSecondary700.withOpacity(0.6),
+                color: context.textSecondary700.withValues(alpha: 0.6),
               ),
             ),
           ],
