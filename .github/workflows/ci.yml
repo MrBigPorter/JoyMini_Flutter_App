@@ -1,0 +1,134 @@
+name: "🔍 JoyMini CI Gate — Analyze & Test"
+
+# ⚠️ CI 机器人已暂停 — 如需重新启用，恢复下方被注释的 push/pull_request 触发器
+on:
+  # push:
+  #   branches:
+  #     - main
+  #     - test
+  #     - "feature/**"
+  #     - "fix/**"
+  #     - "hotfix/**"
+  # pull_request:
+  #   branches:
+  #     - main
+  #     - test
+  #   types: [opened, synchronize, reopened]
+  # 手动补跑（仅保留手动触发）
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true  # 同分支新提交直接取消旧跑，节省资源
+
+permissions:
+  contents: read
+  checks: write      # 用于 test reporter 写入 PR checks
+  pull-requests: write
+
+jobs:
+  # ─────────────────────────────────────────────────────────
+  # Job 1: Static Analysis  (ubuntu — 快，免费)
+  # ─────────────────────────────────────────────────────────
+  analyze:
+    name: "🔎 Flutter Analyze"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter ${{ '3.41.4' }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.4"
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run flutter analyze
+        # --no-fatal-warnings: warning 不阻断（项目存量 warning 较多，待逐步清理）
+        # --no-fatal-infos:    info    不阻断
+        # 只有 error 级别才会让 CI 变红
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+  # ─────────────────────────────────────────────────────────
+  # Job 2: Unit & Widget Tests  (ubuntu — 并行运行)
+  # ─────────────────────────────────────────────────────────
+  test:
+    name: "🧪 Flutter Test"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.41.4
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.4"
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run Tests with Coverage
+        run: |
+          flutter test \
+            --dart-define-from-file=lib/core/config/env/test.json \
+            --coverage \
+            --reporter=github \
+            || EXIT_CODE=$?
+
+          # 生成简洁的覆盖率摘要
+          if [ -f coverage/lcov.info ]; then
+            LINES=$(grep -c "^DA:" coverage/lcov.info || echo 0)
+            HIT=$(grep -c "^DA:.*,[^0]" coverage/lcov.info || echo 0)
+            if [ "$LINES" -gt 0 ]; then
+              PCT=$(awk "BEGIN { printf \"%.1f\", ($HIT/$LINES)*100 }")
+              echo "## 📊 Test Coverage: ${PCT}% (${HIT}/${LINES} lines)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+          exit ${EXIT_CODE:-0}
+
+      - name: Upload Coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage/lcov.info
+          fail_ci_if_error: false   # 覆盖率上传失败不影响 CI 红绿灯
+          verbose: false
+
+  # ─────────────────────────────────────────────────────────
+  # Job 3: Summary Badge  (仅 PR 可见)
+  # ─────────────────────────────────────────────────────────
+  ci-summary:
+    name: "✅ CI Gate Summary"
+    needs: [analyze, test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report Gate Result
+        run: |
+          ANALYZE="${{ needs.analyze.result }}"
+          TEST="${{ needs.test.result }}"
+
+          echo "## 🔍 CI Gate Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Job | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Flutter Analyze | $( [ "$ANALYZE" == "success" ] && echo "✅ Passed" || echo "❌ $ANALYZE" ) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Flutter Test    | $( [ "$TEST"    == "success" ] && echo "✅ Passed" || echo "❌ $TEST" ) |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$ANALYZE" != "success" || "$TEST" != "success" ]]; then
+            echo ""
+            echo "> ⛔ CI Gate failed. Deploy workflow will not start." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> 🚀 All checks passed. Deploy workflow may proceed." >> "$GITHUB_STEP_SUMMARY"
+

@@ -19,6 +19,11 @@ on:
   # 逻辑 3：保留手动点击按钮触发，以防万一
   workflow_dispatch:
 
+# ── 并发保护：同一分支/tag 的旧部署自动取消，避免踩踏 ───────────────────────
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false   # 部署不能强行中断（防止半截发布）；分析/测试阶段才 cancel
+
 permissions:
   contents: read
   deployments: write
@@ -57,6 +62,7 @@ jobs:
     needs: preflight-reminder
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted
+    timeout-minutes: 60   # 超过 60 分钟自动 fail，防止 runner 被永久占用
     # [优化] 加入全局环境变量，强行使用 Node.js 24 新引擎
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -137,6 +143,17 @@ jobs:
           fvm flutter pub get
           
           fvm flutter --version
+      # ================= Phase 4.5: QA Gate =================
+      - name: 🔎 4.5a. Flutter Analyze (Static Analysis Gate)
+        run: fvm flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: 🧪 4.5b. Flutter Test (Unit & Widget Gate)
+        run: |
+          fvm flutter test \
+            --dart-define-from-file=${{ env.ENV_FILE }} \
+            --reporter=github \
+            --no-pub
+
       # ================= Phase 5: Web Deployment =================
       - name: 🚀 Build Web (H5)
         run: |

@@ -1,0 +1,24 @@
+# JoyMini CODEOWNERS
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# 格式: <路径模式>   <GitHub @用户名>
+# 所列路径有变更时，对应 owner 必须 Approve 才能合并 PR
+
+# ─── 默认：所有文件都需要 @porter review ──────────────────
+*                                   @porter
+
+# ─── CI/CD 配置：高风险，双人确认 ───────────────────────────
+.github/                            @porter
+
+# ─── 核心认证/安全逻辑 ────────────────────────────────────
+lib/core/services/auth/             @porter
+lib/core/store/auth/                @porter
+lib/app/page/login_page/            @porter
+
+# ─── 路由配置（改错会导致全局跳转异常）──────────────────────
+lib/app/routes/                     @porter
+
+# ─── 依赖声明（锁定版本以防供应链攻击）──────────────────────
+pubspec.yaml                        @porter
+pubspec.lock                        @porter
+

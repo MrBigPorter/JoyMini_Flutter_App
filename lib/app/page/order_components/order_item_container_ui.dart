@@ -299,9 +299,12 @@ class _OrderItemInfo extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              item.isRefunded ? 'Total Refund' : 'common.total.price'.tr(),
-              style: TextStyle(fontSize: 14.sp, color: context.textPrimary900, fontWeight: FontWeight.bold),
+            Flexible(
+              child: Text(
+                item.isRefunded ? 'Total Refund' : 'common.total.price'.tr(),
+                style: TextStyle(fontSize: 14.sp, color: context.textPrimary900, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             Text(
               '₱${item.finalAmount}',

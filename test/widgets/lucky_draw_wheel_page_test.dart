@@ -114,16 +114,18 @@ void main() {
     await tester.ensureVisible(find.text('Start Draw'));
     await tester.tap(find.text('Start Draw'));
     await tester.pump();
-    await tester.pump(const Duration(seconds: 5));
-    await tester.pump(const Duration(milliseconds: 200));
+    // Animation duration is 5.5s; pump 6s to ensure it completes and dialog appears.
+    // One extra pump() afterwards lets the showDialog frame render.
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pump(); // Let the dialog frame render
 
     expect(find.text('View My Results'), findsOneWidget);
     expect(find.text('Back to Tickets'), findsOneWidget);
 
     await tester.ensureVisible(find.text('View My Results'));
     await tester.tap(find.text('View My Results'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    // pumpAndSettle waits for the dialog-close animation AND the route-pop animation
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
 
     expect(
       find.text('route-result: $luckyDrawWheelReturnToResults'),
