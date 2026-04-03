@@ -185,7 +185,7 @@ extension LoginPageUI on _LoginPageState {
                                     SizedBox(height: 16.h),
                                   ],
 
-                                  if (showAppleButton) ...[
+                                  /*if (showAppleButton) ...[
                                     Button(
                                       width: double.infinity,
                                       height: 48.h,
@@ -196,7 +196,7 @@ extension LoginPageUI on _LoginPageState {
                                       child: Text('login.oauth.apple'.tr()),
                                     ),
                                     SizedBox(height: 16.h),
-                                  ],
+                                  ],*/
 
 
                                 ],
