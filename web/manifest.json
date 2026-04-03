@@ -9,20 +9,59 @@
     "background_color": "#F8F9FA",
     "theme_color": "#FF5722",
     "lang": "en",
-    "categories": ["shopping", "lifestyle"],
+    "categories": [
+        "shopping",
+        "lifestyle"
+    ],
     "prefer_related_applications": false,
+    "shortcuts": [
+        {
+            "name": "Flash Sale",
+            "short_name": "Flash Sale",
+            "description": "View current flash sale sessions",
+            "url": "/flash-sale",
+            "icons": [
+                {
+                    "src": "icons/Icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Lucky Draw",
+            "short_name": "Lucky Draw",
+            "description": "Check your lucky draw tickets",
+            "url": "/lucky-draw",
+            "icons": [
+                {
+                    "src": "icons/Icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Orders",
+            "short_name": "Orders",
+            "description": "Track your orders",
+            "url": "/orders",
+            "icons": [
+                {
+                    "src": "icons/Icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ],
     "icons": [
         {
             "src": "icons/Icon-192.png",
             "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any"
+            "type": "image/png"
         },
         {
             "src": "icons/Icon-512.png",
             "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any"
+            "type": "image/png"
         },
         {
             "src": "icons/Icon-maskable-192.png",
@@ -35,29 +74,6 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
-        }
-    ],
-    "shortcuts": [
-        {
-            "name": "Flash Sale",
-            "short_name": "Flash Sale",
-            "description": "View current flash sale sessions",
-            "url": "/flash-sale",
-            "icons": [{ "src": "icons/Icon-192.png", "sizes": "192x192" }]
-        },
-        {
-            "name": "Lucky Draw",
-            "short_name": "Lucky Draw",
-            "description": "Check your lucky draw tickets",
-            "url": "/lucky-draw",
-            "icons": [{ "src": "icons/Icon-192.png", "sizes": "192x192" }]
-        },
-        {
-            "name": "Orders",
-            "short_name": "Orders",
-            "description": "Track your orders",
-            "url": "/orders",
-            "icons": [{ "src": "icons/Icon-192.png", "sizes": "192x192" }]
         }
     ]
 }
