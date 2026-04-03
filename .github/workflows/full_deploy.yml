@@ -2,10 +2,8 @@ name: JoyMini Enterprise CI/CD Pipeline
 
 on:
   push:
-    # 逻辑 1：推送到 test 分支时，自动触发测试环境打包
     branches:
       - test
-    # 逻辑 2：只有推送 v 开头的标签时，才触发正式环境打包
     tags:
       - 'v*'
   pull_request:
@@ -16,64 +14,42 @@ on:
       - opened
       - synchronize
       - reopened
-  # 逻辑 3：保留手动点击按钮触发，以防万一
   workflow_dispatch:
 
-# ── 并发保护：同一分支/tag 的旧部署自动取消，避免踩踏 ───────────────────────
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: false   # 部署不能强行中断（防止半截发布）；分析/测试阶段才 cancel
+  cancel-in-progress: false
 
 permissions:
   contents: read
   deployments: write
 
 jobs:
-  preflight-reminder:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish self-hosted runner reminder
-        run: |
-          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
-          ## 🖥️ Self-hosted Runner Reminder
-
-          This workflow continues on your local Mac self-hosted runner.
-
-          If the next job stays in **Queued**, please start the runner first:
-
-          ```bash
-          cd /Volumes/MySSD/github-runner
-          ./run.sh
-          ```
-
-          Wait until the terminal shows **Connected to GitHub**.
-
-          Current trigger details:
-          - Event: `${{ github.event_name }}`
-          - Ref: `${{ github.ref }}`
-          - Actor: `${{ github.actor }}`
-
-          For PR/web preview runs, the workflow still needs the local self-hosted runner to pick up the build job.
-          EOF
-
-          echo "Reminder published: start the local self-hosted runner and wait for 'Connected to GitHub' if the next job is queued."
-
-  build-and-deploy:
-    needs: preflight-reminder
+  # ─────────────────────────────────────────────────────────────────
+  # Job 1: QA Gate + Web Deploy  ── ubuntu-latest（便宜 10x）
+  #   触发条件：所有事件（PR / push / tag）
+  #   耗时预估：~20 min
+  # ─────────────────────────────────────────────────────────────────
+  web-and-qa:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: self-hosted
-    timeout-minutes: 60   # 超过 60 分钟自动 fail，防止 runner 被永久占用
-    # [优化] 加入全局环境变量，强行使用 Node.js 24 新引擎
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    steps:
-      # ================= Phase 1: Secure Checkout =================
-      - name: 1. Checkout Code (Preserve Cache)
-        uses: actions/checkout@v4
-        with:
-          clean: false
+    outputs:
+      # 传递给 mobile-build job 使用
+      env_file:    ${{ steps.set_env.outputs.env_file }}
+      env_tag:     ${{ steps.set_env.outputs.env_tag }}
+      is_prod:     ${{ steps.set_env.outputs.is_prod }}
+      app_version: ${{ steps.meta.outputs.app_version }}
+      short_sha:   ${{ steps.meta.outputs.short_sha }}
+      firebase_app_id: ${{ steps.set_env.outputs.firebase_app_id }}
 
-      # ================= Phase 1.5: Auto Versioning =================
+    steps:
+      # ── Phase 1 ────────────────────────────────────────────────
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+
       - name: 🤖 1.5. Auto Bump Build Number
         if: github.event_name != 'pull_request'
         run: |
@@ -82,173 +58,189 @@ jobs:
           perl -pi -e "s/^version: .*/version: $NEW_VERSION/g" pubspec.yaml
           echo "✅ Cloud build version set to: $NEW_VERSION"
 
-      # ================= Phase 2: Environment Determination =================
+      # ── Phase 2 ────────────────────────────────────────────────
       - name: 2. Determine Deployment Environment
         id: set_env
         run: |
+          # 同时写入 GITHUB_ENV（本 job 后续步骤用）和 GITHUB_OUTPUT（mobile-build job 用）
+          set_var() { echo "$1=$2" >> $GITHUB_ENV; echo "$1=$2" >> $GITHUB_OUTPUT; }
+
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "ENV_TAG=[PR PREVIEW]" >> $GITHUB_ENV
-            echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
-            echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}" >> $GITHUB_ENV
-            echo "IS_PROD=false" >> $GITHUB_ENV
-            echo "IS_PR=true" >> $GITHUB_ENV
-            echo "CF_BRANCH=pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-            echo "CF_PROJECT=joymini-web-test" >> $GITHUB_ENV  # [新增] PR 也部署到测试项目
+            set_var env_tag    "[PR PREVIEW]"
+            set_var env_file   "lib/core/config/env/test.json"
+            set_var is_prod    "false"
+            set_var cf_branch  "pr-${{ github.event.pull_request.number }}"
+            set_var cf_project "joymini-web-test"
+            set_var firebase_app_id "${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}"
           elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "ENV_TAG=[PROD]" >> $GITHUB_ENV
-            echo "ENV_FILE=lib/core/config/env/prod.json" >> $GITHUB_ENV
-            echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_PROD }}" >> $GITHUB_ENV
-            echo "IS_PROD=true" >> $GITHUB_ENV
-            echo "IS_PR=false" >> $GITHUB_ENV
-            echo "CF_BRANCH=main" >> $GITHUB_ENV
-            echo "CF_PROJECT=joymini-web" >> $GITHUB_ENV  # [新增] 正式版进正式项目
+            set_var env_tag    "[PROD]"
+            set_var env_file   "lib/core/config/env/prod.json"
+            set_var is_prod    "true"
+            set_var cf_branch  "main"
+            set_var cf_project "joymini-web"
+            set_var firebase_app_id "${{ secrets.FIREBASE_ANDROID_APP_ID_PROD }}"
           else
-            echo "ENV_TAG=[TEST]" >> $GITHUB_ENV
-            echo "ENV_FILE=lib/core/config/env/test.json" >> $GITHUB_ENV
-            echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}" >> $GITHUB_ENV
-            echo "IS_PROD=false" >> $GITHUB_ENV
-            echo "IS_PR=false" >> $GITHUB_ENV
-            echo "CF_BRANCH=test" >> $GITHUB_ENV
-            echo "CF_PROJECT=joymini-web-test" >> $GITHUB_ENV  # [新增] 测试版进测试项目
+            set_var env_tag    "[TEST]"
+            set_var env_file   "lib/core/config/env/test.json"
+            set_var is_prod    "false"
+            set_var cf_branch  "test"
+            set_var cf_project "joymini-web-test"
+            set_var firebase_app_id "${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}"
           fi
 
-      # ================= Phase 3: Extract Metadata =================
+      # ── Phase 3 ────────────────────────────────────────────────
       - name: 📊 3. Extract Build Metadata
         id: meta
         run: |
-          # [核心修复] 保留带 + 号的完整版本号
           APP_VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //g')
+          SHORT_SHA=$(git rev-parse --short HEAD)
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "SHORT_SHA=$SHORT_SHA"     >> $GITHUB_ENV
+          echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA"     >> $GITHUB_OUTPUT
 
-      # ================= Phase 4: Environment Setup =================
+      # ── Phase 4: Flutter (ubuntu, no Java needed for web) ──────
+      - name: 🐦 4a. Setup Flutter (ubuntu, cached)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          cache: true
+
+      - name: 📦 4b. Flutter pub get
+        run: |
+          flutter config --no-analytics
+          flutter pub get
+
+      # ── Phase 4.5: QA Gate ─────────────────────────────────────
+      - name: 🔎 4.5a. Flutter Analyze
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: 🧪 4.5b. Flutter Test
+        run: |
+          flutter test \
+            --dart-define-from-file=${{ env.env_file }} \
+            --reporter=github \
+            --no-pub
+
+      # ── Phase 5: Web ───────────────────────────────────────────
+      - name: 🚀 5. Build Web (H5)
+        run: |
+          rm -rf build/web
+          flutter build web --release --no-wasm-dry-run \
+            --dart-define-from-file=${{ env.env_file }}
+
+      - name: ☁️ Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          projectName: ${{ env.cf_project }}
+          directory: build/web
+          branch: ${{ env.cf_branch }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 2: Mobile Build  ── macos-latest（只在非 PR 时运行）
+  #   依赖 web-and-qa 成功，QA 不过则不浪费 macOS 机时
+  #   触发条件：push / tag / workflow_dispatch
+  #   耗时预估：~50 min
+  # ─────────────────────────────────────────────────────────────────
+  mobile-build:
+    needs: web-and-qa
+    if: github.event_name != 'pull_request'
+    runs-on: self-hosted   # 本地 Mac runner，免费；iOS/Android 构建留在本机
+    timeout-minutes: 60
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      # 从 web-and-qa 的 outputs 继承所有环境变量
+      ENV_TAG:              ${{ needs.web-and-qa.outputs.env_tag }}
+      ENV_FILE:             ${{ needs.web-and-qa.outputs.env_file }}
+      IS_PROD:              ${{ needs.web-and-qa.outputs.is_prod }}
+      APP_VERSION:          ${{ needs.web-and-qa.outputs.app_version }}
+      SHORT_SHA:            ${{ needs.web-and-qa.outputs.short_sha }}
+      FIREBASE_ANDROID_APP_ID: ${{ needs.web-and-qa.outputs.firebase_app_id }}
+
+    steps:
+      # ── Phase 1 ────────────────────────────────────────────────
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🤖 1.5. Apply Version Bump (same formula as web-and-qa)
+        run: |
+          perl -pi -e "s/^version: .*/version: ${{ needs.web-and-qa.outputs.app_version }}/g" pubspec.yaml
+          echo "✅ Version applied: ${{ needs.web-and-qa.outputs.app_version }}"
+
+      # ── Phase 4: Environment Setup ─────────────────────────────
       - name: 🐦 4a. Expose Local FVM to Runner
         run: |
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
-      - name: 🛠️ 4b. Prepare Flutter Environment (Optimized)
+      - name: 🛠️ 4b. Prepare Flutter Environment via FVM
         run: |
-          # 仅清理构建产物，保留 .dart_tool 缓存
-          rm -rf build
-
-          # 智能安装：如果版本已存在则跳过
-          if ! fvm list | grep -q "3.41.4"; then
-            fvm install 3.41.4
-          fi
-
+          fvm install
           fvm flutter config --no-analytics
-
-          # 强制重新获取一次依赖 (如果你本地 SSD 慢，建议保留这步)
           fvm flutter pub get
-          
-          fvm flutter --version
-      # ================= Phase 4.5: QA Gate =================
-      - name: 🔎 4.5a. Flutter Analyze (Static Analysis Gate)
-        run: fvm flutter analyze --no-fatal-warnings --no-fatal-infos
 
-      - name: 🧪 4.5b. Flutter Test (Unit & Widget Gate)
-        run: |
-          fvm flutter test \
-            --dart-define-from-file=${{ env.ENV_FILE }} \
-            --reporter=github \
-            --no-pub
-
-      # ================= Phase 5: Web Deployment =================
-      - name: 🚀 Build Web (H5)
-        run: |
-          rm -rf build/web
-          # 使用 --no-wasm-dry-run 禁用 WASM 干运行，避免兼容性问题
-          fvm flutter build web --release --no-wasm-dry-run --dart-define-from-file=${{ env.ENV_FILE }}
-
-      - name: ☁️ Deploy to Cloudflare Pages
-        id: cf_deploy
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: ${{ env.CF_PROJECT || 'joymini-web' }}
-          directory: build/web
-          branch: ${{ env.CF_BRANCH }}
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-
-      # ================= Phase 6: iOS Dynamic Config =================
-      - name: 🍏 Dynamically Adjust iOS Project Files (Test Only)
-        if: github.event_name != 'pull_request' && env.IS_PROD == 'false'
+      # ── Phase 6: iOS Dynamic Config ────────────────────────────
+      - name: 🍏 6. Adjust iOS Bundle ID (Test Only)
+        if: env.IS_PROD == 'false'
         run: |
           sed -i '' "s/com.porter.joyminis/com.porter.joyminis.test/g" ios/Runner.xcodeproj/project.pbxproj
           echo "✅ iOS Bundle ID changed to .test"
 
-      # ================= Phase 7: Restore All Credentials =================
-      - name: 🔐 7. Restore All Credentials (Environment Aware)
-        if: github.event_name != 'pull_request'
+      # ── Phase 7: Credentials ───────────────────────────────────
+      - name: 🔐 7. Restore All Credentials
         run: |
-          # 1. 强制清理旧的残留配置，防止干扰
-          rm -f android/key.properties
-          rm -f android/app/*.jks
-          rm -f android/app/*.keystore
-
-          # 2. 还原公共配置文件
+          rm -f android/key.properties android/app/*.jks android/app/*.keystore
           echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
           echo "${{ secrets.LOCAL_PROPERTIES }}" > local.properties
 
-          # 3. 分环境还原“玉玺”
           if [[ "${{ env.IS_PROD }}" == "true" ]]; then
             echo "🚀 正在部署 [正式版]..."
             echo '${{ secrets.IOS_G_SERVICES_PROD }}' > ios/Runner/GoogleService-Info.plist
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-            # 逐行写入，避开 EOF 缩进坑
             echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}" > android/key.properties
-            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
-            echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
-            echo "storeFile=upload-keystore.jks" >> android/key.properties
+            echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}"     >> android/key.properties
+            echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}"           >> android/key.properties
+            echo "storeFile=upload-keystore.jks"                        >> android/key.properties
           else
             echo "🧪 正在部署 [测试版]..."
             echo '${{ secrets.IOS_G_SERVICES_TEST }}' > ios/Runner/GoogleService-Info.plist
             echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
-            # 逐行写入测试版专用配置
-            echo "storePassword=android" > android/key.properties
-            echo "keyPassword=android" >> android/key.properties
-            echo "keyAlias=androiddebugkey" >> android/key.properties
-            echo "storeFile=debug.keystore" >> android/key.properties
+            echo "storePassword=android"          > android/key.properties
+            echo "keyPassword=android"           >> android/key.properties
+            echo "keyAlias=androiddebugkey"      >> android/key.properties
+            echo "storeFile=debug.keystore"      >> android/key.properties
           fi
 
       - name: 🐦 7a. Setup Shorebird
-        if: github.event_name != 'pull_request'
         uses: shorebirdtech/setup-shorebird@v1
 
-      # 【本次核心修改 1】：强制产出 APK
       - name: 🚀 7b. Build Android via Shorebird (Force APK)
-        if: github.event_name != 'pull_request'
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
-        run: |
-          shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
+        run: shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
 
-      # ================= Phase 8: iOS Build =================
-      - name: 🚀 Build iOS (IPA)
-        if: github.event_name != 'pull_request'
-        run: |
-          fvm flutter build ipa --release --no-codesign --dart-define-from-file=${{ env.ENV_FILE }}
+      # ── Phase 8: iOS ───────────────────────────────────────────
+      - name: 🚀 8. Build iOS (IPA)
+        run: fvm flutter build ipa --release --no-codesign --dart-define-from-file=${{ env.ENV_FILE }}
 
-      # ================= Phase 9: Firebase Distribution =================
-      # 【本次核心修改 2】：只认 APK，失败即报错！
+      # ── Phase 9: Firebase Distribution ─────────────────────────
       - name: 🦅 9. Distribute to Firebase App Distribution
-        if: github.event_name != 'pull_request'
         run: |
           if ! command -v firebase &> /dev/null; then
               curl -sL https://firebase.tools | upgrade=true bash
           fi
-          
+
           FB_KEY_PATH="${{ github.workspace }}/firebase-key.json"
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > "$FB_KEY_PATH"
           export GOOGLE_APPLICATION_CREDENTIALS="$FB_KEY_PATH"
-          
+
           TARGET_FILE=$(find build -name "*release.apk" | head -n 1)
-          
+
           if [ -n "$TARGET_FILE" ] && [ -f "$TARGET_FILE" ]; then
             echo "🚀 Found APK to upload: $TARGET_FILE"
-            # 删除了 || echo，失败直接抛出红灯！
             firebase appdistribution:distribute "$TARGET_FILE" \
               --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
               --groups "admin" \
@@ -258,16 +250,12 @@ jobs:
             echo "❌ 致命错误: 没有找到 APK 文件！请检查 7b 步骤。"
             exit 1
           fi
-          
+
           rm -f "$FB_KEY_PATH"
 
-      # ================= Phase 10: Skip Artifact Upload =================
-      # 为节省 GitHub Actions 存储空间，不再上传 APK/IPA 到 Artifacts。
-      # 安装分发仍通过 Firebase App Distribution，Web 仍部署到 Cloudflare。
-
-      # ================= Phase 11: Telegram Notification =================
-      - name: 📱 Send Detailed Telegram Report
-        if: always() && github.event_name != 'pull_request'
+      # ── Phase 11: Telegram ─────────────────────────────────────
+      - name: 📱 11. Send Detailed Telegram Report
+        if: always()
         run: |
           MESSAGE="🐺 *JoyMini CI/CD Pipeline*
           📌 *Status*: ${{ job.status }}
@@ -275,23 +263,22 @@ jobs:
           📦 *App Version*: \`${{ env.APP_VERSION }}\`
           📝 *Commit*: \`${{ env.SHORT_SHA }}\`
           🔥 *Hot Update*: Shorebird Engine Active 🐦"
-          
+
           QR_URL="https://quickchart.io/qr?text=${{ secrets.FIREBASE_INVITE_LINK }}&size=400"
-          
+
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendPhoto" \
             -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
             -F "photo=$QR_URL" \
             -F "caption=$MESSAGE" \
             -F "parse_mode=Markdown"
 
-      # ================= Phase 12: Smart Cleanup =================
+      # ── Phase 12: Cleanup ──────────────────────────────────────
       - name: 🧹 12. Smart Cleanup
         if: always()
         run: |
-          echo "Cleaning credentials..."
-          rm -f android/app/upload-keystore.jks
-          rm -f android/key.properties
+          rm -f android/app/upload-keystore.jks android/key.properties
           rm -f "${{ github.workspace }}/firebase-key.json"
           git checkout -- ios/Runner.xcodeproj/project.pbxproj
           git checkout -- pubspec.yaml
           echo "✅ Cleanup complete."
+
