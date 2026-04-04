@@ -158,7 +158,6 @@ jobs:
       IS_PROD:              ${{ needs.web-and-qa.outputs.is_prod }}
       APP_VERSION:          ${{ needs.web-and-qa.outputs.app_version }}
       SHORT_SHA:            ${{ needs.web-and-qa.outputs.short_sha }}
-      FIREBASE_ANDROID_APP_ID: ${{ needs.web-and-qa.outputs.firebase_app_id }}
 
     steps:
       # ── Phase 1: Checkout ──────────────────────────────────────
@@ -169,6 +168,18 @@ jobs:
         run: |
           perl -pi -e "s/^version: .*/version: ${{ needs.web-and-qa.outputs.app_version }}/g" pubspec.yaml
           echo "✅ Version applied: ${{ needs.web-and-qa.outputs.app_version }}"
+
+      # ── Phase 2: 在本 Job 直接设置 Firebase App ID ─────────────
+      # ⚠️ Secret 不能通过 outputs 跨 Job 传递（会被 GitHub 安全机制清空）
+      # 必须在本 Job 内直接从 secrets 读取
+      - name: 🔑 2. Set Firebase Android App ID
+        run: |
+          if [[ "${{ env.IS_PROD }}" == "true" ]]; then
+            echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_PROD }}" >> $GITHUB_ENV
+          else
+            echo "FIREBASE_ANDROID_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_TEST }}" >> $GITHUB_ENV
+          fi
+          echo "✅ Firebase App ID 已设置 (IS_PROD=${{ env.IS_PROD }})"
 
       # ── Phase 4: Flutter Environment ───────────────────────────
       - name: 🐦 4a. Expose Local FVM to Runner
