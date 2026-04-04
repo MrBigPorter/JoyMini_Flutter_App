@@ -164,10 +164,10 @@ class DeepLinkOAuthService {
         throw DeepLinkOAuthException('Failed to redirect: $e');
       }
     }
-    await Future.delayed(const Duration(seconds: 2));
+    // 整页跳转已发起，浏览器即将离开当前页面，此行正常情况下不会到达。
+    // 若浏览器通过 BFCache 恢复此页面，以"取消"处理，不向用户展示错误。
     throw DeepLinkOAuthException(
-      'Web OAuth initiated. Please check your browser for completion.\n'
-      'If not redirected automatically, please refresh the page.',
+      'Web OAuth cancelled: redirect initiated, awaiting browser completion.',
     );
   }
 

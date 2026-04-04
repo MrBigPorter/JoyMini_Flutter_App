@@ -16,6 +16,17 @@ class OAuthWebViewPage extends StatefulWidget {
   final String loginUrl;
   final String provider;
 
+  /// 从 loginUrl 提取后端域名，用于检测 OAuth 回调后是否被重定向回后端自身页面
+  /// 例：https://dev-api.joyminis.com/auth/facebook/login → https://dev-api.joyminis.com
+  static String _extractOrigin(String url) {
+    try {
+      final uri = Uri.parse(url);
+      return '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+    } catch (_) {
+      return '';
+    }
+  }
+
   const OAuthWebViewPage({
     super.key,
     required this.loginUrl,
@@ -28,9 +39,35 @@ class OAuthWebViewPage extends StatefulWidget {
 
 class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
   late final WebViewController _controller;
+  late final String _backendOrigin; // 后端 API 域名，用于检测异常回跳
   int _progress = 0;
   bool _handled = false;
   Timer? _timeoutTimer;
+
+  /// 检测后端是否将 OAuth 重定向到自身的 login 页
+  /// （说明后端未正确实现 joymini:// callback 跳转）
+  bool _isBackendLoginPage(String url) {
+    if (_backendOrigin.isEmpty) return false;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final origin = '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+    if (origin != _backendOrigin) return false;
+    // /login 和 /login/ 是明显的失败信号；/auth/ 是正常的 OAuth 流程路径，放行
+    final path = uri.path;
+    return !path.startsWith('/auth/') &&
+        (path == '/login' || path.startsWith('/login/') || path.startsWith('/login?'));
+  }
+
+  /// 处理系统返回键：WebView 有历史则向后导航，否则关闭页面
+  Future<void> _handleBackPress() async {
+    final canGoBack = await _controller.canGoBack();
+    if (!mounted) return;
+    if (canGoBack) {
+      await _controller.goBack();
+    } else {
+      Navigator.of(context).pop(null);
+    }
+  }
 
   /// 根据平台返回合适的 User Agent，避免 iOS 上显示 Android 版 OAuth 页面
   static String _buildUserAgent() {
@@ -47,6 +84,7 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
   @override
   void initState() {
     super.initState();
+    _backendOrigin = OAuthWebViewPage._extractOrigin(widget.loginUrl);
 
     // 5 分钟超时保护
     _timeoutTimer = Timer(const Duration(minutes: 5), () {
@@ -72,6 +110,19 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
             final uri = Uri.tryParse(request.url);
             if (uri != null && uri.scheme == 'joymini') {
               _interceptUrl(request.url);
+              return NavigationDecision.prevent;
+            }
+            // 防御：后端 OAuth 未正确跳 joymini:// 而是重定向回自身 /login 页
+            // （常见于后端未保存 callback 参数或 Facebook 授权被取消）
+            if (_isBackendLoginPage(request.url) && !_handled) {
+              _handled = true;
+              _timeoutTimer?.cancel();
+              debugPrint('[OAuthWebViewPage] 🔙 Backend redirected to login page '
+                  '(OAuth failed / backend missing joymini:// redirect): ${request.url}');
+              // 使用 addPostFrameCallback 确保在 NavigationDelegate 回调外执行 pop
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) Navigator.of(context).pop(null);
+              });
               return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
@@ -103,8 +154,10 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
 
     final token = uri.queryParameters['token'];
     final refreshToken = uri.queryParameters['refreshToken'];
+    final error = uri.queryParameters['error'];
 
     if (token != null && token.isNotEmpty && mounted) {
+      // 授权成功：带 token 返回
       _handled = true;
       _timeoutTimer?.cancel();
       debugPrint('[OAuthWebViewPage] ✅ Token received, popping page');
@@ -112,6 +165,13 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
         'token': token,
         'refreshToken': refreshToken ?? '',
       });
+    } else if (mounted) {
+      // 授权取消或后端返回错误（无 token）：静默关闭 WebView
+      _handled = true;
+      _timeoutTimer?.cancel();
+      debugPrint('[OAuthWebViewPage] ⚠️ OAuth callback without token '
+          '(error: $error), closing WebView');
+      Navigator.of(context).pop(null);
     }
   }
 
@@ -132,39 +192,48 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: 'login.oauth.cancel'.tr(),
-          onPressed: () => Navigator.of(context).pop(null),
+    return PopScope(
+      // 禁止系统自动 pop，改由 _handleBackPress 决定行为：
+      // - WebView 有历史 → 在 WebView 内后退
+      // - WebView 无历史 → 关闭页面
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBackPress();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'login.oauth.cancel'.tr(),
+            onPressed: () => Navigator.of(context).pop(null),
+          ),
+          title: Text(
+            _providerTitle(),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          centerTitle: true,
+          elevation: 0,
+          scrolledUnderElevation: 1,
         ),
-        title: Text(
-          _providerTitle(),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        scrolledUnderElevation: 1,
-      ),
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            if (_progress < 100)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: LinearProgressIndicator(
-                  value: _progress > 0 ? _progress / 100.0 : null,
-                  minHeight: 3,
-                  color: theme.colorScheme.primary,
-                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+        body: SafeArea(
+          bottom: false,
+          child: Stack(
+            children: [
+              WebViewWidget(controller: _controller),
+              if (_progress < 100)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(
+                    value: _progress > 0 ? _progress / 100.0 : null,
+                    minHeight: 3,
+                    color: theme.colorScheme.primary,
+                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
