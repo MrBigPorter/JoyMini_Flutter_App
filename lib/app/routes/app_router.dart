@@ -261,8 +261,8 @@ class AppRouter {
               // 所以使用 Future.microtask 在下一帧执行
               Future.microtask(() async {
                 try {
-                  // 获取 provider（默认为 google，可根据需要从 URL 参数或 state 解析）
-                  final provider = 'google'; // TODO: 从 state 或 URL 参数解析 provider
+                  // 从 URL 参数解析 provider（后端在 state 或 URL 中返回）
+                  final provider = state.uri.queryParameters['provider'] ?? 'google';
                   
                   // 调用全局处理器保存 token
                   await GlobalOAuthHandler.handleDeepLinkOAuthCallback(
@@ -286,12 +286,15 @@ class AppRouter {
                 }
               });
             } else {
-              debugPrint('No token found in callback URL');
-              // 没有 token，直接重定向到首页
+              // 无 token：可能是取消授权（error=cancelled）或其他错误
+              final error = state.uri.queryParameters['error'];
+              final provider = state.uri.queryParameters['provider'] ?? '';
+              debugPrint('No token in callback URL, error=$error provider=$provider');
               Future.microtask(() {
-                if (context.mounted) {
-                  context.go('/home');
-                }
+                if (!context.mounted) return;
+                // 取消授权 → 直接回登录页，不经过 /home 再被守卫跳回
+                // 其他错误 → 同样回登录页，避免空白停留
+                context.go('/login');
               });
             }
             
