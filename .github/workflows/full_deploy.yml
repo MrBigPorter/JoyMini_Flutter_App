@@ -161,7 +161,7 @@ jobs:
       FIREBASE_ANDROID_APP_ID: ${{ needs.web-and-qa.outputs.firebase_app_id }}
 
     steps:
-      # ── Phase 1 ────────────────────────────────────────────────
+      # ── Phase 1: Checkout ──────────────────────────────────────
       - name: 1. Checkout Code
         uses: actions/checkout@v4
 
@@ -170,7 +170,7 @@ jobs:
           perl -pi -e "s/^version: .*/version: ${{ needs.web-and-qa.outputs.app_version }}/g" pubspec.yaml
           echo "✅ Version applied: ${{ needs.web-and-qa.outputs.app_version }}"
 
-      # ── Phase 4: Environment Setup ─────────────────────────────
+      # ── Phase 4: Flutter Environment ───────────────────────────
       - name: 🐦 4a. Expose Local FVM to Runner
         run: |
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
@@ -182,12 +182,12 @@ jobs:
           fvm flutter config --no-analytics
           fvm flutter pub get
 
-      # ── Phase 6: iOS Dynamic Config ────────────────────────────
+      # ── Phase 6: iOS Bundle ID (Test Only) ─────────────────────
       - name: 🍏 6. Adjust iOS Bundle ID (Test Only)
         if: env.IS_PROD == 'false'
         run: |
-          sed -i '' "s/com.porter.joyminis/com.porter.joyminis.test/g" ios/Runner.xcodeproj/project.pbxproj
-          echo "✅ iOS Bundle ID changed to .test"
+          sed -i '' "s/com.porter.joyminis$/com.porter.joyminis.test/g" ios/Runner.xcodeproj/project.pbxproj
+          echo "✅ iOS Bundle ID → com.porter.joyminis.test"
 
       # ── Phase 7: Credentials ───────────────────────────────────
       - name: 🔐 7. Restore All Credentials
@@ -197,16 +197,18 @@ jobs:
           echo "${{ secrets.LOCAL_PROPERTIES }}" > local.properties
 
           if [[ "${{ env.IS_PROD }}" == "true" ]]; then
-            echo "🚀 正在部署 [正式版]..."
+            echo "🚀 [PROD] 写入生产证书..."
             echo '${{ secrets.IOS_G_SERVICES_PROD }}' > ios/Runner/GoogleService-Info.plist
+            # Android Release 签名
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
             echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}" > android/key.properties
             echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}"     >> android/key.properties
             echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}"           >> android/key.properties
             echo "storeFile=upload-keystore.jks"                        >> android/key.properties
           else
-            echo "🧪 正在部署 [测试版]..."
+            echo "🧪 [TEST] 写入测试证书..."
             echo '${{ secrets.IOS_G_SERVICES_TEST }}' > ios/Runner/GoogleService-Info.plist
+            # Android Debug 签名（内测分发用）
             echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
             echo "storePassword=android"          > android/key.properties
             echo "keyPassword=android"           >> android/key.properties
@@ -214,23 +216,82 @@ jobs:
             echo "storeFile=debug.keystore"      >> android/key.properties
           fi
 
+      # ── Phase 7a: Shorebird ────────────────────────────────────
       - name: 🐦 7a. Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
 
-      - name: 🚀 7b. Build Android via Shorebird (Force APK)
+      # ── Phase 7b: Android Build ────────────────────────────────
+      # [TEST]  → debug 签名 APK → Firebase 分发给内测人员
+      # [PROD]  → release 签名 APK → Firebase 分发给管理员验收
+      - name: 🤖 7b. Build Android APK via Shorebird
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
-        run: shorebird release android --artifact apk -- --dart-define-from-file=${{ env.ENV_FILE }}
+        run: |
+          shorebird release android --artifact apk \
+            -- --dart-define-from-file=${{ env.ENV_FILE }}
+          echo "✅ Android APK 构建完成 (ENV: ${{ env.ENV_TAG }})"
 
-      # ── Phase 8: iOS ───────────────────────────────────────────
-      - name: 🚀 8. Build iOS (IPA)
-        run: fvm flutter build ipa --release --no-codesign --dart-define-from-file=${{ env.ENV_FILE }}
+      # ── Phase 8: iOS Build（仅编译，不签名）───────────────────
+      # 当前：--no-codesign 只验证编译是否通过，不产出可安装包
+      # 启用签名：在本机 Keychain 装好 Apple Distribution 证书后去掉 --no-codesign
+      - name: 🍏 8. Build iOS IPA (no-codesign, compile verify only)
+        run: |
+          fvm flutter build ipa --release --no-codesign \
+            --dart-define-from-file=${{ env.ENV_FILE }}
+          echo "ℹ️ iOS 编译通过（未签名，暂不可安装）"
 
-      # ── Phase 9: Firebase Distribution ─────────────────────────
-      - name: 🦅 9. Distribute to Firebase App Distribution
+      # ──────────────────────────────────────────────────────────
+      # [iOS TEST 分发] Firebase App Distribution
+      # 条件：需要 Ad Hoc Provisioning Profile + 注册测试设备 UDID
+      # 启用步骤：
+      #   1. 去掉 --no-codesign，改为 Ad Hoc 签名
+      #   2. 在 Firebase 注册测试设备 UDID
+      #   3. 取消下方注释，填入 FIREBASE_IOS_APP_ID_TEST
+      # ──────────────────────────────────────────────────────────
+      # - name: 🍎 8b. [TEST] Distribute iOS via Firebase App Distribution
+      #   if: env.IS_PROD == 'false'
+      #   run: |
+      #     IPA_FILE=$(find build/ios/ipa -name "*.ipa" | head -n 1)
+      #     firebase appdistribution:distribute "$IPA_FILE" \
+      #       --app "${{ secrets.FIREBASE_IOS_APP_ID_TEST }}" \
+      #       --groups "admin" \
+      #       --non-interactive \
+      #       --release-notes "[TEST] ${{ env.APP_VERSION }}"
+
+      # ──────────────────────────────────────────────────────────
+      # [iOS PROD 发布] TestFlight → App Store
+      # 条件：需要 Apple Distribution 证书 + App Store Connect API 密钥
+      # 启用步骤：
+      #   1. Mac Keychain 装好 Apple Distribution 证书
+      #   2. App Store Connect → 用户与访问 → 密钥 → 创建 API Key
+      #   3. 配置以下 3 个 GitHub Secrets：
+      #      - APP_STORE_CONNECT_API_KEY_ID      (Key ID，10位字母数字)
+      #      - APP_STORE_CONNECT_API_ISSUER_ID   (Issuer ID，UUID格式)
+      #      - APP_STORE_CONNECT_API_KEY_BASE64  (下载的 .p8 文件 base64)
+      #   4. 取消下方注释
+      # ──────────────────────────────────────────────────────────
+      # - name: 🍎 8c. [PROD] Upload iOS to TestFlight
+      #   if: env.IS_PROD == 'true'
+      #   run: |
+      #     mkdir -p ~/.appstoreconnect/private_keys
+      #     echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" \
+      #       | base64 --decode \
+      #       > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
+      #     IPA_FILE=$(find build/ios/ipa -name "*.ipa" | head -n 1)
+      #     xcrun altool --upload-app \
+      #       --type ios --file "$IPA_FILE" \
+      #       --apiKey "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}" \
+      #       --apiIssuer "${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}"
+      #     rm -rf ~/.appstoreconnect/private_keys
+      #     echo "✅ iOS 已上传至 TestFlight"
+
+      # ── Phase 9: Android → Firebase App Distribution ──────────
+      # [TEST] → FIREBASE_ANDROID_APP_ID_TEST (com.porter.joyminis.test)
+      # [PROD] → FIREBASE_ANDROID_APP_ID_PROD (com.porter.joyminis)
+      - name: 🦅 9. Distribute Android to Firebase App Distribution
         run: |
           if ! command -v firebase &> /dev/null; then
-              curl -sL https://firebase.tools | upgrade=true bash
+            curl -sL https://firebase.tools | upgrade=true bash
           fi
 
           FB_KEY_PATH="${{ github.workspace }}/firebase-key.json"
@@ -238,31 +299,35 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS="$FB_KEY_PATH"
 
           TARGET_FILE=$(find build -name "*release.apk" | head -n 1)
-
-          if [ -n "$TARGET_FILE" ] && [ -f "$TARGET_FILE" ]; then
-            echo "🚀 Found APK to upload: $TARGET_FILE"
-            firebase appdistribution:distribute "$TARGET_FILE" \
-              --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
-              --groups "admin" \
-              --non-interactive \
-              --release-notes "Version: ${{ env.APP_VERSION }} (Shorebird Release)"
-          else
-            echo "❌ 致命错误: 没有找到 APK 文件！请检查 7b 步骤。"
+          if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then
+            echo "❌ 找不到 APK，请检查 Phase 7b"
             exit 1
           fi
 
-          rm -f "$FB_KEY_PATH"
+          echo "🚀 APK: $TARGET_FILE"
+          echo "📱 App ID: ${{ env.FIREBASE_ANDROID_APP_ID }}"
 
-      # ── Phase 11: Telegram ─────────────────────────────────────
-      - name: 📱 11. Send Detailed Telegram Report
+          firebase appdistribution:distribute "$TARGET_FILE" \
+            --app "${{ env.FIREBASE_ANDROID_APP_ID }}" \
+            --groups "admin" \
+            --non-interactive \
+            --release-notes "[${{ env.ENV_TAG }}] v${{ env.APP_VERSION }} | ${{ env.SHORT_SHA }}"
+
+          rm -f "$FB_KEY_PATH"
+          echo "✅ Android 已分发至 Firebase (${{ env.ENV_TAG }})"
+
+      # ── Phase 11: Telegram 通知 ────────────────────────────────
+      - name: 📱 11. Send Telegram Report
         if: always()
         run: |
-          MESSAGE="🐺 *JoyMini CI/CD Pipeline*
-          📌 *Status*: ${{ job.status }}
-          🏷️ *Environment*: ${{ env.ENV_TAG }}
-          📦 *App Version*: \`${{ env.APP_VERSION }}\`
+          STATUS_EMOJI=$([[ "${{ job.status }}" == "success" ]] && echo "✅" || echo "❌")
+          MESSAGE="${STATUS_EMOJI} *JoyMini CI/CD*
+          📌 *环境*: ${{ env.ENV_TAG }}
+          📦 *版本*: \`${{ env.APP_VERSION }}\`
           📝 *Commit*: \`${{ env.SHORT_SHA }}\`
-          🔥 *Hot Update*: Shorebird Engine Active 🐦"
+          🤖 *Android*: Firebase App Distribution ✅
+          🍏 *iOS*: 编译通过，分发待启用
+          🔥 *热更新*: Shorebird 已集成"
 
           QR_URL="https://quickchart.io/qr?text=${{ secrets.FIREBASE_INVITE_LINK }}&size=400"
 
@@ -276,9 +341,9 @@ jobs:
       - name: 🧹 12. Smart Cleanup
         if: always()
         run: |
-          rm -f android/app/upload-keystore.jks android/key.properties
+          rm -f android/app/upload-keystore.jks android/app/debug.keystore
+          rm -f android/key.properties
           rm -f "${{ github.workspace }}/firebase-key.json"
           git checkout -- ios/Runner.xcodeproj/project.pbxproj
           git checkout -- pubspec.yaml
-          echo "✅ Cleanup complete."
-
+          echo "✅ Cleanup done"
