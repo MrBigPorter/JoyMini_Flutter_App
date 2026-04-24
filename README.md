@@ -68,11 +68,11 @@ The project demonstrates deep expertise in:
 
 ## 👤 Developer Portfolio
 
-<p align="center">
-  <b>Porter Pan</b> · <a href="https://github.com/MrBigPorter">github.com/MrBigPorter</a> · <a href="https://linkedin.com/in/porterpan">linkedin.com/in/porterpan</a>
+<p>
+  <b>Porter</b> · <a href="https://github.com/MrBigPorter">github.com/MrBigPorter</a> · <a href="https://blog.joymins.com">blog</a>
 </p>
 
-**Senior Full-Stack Engineer** with 10+ years of experience architecting and building production-grade applications across the entire stack. This Flutter project is one of two major portfolio projects — see the companion [**Lucky Nest Monorepo**](https://github.com/MrBigPorter/lucky-nest-monorepo) for the full-stack web counterpart.
+**Senior Full-Stack Engineer** with 10+ years of experience architecting and building production-grade applications across the entire stack. This Flutter project is one of two major portfolio projects — see the companion [**LJoyMini_Flutter_App**](https://github.com/MrBigPorter/JoyMini_Flutter_App) for the full-stack web counterpart.
 
 ### Full-Stack Capabilities
 
@@ -882,9 +882,9 @@ In parallel with this Flutter project, I also built a **production-grade full-st
 
 | Component | Technology | Key Features |
 |-----------|-----------|--------------|
-| [**Admin Dashboard**](https://github.com/MrBigPorter/lucky-nest-monorepo) | Next.js 15, React 19, TypeScript | RBAC, 6-language i18n, real-time chat (Socket.IO), AI image translation (Google Gemini) |
-| [**REST API**](https://github.com/MrBigPorter/lucky-nest-monorepo) | NestJS 11, Prisma 6, PostgreSQL 16 | Dual JWT/OAuth 2.0, WebSocket IM gateway, 70+ migrations, KYC pipeline (AWS Rekognition) |
-| [**Multi-Platform Blog**](https://github.com/MrBigPorter/lucky-nest-monorepo) | Next.js 15, Capacitor 6 | PWA, Cloudflare edge (sub-200ms TTFB), iOS/Android, offline support |
+| [**Admin Dashboard**](https://github.com/MrBigPorter/JoyMini-Flutter-App) | Next.js 15, React 19, TypeScript | RBAC, 6-language i18n, real-time chat (Socket.IO), AI image translation (Google Gemini) |
+| [**REST API**](https://github.com/MrBigPorter/JoyMini-Flutter-App) | NestJS 11, Prisma 6, PostgreSQL 16 | Dual JWT/OAuth 2.0, WebSocket IM gateway, 70+ migrations, KYC pipeline (AWS Rekognition) |
+| [**Multi-Platform Blog**](https://github.com/MrBigPorter/JoyMini-Flutter-App) | Next.js 15, Capacitor 6 | PWA, Cloudflare edge (sub-200ms TTFB), iOS/Android, offline support |
 | **Liveness Check** | Vite + React + AWS Rekognition | Face liveness detection, cross-origin iframe IPC |
 | **Shared Packages** | TypeScript, Radix UI, ESLint | Types, constants, UI components, shared configs |
 
@@ -895,7 +895,7 @@ In parallel with this Flutter project, I also built a **production-grade full-st
 - **Dual CI/CD Pipeline** — GitHub Actions + GitLab CI with multi-stage Docker builds and zero-downtime deployment
 - **40+ Test Files** — Vitest, Jest, Playwright, Lighthouse CI performance budgets (LCP < 2.5s, CLS < 0.1)
 
-> **GitHub:** [github.com/MrBigPorter/lucky-nest-monorepo](https://github.com/MrBigPorter/lucky-nest-monorepo)
+> **GitHub:** [https://github.com/MrBigPorter/JoyMini_Nest_Monorepo](https://github.com/MrBigPorter/JoyMini_Nest_Monorepo)
 
 ---
 
