@@ -1,5 +1,5 @@
 # ─── 环境变量 ──────────────────────────────────────────────────────────────────
-DEV  := --dart-define-from-file=lib/core/config/env/dev.json
+DEV  := --dart-define-from-file=lib/core/config/env/dev.json --web-port=4000
 TEST := --dart-define-from-file=lib/core/config/env/test.json
 PROD := --dart-define-from-file=lib/core/config/env/prod.json
 
@@ -19,7 +19,7 @@ help:
 	@echo "│              Flutter Happy App — Makefile                │"
 	@echo "├─────────────────────────────────────────────────────────┤"
 	@echo "│  🚀 正常运行（增量构建，速度快）                          │"
-	@echo "│    make dev          dev 环境运行                        │"
+	@echo "│    make dev          dev 环境运行（端口 4000）            │"
 	@echo "│    make test         test 环境运行                       │"
 	@echo "│    make prod         prod 环境运行                       │"
 	@echo "├─────────────────────────────────────────────────────────┤"
