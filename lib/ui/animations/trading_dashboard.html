@@ -119,23 +119,7 @@
   .sg-bear { background:rgba(246,70,93,0.15); color:#f6465d; border:1px solid rgba(246,70,93,0.3); }
 
   /* Table */
-  .tbl-wrap {
-    background:#0f1629; border:1px solid #1e2d50; border-radius:8px;
-    overflow-x:auto; margin-bottom:10px;
-  }
-  table { width:100%; border-collapse:collapse; font-size:11px; }
-  th {
-    background:#1a1f35; padding:7px 10px; text-align:center;
-    font-weight:600; font-size:9px; text-transform:uppercase;
-    letter-spacing:0.3px; color:#f0b90b;
-    border-bottom:2px solid #1e2d50; white-space:nowrap;
-  }
-  td { padding:6px 10px; text-align:center; white-space:nowrap; border-bottom:1px solid #131a2e; font-variant-numeric:tabular-nums; }
-  .gr { color:#0ecb81; } .rd { color:#f6465d; } .yl { color:#f0b90b; }
 
-  .sig-panel { background:#0f1629; border:1px solid #1e2d50; border-radius:8px; padding:10px 14px; margin-bottom:8px; }
-  .sig-panel h3 { font-size:12px; color:#848e9c; margin-bottom:6px; }
-  .sig-item { display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:4px; background:rgba(30,45,80,0.2); font-size:11px; }
   .phase-panel { background:#0f1629; border:1px solid #1e2d50; border-radius:10px; padding:14px 18px; margin-bottom:10px; }
   .phase-loading { text-align:center; color:#848e9c; padding:20px; font-size:12px; }
   .phase-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:8px; }
@@ -229,19 +213,7 @@
   <pre id="exportContent" style="font-size:9px;font-family:monospace;color:#e0e6f0;white-space:pre;overflow-x:auto;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;max-height:300px;line-height:1.5;"></pre>
 </div>
 
-<div class="tbl-wrap">
-  <table><thead><tr>
-    <th>周期</th><th>MA</th><th>CVD</th><th>CMD</th><th>战力</th><th>趋势</th><th>审计</th><th>资金Δ</th><th>加速度</th><th>缺口</th><th>持仓</th><th>K</th>
-  </tr></thead><tbody id="auditBody"><tr><td colspan="12" style="color:#5a6270;padding:20px;text-align:center;">加载中...</td></tr></tbody></table>
-</div>
 
-<div class="sig-panel">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <h3 style="margin:0">⚡ 实时信号</h3>
-    <button class="bt-btn" id="btBtn">📊 回测</button>
-  </div>
-  <div class="sig-list" id="sigList"><div style="color:#5a6270;padding:6px;text-align:center;">等待数据...</div></div>
-</div>
 <div class="bt-results" id="btResults"></div>
 
 <div class="last-update" id="lastUpdate">—</div>
@@ -1129,22 +1101,9 @@ function updateUI(){
     else if(fs<-0.2){fb.style.width=Math.min(100,100-fp)+'%';fb.style.background='linear-gradient(90deg,#f6465d,#c0392b)';fd.textContent='🔴强空头';}
     else{fb.style.width='50%';fb.style.background='#5a6270';fd.textContent='🟡震荡';}}
   // ... UI update continues
-  const tb=document.getElementById('auditBody');let html='';
-  if(price>0&&Object.keys(tfData).length>0){
-    for(const key of TF_KEYS){const d=tfData[key];if(!d)continue;
-      const isAbove=price>d.ma;const lbl=MA_CONFIG.find(m=>m.key===key)?.label||key;
-      html+='<tr><td style="font-weight:600">'+lbl+'</td><td class="yl">'+(d.ma?'$'+d.ma.toFixed(2):'—')+'</td><td class="'+(d.cvd>0?'gr':'rd')+'">'+fmtVol(d.cvd)+'</td><td class="'+(d.cmd>0?'gr':'rd')+'">'+fmtVol(d.cmd)+'</td><td style="color:'+(Math.abs(d.mult)>3?(d.mult>0?'#0ecb81':'#f6465d'):'#e0e6f0')+'">'+fmtMult(d.mult)+'</td><td style="color:'+(isAbove?'#0ecb81':'#f6465d')+'">'+(isAbove?'顺势':'压制')+'</td><td><span class="sg '+(isAbove?'sg-bull':'sg-bear')+'">'+(isAbove?'稳健':'破位')+'</span></td><td class="'+(d.mfCur>0?'gr':'rd')+'">'+fmtVol(d.mfCur||0)+'</td><td class="'+(d.rate>0?'gr':'rd')+'">'+(d.rate!==undefined&&!isNaN(d.rate)?(d.rate>0?'+':'')+d.rate.toFixed(1)+'%':'—')+'</td><td class="yl">'+(d.gap!==undefined&&!isNaN(d.gap)?(d.gap<=0?'已超额':'需+'+fmtVol(d.gap)):'—')+'</td><td><span class="sg '+(d.isBull?'sg-bull':'sg-bear')+'">'+(d.isBull?'增':'减')+'</span></td><td style="color:'+(d.stochK>80?'#f0b90b':d.stochK<20?'#0ecb81':'#e0e6f0')+'">'+(d.stochK!==undefined?d.stochK.toFixed(1):'—')+'</td></tr>';}
-  }else{html='<tr><td colspan="12" style="color:#5a6270;padding:20px;text-align:center;">⏳加载中...</td></tr>';}
-  tb.innerHTML=html;
   
-  const sl=document.getElementById('sigList');
-  // 合并 chartSignals 到信号列表
-  const allSigs=[...chartSignals].slice(-20).reverse().map(s=>({i:s.icon||'•',t:s.label||s.type||'',c:s.color||'#e0e6f0'}));
-  const txtSigs=signals.map(s=>({i:s.i,t:s.t,c:s.c}));
-  const merged=[...txtSigs,...allSigs];
-  if(merged.length>0){sl.innerHTML=merged.map(s=>'<div class="sig-item"><span>'+s.i+'</span><span style="color:'+s.c+';flex:1">'+s.t+'</span></div>').join('');}
-  else if(dataReady){sl.innerHTML='<div style="color:#5a6270;padding:6px;text-align:center;">暂无信号</div>';}
-  else{sl.innerHTML='<div style="color:#5a6270;padding:6px;text-align:center;">等待数据...</div>';}
+  
+  
   
   const rd=detectRegime();
   document.getElementById('marketRegime').textContent=rd.regime+' '+rd.desc;
@@ -1315,8 +1274,7 @@ async function init(){
     if(chartOffset>no)chartOffset=no;if(chartOffset<0)chartOffset=0;drawChart();}
   document.getElementById('zoomInBtn').onclick=()=>zoomChart(-10);
   document.getElementById('zoomOutBtn').onclick=()=>zoomChart(10);
-  document.getElementById('btBtn').addEventListener('click',runBacktest);
-  document.getElementById('exportBtn').onclick=()=>{document.getElementById('exportContent').textContent=generateExportData();document.getElementById('exportPanel').style.display='block';};
+    document.getElementById('exportBtn').onclick=()=>{document.getElementById('exportContent').textContent=generateExportData();document.getElementById('exportPanel').style.display='block';};
   document.getElementById('downloadBtn').onclick=()=>{const d=generateExportData();const b=new Blob([d],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='porter_'+SYMBOL+'_'+new Date().toISOString().slice(0,10)+'.txt';a.click();URL.revokeObjectURL(a.href);};
   document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(document.getElementById('exportContent').textContent).then(()=>{document.getElementById('copyBtn').textContent='✅已复制';setTimeout(()=>document.getElementById('copyBtn').textContent='📋复制',2000);});};
   const tfBar=document.getElementById('tfBar');
