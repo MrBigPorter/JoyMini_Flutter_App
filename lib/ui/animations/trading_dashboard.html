@@ -536,7 +536,12 @@ function scanChartSignals() {
     const i=Math.abs(k4h[l].time-t)<Math.abs(k4h[h].time-t)?l:h;
     return i>=0&&i<arr.length?arr[i]:0;}
 
-  // ── 预收集金叉位置（用于回踩检测）──
+	  // ── 预计算 6h/8h/12h/1d CMD ──
+	  function mkCmdArr(kd){if(!kd||kd.length<24)return[];const mf=kd.map(k=>(k.close-k.open)*k.volume);const a=[];for(let i=0;i<kd.length;i++){if(i<24){a.push(0);continue;}let s=0;for(let j=i-23;j<=i;j++)s+=mf[j];a.push(s);}return a;}
+	  const c6hArr=mkCmdArr(k6h),c8hArr=mkCmdArr(k8h),c12hArr=mkCmdArr(k12h),c1dArr=mkCmdArr(k1d);
+	  function vCmd(arr,kd,t){if(!arr||!kd||!arr.length)return 0;let l=0,h=kd.length-1;while(l<h-1){const m=(l+h)>>1;if(kd[m].time<=t)l=m;else h=m;}const i=Math.abs(kd[l].time-t)<Math.abs(kd[h].time-t)?l:h;return i>=0&&i<arr.length?arr[i]:0;}
+
+	  // ── 预收集金叉位置（用于回踩检测）──
   const allGC=[];
   for(let i=31;i<k15.length;i++){
     if(!ma15[i]||!ma15[i-1]) continue;
