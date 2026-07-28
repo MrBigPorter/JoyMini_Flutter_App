@@ -192,23 +192,31 @@
   <div class="ma-legend" id="maLegend"></div>
 </div>
 
-<div class="chart-wrap" style="height:300px;margin-bottom:6px;">
-  <div style="display:flex;justify-content:space-between;padding:2px 12px;font-size:10px;color:#848e9c;border-bottom:1px solid #1e2d50;">
-    <span>📊 4H (最近60根)</span>
-    <span id="sub4hLabel"></span>
+<div class="chart-wrap">
+  <div class="tf-bar" style="justify-content:space-between;">
+    <span>📊 4H</span>
+    <span style="display:flex;gap:4px;align-items:center;">
+      <span id="sub4hLabel" style="color:#848e9c;font-size:10px;"></span>
+      <button class="zoom-btn" id="zoom4hIn" style="width:20px;height:18px;font-size:12px;">+</button>
+      <button class="zoom-btn" id="zoom4hOut" style="width:20px;height:18px;font-size:12px;">−</button>
+    </span>
   </div>
   <div class="chart-inner">
-    <canvas id="chartCanvas4h" style="height:270px;"></canvas>
+    <canvas id="chartCanvas4h" style="height:220px;"></canvas>
   </div>
 </div>
 
-<div class="chart-wrap" style="height:300px;margin-bottom:6px;">
-  <div style="display:flex;justify-content:space-between;padding:2px 12px;font-size:10px;color:#848e9c;border-bottom:1px solid #1e2d50;">
-    <span>📊 1D (最近60根)</span>
-    <span id="sub1dLabel"></span>
+<div class="chart-wrap">
+  <div class="tf-bar" style="justify-content:space-between;">
+    <span>📊 1D</span>
+    <span style="display:flex;gap:4px;align-items:center;">
+      <span id="sub1dLabel" style="color:#848e9c;font-size:10px;"></span>
+      <button class="zoom-btn" id="zoom1dIn" style="width:20px;height:18px;font-size:12px;">+</button>
+      <button class="zoom-btn" id="zoom1dOut" style="width:20px;height:18px;font-size:12px;">−</button>
+    </span>
   </div>
   <div class="chart-inner">
-    <canvas id="chartCanvas1d" style="height:270px;"></canvas>
+    <canvas id="chartCanvas1d" style="height:220px;"></canvas>
   </div>
 </div>
 
@@ -304,7 +312,7 @@ let chartSignals = []; // detected buy/sell markers: {idx, type, label, color, i
 
 // Chart settings
 let chartTF = '15m';         // current candle resolution
-let chartBarCount = 80;      // candles visible (zoom)
+let chartBarCount = 80;let subBar4h=336,subBar1d=180;
 let chartOffset = 0;         // scroll offset: 0 = latest, >0 = older
 let maxHistory = 10000;      // max candles to fetch (15m~3.5月, 1h~14月, 4h~4.5年)
 let crosshairPos = null;     // {x, y} in canvas coords
@@ -910,7 +918,7 @@ function drawMiniChart(tf,canvasId,labelId){
   const kls=allKlines[tf];if(!kls||kls.length<20||!state.price)return;
   const rect=canvas.parentElement.getBoundingClientRect();
   const DPR=window.devicePixelRatio||1;
-  const w=rect.width,h=270;
+  const w=rect.width,h=220;
   canvas.width=w*DPR;canvas.height=h*DPR;
   canvas.style.width=w+'px';canvas.style.height=h+'px';
   const ctx=canvas.getContext('2d');
@@ -918,8 +926,8 @@ function drawMiniChart(tf,canvasId,labelId){
   const pad={top:10,bottom:10,left:50,right:10};
   const cw=w-pad.left-pad.right,ch=h-pad.top-pad.bottom;
   ctx.clearRect(0,0,w,h);
-  // 可读K线数量: 4H=168根(28天),1D=90根(3个月)
-  const barCnt=tf==='4h'?168:90;
+  // 可读K线: 4H=336根(56天),1D=180根(6个月),显示更多左侧趋势
+  const barCnt=tf==='4h'?subBar4h:subBar1d;
   const vis=kls.slice(-barCnt);const N=vis.length;
   let maxP=-Infinity,minP=Infinity;
   for(const k of vis){if(k.high>maxP)maxP=k.high;if(k.low<minP)minP=k.low;}
@@ -960,17 +968,19 @@ function drawMiniChart(tf,canvasId,labelId){
     ctx.beginPath();ctx.moveTo(x,yPos(k.high));ctx.lineTo(x,yPos(k.low));ctx.stroke();
     ctx.fillRect(x-candleW/2,Math.min(yPos(k.open),yPos(k.close)),candleW,Math.max(1,Math.abs(yPos(k.close)-yPos(k.open))));
   }
-  // 位置高亮标记
+  // 当前位置标记(对齐15M最新一根K线)
   const mainKls=allKlines[chartTF];if(mainKls&&mainKls.length){
-    const mEnd=mainKls.length-chartOffset;const mSt=Math.max(0,mEnd-chartBarCount);
-    const tSt=mainKls[mSt].time,tEd=mainKls[Math.min(mEnd,mainKls.length-1)].time;
-    let hx=-1;
-    for(let i=0;i<N;i++){if(vis[i].time>=tSt&&vis[i].time<=tEd){hx=i;break;}}
-    if(hx>=0){
-      const mx=xPos(hx);const bw=cw/N*0.5;
-      ctx.fillStyle='rgba(240,185,11,0.2)';ctx.fillRect(mx-bw,pad.top,bw*2,ch);
-      ctx.strokeStyle='rgba(240,185,11,0.7)';ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(mx-bw,pad.top+ch);ctx.lineTo(mx,pad.top+ch+6);ctx.lineTo(mx+bw,pad.top+ch);ctx.closePath();ctx.fill();ctx.stroke();}
+    const curTime=mainKls[Math.max(0,mainKls.length-chartOffset-1)].time;
+    let ci=-1;
+    for(let i=0;i<N;i++){if(vis[i].time<=curTime&&(i==N-1||vis[i+1].time>curTime)){ci=i;break;}}
+    if(ci<0){for(let i=0;i<N;i++){if(vis[i].time>=curTime){ci=i;break;}}}
+    if(ci>=0){
+      const mx=xPos(ci);const bw=cw/N*2;
+      ctx.fillStyle='rgba(240,185,11,0.12)';ctx.fillRect(mx-bw,pad.top,bw*2,ch);
+      ctx.strokeStyle='rgba(240,185,11,0.7)';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+      ctx.beginPath();ctx.moveTo(mx,pad.top);ctx.lineTo(mx,pad.top+ch);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='#f0b90b';ctx.font='bold 9px Inter,sans-serif';ctx.textAlign='center';
+      ctx.fillText('◀ '+tf.toUpperCase()+'当前 ▶',mx,pad.top+10);}
   }
   const el=document.getElementById(labelId);if(el)el.textContent=vis[0].time?new Date(vis[0].time).toLocaleDateString()+'~'+new Date(vis[vis.length-1].time).toLocaleDateString():'';
 }
@@ -1369,6 +1379,10 @@ async function init(){
     if(chartOffset>no)chartOffset=no;if(chartOffset<0)chartOffset=0;drawChart();}
   document.getElementById('zoomInBtn').onclick=()=>zoomChart(-10);
   document.getElementById('zoomOutBtn').onclick=()=>zoomChart(10);
+  document.getElementById('zoom4hIn').onclick=()=>{subBar4h=Math.max(50,subBar4h-50);drawChart();};
+  document.getElementById('zoom4hOut').onclick=()=>{subBar4h=Math.min(2000,subBar4h+50);drawChart();};
+  document.getElementById('zoom1dIn').onclick=()=>{subBar1d=Math.max(30,subBar1d-30);drawChart();};
+  document.getElementById('zoom1dOut').onclick=()=>{subBar1d=Math.min(1000,subBar1d+30);drawChart();};
     document.getElementById('exportBtn').onclick=()=>{document.getElementById('exportContent').textContent=generateExportData();document.getElementById('exportPanel').style.display='block';};
   document.getElementById('downloadBtn').onclick=()=>{const d=generateExportData();const b=new Blob([d],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='porter_'+SYMBOL+'_'+new Date().toISOString().slice(0,10)+'.txt';a.click();URL.revokeObjectURL(a.href);};
   document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(document.getElementById('exportContent').textContent).then(()=>{document.getElementById('copyBtn').textContent='✅已复制';setTimeout(()=>document.getElementById('copyBtn').textContent='📋复制',2000);});};
