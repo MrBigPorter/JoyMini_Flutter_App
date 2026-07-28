@@ -698,7 +698,8 @@ function scanChartSignals() {
 	    // ═══════════════════════════════════════════════════════
 	    const priceNearMA=Math.abs(p-ma15[i])/ma15[i]<0.008;
 	    const step1OK=mf15[i]>0&&mf15[i-1]>0;
-	    const rtOversold=oversold&&priceNearMA&&p>ma15[i]&&step1OK&&multi>0.3;
+	    const cmdSlopeOK=v1h(c1hArr,k15[i].time)>(v1h(c1hArr,k15[i].time-21600000)||0);
+	    const rtOversold=oversold&&priceNearMA&&p>ma15[i]&&step1OK&&multi>0.3&&cmdSlopeOK;
 	    const rtTrend=!oversold&&priceNearMA&&p>ma15[i]&&step1OK&&majorUp&&multi>0.8;
 	    if((rtOversold||rtTrend)&&i-cool.rt>=MIN){
 	      cool.rt=i;
@@ -708,6 +709,7 @@ function scanChartSignals() {
 	    // ═══════════════════════════════════════════════════════
 	    // 信号4: 出逃←卖出 (超买区+连续流出)
 	    // ═══════════════════════════════════════════════════════
+	    const s5rt=mf15[i]+mf15[i-1]+mf15[i-2]+mf15[i-3]+mf15[i-4];
 	    if(i>55&&mf15[i]<0&&mf15[i-1]<0&&s5rt<-100000&&overbought&&multi<0){
 	      chartSignals.push({...sigCtx,type:'flight',icon:'🔻',label:'出逃←卖出',color:'#f6465d'});cool.flight=i;}
 	  }
