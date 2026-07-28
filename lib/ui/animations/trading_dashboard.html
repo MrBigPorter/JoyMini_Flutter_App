@@ -747,6 +747,117 @@ function runBacktest() {
   btn.classList.remove('running');btn.textContent='📊 回测';
 }
 
+// ---------- 画布坐标 & OHLC ----------
+function getCanvasCoords(e) {
+  const canvas=document.getElementById('chartCanvas');
+  const rect=canvas.getBoundingClientRect();
+  return {x:e.clientX-rect.left, y:e.clientY-rect.top};
+}
+function getCandleIndex(mx) {
+  const canvas=document.getElementById('chartCanvas');
+  const rect=canvas.getBoundingClientRect();
+  const w=rect.width;
+  const padIn={left:55,right:175};
+  const cw=w-padIn.left-padIn.right;
+  const kls=allKlines[chartTF];
+  if(!kls||kls.length<2) return null;
+  const maxVis=Math.min(kls.length,chartBarCount);
+  const maxOff=Math.max(0,kls.length-maxVis);
+  const offset=Math.min(chartOffset||0,maxOff);
+  const endIdx=kls.length-offset;
+  const startIdx=Math.max(0,endIdx-maxVis);
+  const N=endIdx-startIdx;
+  const relX=mx-padIn.left;
+  if(relX<0||relX>cw) return null;
+  const idx=Math.round((relX/cw)*(N-1));
+  return Math.max(0,Math.min(N-1,idx));
+}
+function showSigDetail(sig,mx,my){
+  const el=document.getElementById('sigDetail');
+  if(!el||!sig)return;
+  const lb={'gc':'🟢金叉','dc':'💀死叉','rt':'✅回踩','chase':'🚨追高','bottom':'🔍底部','gc_weak':'⚪金叉(弱)','dc_warn':'🔶死叉预警','fake':'⛔假金叉','flight':'🔻出逃'};
+  const d=sig;
+  el.style.display='block';
+  el.innerHTML='<div class="t">'+(lb[d.type]||d.type||'')+' · '+(d.time?new Date(d.time).toLocaleString():'')+'</div>'+
+    '<div class="row"><span class="l">价格</span><span class="v">$'+((d.price||0).toFixed(2))+'</span></div>'+
+    '<div class="row"><span class="l">15M SMA30</span><span class="v">$'+((d.ma15||0).toFixed(2))+'</span></div>'+
+    '<div class="row"><span class="l">1H SMA30</span><span class="v">$'+((d.ma60||0).toFixed(2))+'</span></div>'+
+    '<div class="row"><span class="l">偏离度</span><span class="v">'+(d.div||0).toFixed(2)+'%</span></div>'+
+    '<div class="row"><span class="l">CMD(15M)</span><span class="v" style="color:'+((d.cmd||0)>0?'#0ecb81':'#f6465d')+'">'+fmtVol(d.cmd||0)+'</span></div>'+
+    '<div class="row"><span class="l">战力</span><span class="v">'+fmtMult(d.mult||0)+'</span></div>';
+  const inner=document.querySelector('.chart-inner');const ir=inner.getBoundingClientRect();
+  el.style.left=Math.min(mx+15,ir.width-230)+'px';el.style.top=Math.max(5,Math.min(my-80,ir.height-200))+'px';
+}
+function updateOHLC(index) {
+  const tip=document.getElementById('ohlcTip');
+  const kls=allKlines[chartTF];
+  if(index===null||!kls||index<0){tip.style.display='none';return;}
+  const maxVis=Math.min(kls.length,chartBarCount);
+  const maxOff=Math.max(0,kls.length-maxVis);
+  const off=Math.min(chartOffset||0,maxOff);
+  const end=kls.length-off;const st=Math.max(0,end-maxVis);
+  const vis=kls.slice(st,end);
+  if(index>=vis.length){tip.style.display='none';return;}
+  const k=vis[index];const up=k.close>=k.open;
+  tip.style.display='block';
+  tip.innerHTML='<div class="t">'+new Date(k.time).toLocaleString()+'</div>'+
+    '<div class="row"><span class="l">开</span><span class="v '+(up?'up':'dn')+'">$'+k.open.toFixed(2)+'</span></div>'+
+    '<div class="row"><span class="l">高</span><span class="v up">$'+k.high.toFixed(2)+'</span></div>'+
+    '<div class="row"><span class="l">低</span><span class="v dn">$'+k.low.toFixed(2)+'</span></div>'+
+    '<div class="row"><span class="l">收</span><span class="v '+(up?'up':'dn')+'">$'+k.close.toFixed(2)+'</span></div>'+
+    '<div class="row"><span class="l">量</span><span class="v">'+k.volume.toFixed(4)+'</span></div>'+
+    '<div class="row"><span class="l">Δ</span><span class="v '+(up?'up':'dn')+'">'+((k.close-k.open)/k.open*100).toFixed(2)+'%</span></div>';
+  const ch=crosshairPos||{};
+  if(ch.x){
+    const canvas=document.getElementById('chartCanvas');
+    const crect=canvas.getBoundingClientRect();
+    const inner=tip.parentElement;
+    const irect=inner.getBoundingClientRect();
+    let tx=ch.x+15,ty=ch.y-80;
+    if(tx+160>irect.width)tx=ch.x-160;
+    if(ty<5)ty=ch.y+15;
+    tip.style.left=tx+'px';tip.style.top=ty+'px';
+  }
+}
+function setupCanvasEvents() {
+  const canvas=document.getElementById('chartCanvas');
+  const inner=canvas.parentElement;
+  let isDragging=false,dragStartX=0,dragStartOffset=0;
+  let crosshairPos=null,hoveredCandle=null;
+  inner.addEventListener('mousemove',e=>{
+    if(isDragging) return;
+    const coords=getCanvasCoords(e);crosshairPos=coords;
+    const idx=getCandleIndex(coords.x);hoveredCandle=idx;
+    updateOHLC(idx);drawChart();
+  });
+  inner.addEventListener('mouseleave',()=>{
+    crosshairPos=null;hoveredCandle=null;
+    document.getElementById('ohlcTip').style.display='none';drawChart();
+  });
+  inner.addEventListener('click',e=>{
+    const crect=canvas.getBoundingClientRect();
+    const mx=e.clientX-crect.left,my=e.clientY-crect.top;
+    // 点击滚动条跳转
+    const padC={top:20,ch:450-20-24};
+    if(my>=padC.top+padC.ch+4&&my<=padC.top+padC.ch+10){
+      const cw=crect.width-55-210;
+      const relX=e.clientX-crect.left-55;
+      const kls=allKlines[chartTF];
+      if(kls&&kls.length>chartBarCount){
+        chartOffset=Math.round((relX/cw)*(kls.length-chartBarCount));
+        if(chartOffset>kls.length-chartBarCount)chartOffset=kls.length-chartBarCount;
+        if(chartOffset<0)chartOffset=0;drawChart();
+      }
+      return;
+    }
+    // 点击信号详情
+    if(!window._sigPos||!window._sigPos.length) return;
+    let found=null,best=30;
+    for(const sp of window._sigPos){const d=Math.hypot(mx-sp.x,my-sp.ly);if(d<best){best=d;found=sp;}}
+    if(found)showSigDetail(found.sig,mx,my);
+    else document.getElementById('sigDetail').style.display='none';
+  });
+}
 // ---------- DRAW CHART ----------
 function drawChart() {
   const canvas=document.getElementById('chartCanvas');
@@ -842,6 +953,13 @@ function drawChart() {
     ctx.strokeStyle=s.color;ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(bx,by,s.tw,s.th,5);ctx.stroke();
     ctx.fillStyle=s.color;ctx.font='bold 10px Inter,sans-serif';ctx.textAlign='center';
     ctx.fillText(s.txt,x,by+14);}
+  // 存储信号位置供点击详情
+  window._sigPos=[];
+  for(const s of sigs){
+    const x=s.x,my=s.my,dir=s.dir,off=s.off;
+    const ly=dir===-1?my+off:my-off;
+    window._sigPos.push({x,ly,sig:s._sig});
+  }
   // 多周期均线 (MA_CONFIG: 15M/1H/4H/6H/8H/12H/24D)
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
@@ -1024,18 +1142,44 @@ function analyzePhases() {
 function generateExportData(){
   const p=state.price,pp=p?p.toFixed(2):'—';
   function ma(k){const kk=allKlines[k];if(!kk||kk.length<30)return null;const c=kk.map(x=>x.close);let s=0;for(let i=c.length-30;i<c.length;i++)s+=c[i];return s/30;}
-  let L=[];L.push('=== PORTER 全量分析数据 ===');L.push('导出: '+new Date().toLocaleString()+'  币种: '+SYMBOL+'  价格: $'+pp);L.push('');
-  L.push('=== 1. 全周期指标 ===');L.push('周期	MA30	CMD	战力');
-  tks=['15m','1h','4h','6h','8h','12h','1d'];tlb=['15M','1H','4H','6H','8H','12H','24H'];
-  tks.forEach((k,i)=>{const d=tfData[k];if(!d)return;L.push(tlb[i]+'	'+(ma(k)?'$'+ma(k).toFixed(2):'—')+'	'+fmtVol(d.cmd||0)+'	'+fmtMult(d.mult||0));});
-  L.push('');L.push('=== 5. 全部信号 ===');
-  if(chartSignals.length){chartSignals.forEach((s,i)=>{
-    L.push((i+1)+'	'+(s.time?new Date(s.time).toLocaleString():'')+'	'+(s.label||s.type)+'	$'+((s.price||0).toFixed(2)));});
-  }else L.push('(无信号)');
-  L.push('');L.push('=== 6. 综合评估 ===');L.push('融合评分: '+(fusionScore||0).toFixed(2));L.push('=== END ===');
+  function fmtDT(ts){const d=new Date(ts);return d.toLocaleDateString()+' '+d.toLocaleTimeString();}
+  let L=[];L.push('=== PORTER 全量分析数据 ===');
+  L.push('导出: '+new Date().toLocaleString()+'  币种: '+SYMBOL+'  价格: $'+pp+'  周期: '+chartTF);L.push('');
+  L.push('=== 1. 全周期指标 ===');L.push('周期\t方向\tMA30\tCMD\t战力\tStochK\tCVD\t加速度\t资金Δ');
+  const tks=['15m','1h','4h','6h','8h','12h','1d'],tlb=['15M','1H','4H','6H','8H','12H','24H'];
+  tks.forEach((k,i)=>{const d=tfData[k];if(!d)return;
+    const mv=ma(k);const dir=p>mv?'▲涨':'▼跌';
+    L.push(tlb[i]+'\t'+dir+'\t'+(mv?'$'+mv.toFixed(2):'—')+'\t'+fmtVol(d.cmd||0)+'\t'+fmtMult(d.mult||0)+'\tK'+((d.stochK||50).toFixed(0))+'\t'+fmtVol(d.cvd||0)+'\t'+((d.rate||0).toFixed(1))+'%\t'+fmtVol(d.mfCur||0));});
+  L.push('');
+  L.push('=== 2. 资金流多窗口 ===');L.push('窗口\tCMD\t战力\t方向');
+  [['15m','6H'],['1h','1天'],['4h','4天'],['1d','24天']].forEach(([k,lb])=>{const d=tfData[k];if(!d)return;
+    L.push(lb+'\t'+fmtVol(d.cmd||0)+'\t'+fmtMult(d.mult||0)+'\t'+((d.cmd||0)>0?'流入':'流出'));});
+  L.push('');
+  const kCur=allKlines[chartTF];const tfLabel={'15m':'15M','1h':'1H','4h':'4H','1d':'24H'}[chartTF]||chartTF;
+  if(kCur&&kCur.length>0){
+    L.push('=== 3. '+tfLabel+' K线数据（'+kCur.length+'根）===');
+    L.push('时间\t开\t高\t低\t收\t成交量\t单KCMD');
+    const mfCur=kCur.map(k=>(k.close-k.open)*k.volume);
+    kCur.forEach((k,i)=>{L.push(fmtDT(k.time)+'\t'+k.open.toFixed(2)+'\t'+k.high.toFixed(2)+'\t'+k.low.toFixed(2)+'\t'+k.close.toFixed(2)+'\t'+k.volume.toFixed(4)+'\t'+fmtVol(mfCur[i]));});
+    L.push('');
+  }
+  L.push('=== 4. 全部信号 ===');
+  L.push('序号\t时间\t类型\t价格\tMA15\tMA60\t偏离%\tCMD15M\tCMD1H\t战力');
+  if(chartSignals.length){chartSignals.slice(-50).forEach((s,i)=>{
+    const v=s;L.push((i+1)+'\t'+(v.time?fmtDT(v.time):'')+'\t'+(v.label||v.type)+'\t$'+((v.price||0).toFixed(2))+'\t$'+((v.ma15||0).toFixed(2))+'\t$'+((v.ma60||0).toFixed(2))+'\t'+((v.div||0).toFixed(2))+'%\t'+fmtVol(v.cmd||0)+'\t'+fmtVol(v.cmd1h||0)+'\t'+fmtMult(v.mult||0));});
+  }else{L.push('(无信号)');}
+  L.push('');
+  L.push('=== 5. 综合评估 ===');
+  L.push('融合评分: '+(fusionScore||0).toFixed(2));
+  const a2=calcATR(allKlines['1h'])||0;
+  if(a2>0)L.push('ATR(1H): $'+a2.toFixed(2));
+  const mas=tks.map(k=>tfData[k]?.ma).filter(v=>v&&v>0);
+  const sp=mas.filter(m=>m<p);const rs=mas.filter(m=>m>p);
+  L.push('支撑: '+(sp.length?'$'+sp[sp.length-1].toFixed(2):'—')+'  阻力: '+(rs.length?'$'+rs[0].toFixed(2):'—'));
+  if(a2>0)L.push('多止损: $'+(p-a2*1.5).toFixed(2)+'  空止损: $'+(p+a2*1.5).toFixed(2));
+  L.push('');L.push('=== END ===');
   return L.join('\n');
 }
-
 async function refreshAll(){
   if(typeof isLoadingData==='undefined')var isLoadingData=false;
   if(isLoadingData)return;
@@ -1084,6 +1228,7 @@ async function init(){
   await refreshAll();startWS();
   refreshTimer=setInterval(refreshAll,60000);uiTimer=setInterval(updateUI,1000);
   window.addEventListener('resize',drawChart);
+  setupCanvasEvents();
   window.addEventListener('keydown',e=>{
     if(e.key==='='||e.key==='+'){e.preventDefault();zoomChart(-10);}
     if(e.key==='-'){e.preventDefault();zoomChart(10);}
