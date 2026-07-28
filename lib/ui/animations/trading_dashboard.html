@@ -311,7 +311,7 @@ let chartSignals = []; // detected buy/sell markers: {idx, type, label, color, i
 let chartTF = '15m';         // current candle resolution
 let chartBarCount = 80;      // candles visible (zoom)
 let chartOffset = 0;         // scroll offset: 0 = latest, >0 = older
-let maxHistory = 2000;       // max candles to fetch (分多次请求)
+let maxHistory = 10000;      // max candles to fetch (15m~3.5月, 1h~14月, 4h~4.5年)
 let crosshairPos = null;     // {x, y} in canvas coords
 let hoveredCandle = null;    // index of hovered candle
 
@@ -618,6 +618,9 @@ function scanChartSignals() {
 	    const h4Up=p>(d4h?.ma||0)&&(d4h?.cmd||0)>-1;
 	    const h6Up=p>(d6h?.ma||0)&&(d6h?.cmd||0)>-1;
 	    const majorUp=h4Up||h6Up;
+
+	    // ── 自适应基线 bl1k(单KCMD均值,用于阈值) ──
+	    let s1k=0;for(let bi=i-20;bi<i;bi++)s1k+=Math.abs(mf15[bi]);const bl1k=Math.max(100,s1k/20);
 
 	    // ═══════════════════════════════════════════════════════
 	    // 信号0: CMD趋势预警 — 领先指标(不依赖金叉/死叉)
