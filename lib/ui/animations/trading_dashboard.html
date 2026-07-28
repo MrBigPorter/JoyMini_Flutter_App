@@ -707,7 +707,7 @@ function scanChartSignals() {
 	    if(i>55&&mf15[i]<0&&mf15[i-1]<0&&s5rt<-100000&&overbought&&multi<0){
 	      const rdF=detectRegime();const labelF=rdF.confidence>=0.6?'出逃←卖出':'出逃(震荡)';chartSignals.push({...sigCtx,type:'flight',icon:'🔻',label:labelF,color:'#f6465d'});cool.flight=i;}
 	  }
-	  if(chartSignals.length>500) chartSignals=chartSignals.slice(-500);
+	  if(chartSignals.length>2000) chartSignals=chartSignals.slice(-2000);
 	}
 
 // ---------- FETCH ----------
@@ -1230,7 +1230,7 @@ function generateExportData(){
   }
   L.push('=== 4. 全部信号 ===');
   L.push('序号\t时间\t类型\t价格\tMA15\tMA60\t偏离%\tCMD15M\tCMD1H\tCMD4H\tCMD6H\tCMD8H\tCMD12H\tCMD24D\t战力');
-  if(chartSignals.length){chartSignals.slice(-200).forEach((s,i)=>{
+  if(chartSignals.length){chartSignals.slice(-1000).forEach((s,i)=>{
     const v=s;L.push((i+1)+'\t'+(v.time?fmtDT(v.time):'')+'\t'+(v.label||v.type)+'\t$'+((v.price||0).toFixed(2))+'\t$'+((v.ma15||0).toFixed(2))+'\t$'+((v.ma60||0).toFixed(2))+'\t'+((v.div||0).toFixed(2))+'%\t'+fmtVol(v.cmd||0)+'\t'+fmtVol(v.cmd1h||0)+'\t'+fmtVol(v.cmd4h||0)+'\t'+fmtVol(v.cmd6h||0)+'\t'+fmtVol(v.cmd8h||0)+'\t'+fmtVol(v.cmd12h||0)+'\t'+fmtVol(v.cmd1d||0)+'\t'+fmtMult(v.mult||0));});
   }else{L.push('(无信号)');}
   L.push('');
