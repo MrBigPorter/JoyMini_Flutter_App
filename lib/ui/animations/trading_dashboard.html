@@ -718,9 +718,11 @@ function scanChartSignals() {
 	    }
 	    if((rtOversold||rtTrend)&&lySt!=='unsup'&&i-cool.rt>=MIN){
 	      cool.rt=i;
+	      const rd=detectRegime();
 	      let label='回踩←加仓';
 	      if(lySt==='all_pos')label='回踩←加仓(全层共振)';
-	      else if(oversold)label='回踩←加仓(超卖)';
+	      else if(rd.confidence>=0.6)label='回踩←加仓('+(oversold?'超卖':'趋势')+')';
+	      else label='回踩←加仓(震荡)';
 	      chartSignals.push({...sigCtx,type:'rt',icon:'✅',label,color:'#0ecb81'});
 	    }
 	    // ═══════════════════════════════════════════════════════
@@ -728,7 +730,7 @@ function scanChartSignals() {
 	    // ═══════════════════════════════════════════════════════
 	    const s5rt=mf15[i]+mf15[i-1]+mf15[i-2]+mf15[i-3]+mf15[i-4];
 	    if(i>55&&mf15[i]<0&&mf15[i-1]<0&&s5rt<-100000&&overbought&&multi<0){
-	      chartSignals.push({...sigCtx,type:'flight',icon:'🔻',label:'出逃←卖出',color:'#f6465d'});cool.flight=i;}
+	      const rdF=detectRegime();const labelF=rdF.confidence>=0.6?'出逃←卖出':'出逃(震荡)';chartSignals.push({...sigCtx,type:'flight',icon:'🔻',label:labelF,color:'#f6465d'});cool.flight=i;}
 	  }
 	  if(chartSignals.length>500) chartSignals=chartSignals.slice(-500);
 	}
@@ -1091,6 +1093,22 @@ function startWS(){
     ws.onerror=()=>ws.close();}catch(e){}
 }
 
+function detectRegime(){
+  const kl=allKlines[chartTF];if(!kl||kl.length<96)return{regime:'⏳',desc:'等待数据',confidence:0};
+  const last=kl.slice(-96);let pos=0,neg=0,flips=0,prev=0;
+  for(let i=0;i<last.length;i++){const mf=(last[i].close-last[i].open)*last[i].volume;
+    if(mf>0)pos++;else if(mf<0)neg++;
+    if(i>0&&(mf>0)!==(prev>0)&&prev!==0)flips++;prev=mf;}
+  const ratio=pos/max(1,neg);const hi=Math.max(...last.map(k=>k.high)),lo=Math.min(...last.map(k=>k.low));
+  const range=(hi-lo)/(lo||1)*100;const net=((last[last.length-1].close-last[0].close)/last[0].close)*100;
+  let regime,desc,conf;
+  if(pos>neg*2&&flips<20&&range>2){regime='🟢';desc='趋势上涨';conf=0.8;}
+  else if(neg>pos*2&&flips<20&&range>2){regime='🔴';desc='趋势下跌';conf=0.8;}
+  else if(range<2&&flips>30){regime='⚪';desc='窄幅震荡';conf=0.3;}
+  else if(flips>25){regime='🟡';desc='宽幅震荡';conf=0.5;}
+  else{regime='🔶';desc='方向不明';conf=0.4;}
+  return{regime,desc,confidence:conf};
+}
 function updateUI(){
   const{price,change24h,changePct24h}=state;
   document.getElementById('priceDisplay').textContent=fmtPrice(price);
@@ -1124,6 +1142,9 @@ function updateUI(){
   else if(dataReady){sl.innerHTML='<div style="color:#5a6270;padding:6px;text-align:center;">暂无信号</div>';}
   else{sl.innerHTML='<div style="color:#5a6270;padding:6px;text-align:center;">等待数据...</div>';}
   
+  const rd=detectRegime();
+  document.getElementById('marketRegime').textContent=rd.regime+' '+rd.desc;
+  document.getElementById('regimeDesc').textContent='可信度'+Math.round(rd.confidence*100)+'%';
   document.getElementById('lastUpdate').textContent='最后更新: '+new Date().toLocaleTimeString();
   analyzePhases();drawChart();
 }
