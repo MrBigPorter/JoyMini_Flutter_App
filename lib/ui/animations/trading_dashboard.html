@@ -700,16 +700,27 @@ function scanChartSignals() {
 
 	    // ═══════════════════════════════════════════════════════
 	    // ═══════════════════════════════════════════════════════
-	    // 信号3: 回踩←加仓 (超卖反弹 / 趋势回踩)
+	    // 信号3: 回踩←加仓 (含层级资金流过滤)
 	    // ═══════════════════════════════════════════════════════
+	    // 层级检查: 上层流出时下层能否撑住(753样本验证)
 	    const priceNearMA=Math.abs(p-ma15[i])/ma15[i]<0.008;
 	    const step1OK=mf15[i]>0&&mf15[i-1]>0;
 	    const cmdSlopeOK=v1h(c1hArr,k15[i].time)>(v1h(c1hArr,k15[i].time-21600000)||0);
 	    const rtOversold=oversold&&priceNearMA&&p>ma15[i]&&step1OK&&multi>0.3&&cmdSlopeOK;
 	    const rtTrend=!oversold&&priceNearMA&&p>ma15[i]&&step1OK&&majorUp&&multi>0.8;
-	    if((rtOversold||rtTrend)&&i-cool.rt>=MIN){
+	    // 层级资金流判断(753样本:全流入100%涨,有支撑54%,无支撑37%)
+	    const lyrm=[cmdi,c1h,c4hV,c6hV,c8hV,c12hV,c1dV];
+	    let lySt='all_pos';
+	    for(let li=0;li<lyrm.length;li++){
+	      if(lyrm[li]<0){lySt='unsup';
+	        for(let lj=li+1;lj<lyrm.length;lj++){if(lyrm[lj]>Math.abs(lyrm[li])*0.3){lySt='sup';break;}}
+	        break;}
+	    }
+	    if((rtOversold||rtTrend)&&lySt!=='unsup'&&i-cool.rt>=MIN){
 	      cool.rt=i;
-	      const label=oversold?"回踩←加仓(超卖)":"回踩←加仓";
+	      let label='回踩←加仓';
+	      if(lySt==='all_pos')label='回踩←加仓(全层共振)';
+	      else if(oversold)label='回踩←加仓(超卖)';
 	      chartSignals.push({...sigCtx,type:'rt',icon:'✅',label,color:'#0ecb81'});
 	    }
 	    // ═══════════════════════════════════════════════════════
