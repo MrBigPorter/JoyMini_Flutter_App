@@ -105,7 +105,7 @@
   .stat-card .val { font-size:13px; font-weight:700; margin-top:1px; overflow:hidden; text-overflow:ellipsis; }
   .stat-card .sub { font-size:9px; color:#848e9c; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-  .mid-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
+  .mid-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
   .fc {
     background:#0f1629; border:1px solid #1e2d50; border-radius:6px;
     padding:10px 14px;
@@ -162,7 +162,7 @@
   .last-update { font-size:10px; color:#5a6270; text-align:center; padding:6px; }
 
   @media (max-width:1000px) { .stat-grid { grid-template-columns:repeat(4,1fr); } }
-  @media (max-width:700px) { .stat-grid { grid-template-columns:repeat(2,1fr); } .mid-row { grid-template-columns:1fr; } }
+  @media (max-width:700px) { .stat-grid { grid-template-columns:repeat(2,1fr); } .mid-row { grid-template-columns:1fr 1fr; } }
   @media (max-width:600px) { .header { flex-direction:column; gap:6px; text-align:center; } .price-display { text-align:center; } }
 </style>
 </head>
@@ -183,6 +183,7 @@
       </select>
       <span class="conn-dot ld" id="connDot"></span>
       <span id="loadStatus" style="font-size:10px;color:#f0b90b;">加载中...</span>
+      <span id="marketState" style="font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(30,45,80,0.4);font-weight:600;">⏳</span>
     </div>
   </div>
   <div class="price-display">
@@ -214,6 +215,7 @@
   <div class="fc"><div class="lbl">融合评分</div><div class="val" id="fusionNumeric">0.00</div><div class="fc-bar"><div id="fusionBar" style="width:50%"></div></div><div style="font-size:10px;color:#848e9c;margin-top:3px" id="fusionDesc">—</div></div>
   <div class="fc"><div class="lbl">做多防线</div><div class="val gr" id="slLong">—</div></div>
   <div class="fc"><div class="lbl">做空防线</div><div class="val rd" id="slShort">—</div></div>
+  <div class="fc"><div class="lbl">市场状态</div><div class="val" id="marketRegime" style="font-size:14px">⏳</div><div style="font-size:9px;color:#848e9c;margin-top:1px" id="regimeDesc">计算中...</div></div>
 </div>
 <div style="margin-bottom:10px;display:flex;gap:6px;">
   <button id="exportBtn" style="background:transparent;color:#f0b90b;border:1px solid rgba(240,185,11,0.3);border-radius:4px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">📋 复制数据</button>
@@ -1099,7 +1101,7 @@ function detectRegime(){
   for(let i=0;i<last.length;i++){const mf=(last[i].close-last[i].open)*last[i].volume;
     if(mf>0)pos++;else if(mf<0)neg++;
     if(i>0&&(mf>0)!==(prev>0)&&prev!==0)flips++;prev=mf;}
-  const ratio=pos/max(1,neg);const hi=Math.max(...last.map(k=>k.high)),lo=Math.min(...last.map(k=>k.low));
+  const ratio=pos/Math.max(1,neg);const hi=Math.max(...last.map(k=>k.high)),lo=Math.min(...last.map(k=>k.low));
   const range=(hi-lo)/(lo||1)*100;const net=((last[last.length-1].close-last[0].close)/last[0].close)*100;
   let regime,desc,conf;
   if(pos>neg*2&&flips<20&&range>2){regime='🟢';desc='趋势上涨';conf=0.8;}
@@ -1144,7 +1146,10 @@ function updateUI(){
   
   const rd=detectRegime();
   document.getElementById('marketRegime').textContent=rd.regime+' '+rd.desc;
-  document.getElementById('regimeDesc').textContent='可信度'+Math.round(rd.confidence*100)+'%';
+  const adviceMap={'趋势上涨':'回踩做多','趋势下跌':'出逃做空','宽幅震荡':'轻仓观望','窄幅震荡':'等待突破','方向不明':'减少操作'};
+  const adv=adviceMap[rd.desc]||'观望';
+  document.getElementById('regimeDesc').textContent=adv;
+  const ms=document.getElementById('marketState');if(ms)ms.innerHTML=rd.regime+' '+rd.desc+' <span style="color:#f0b90b;font-weight:600">| '+adv+'</span>';
   document.getElementById('lastUpdate').textContent='最后更新: '+new Date().toLocaleTimeString();
   analyzePhases();drawChart();
 }
