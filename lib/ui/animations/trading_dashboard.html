@@ -168,6 +168,7 @@
       <span class="conn-dot ld" id="connDot"></span>
       <span id="loadStatus" style="font-size:10px;color:#f0b90b;">加载中...</span>
       <span id="marketState" style="font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(30,45,80,0.4);font-weight:600;">⏳</span>
+      <button id="fsBtn" style="background:transparent;color:#848e9c;border:1px solid rgba(132,142,156,0.3);border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer;font-family:inherit;" title="全屏">⛶</button>
     </div>
   </div>
   <div class="price-display">
@@ -1291,6 +1292,7 @@ async function init(){
   await refreshAll();startWS();
   refreshTimer=setInterval(refreshAll,60000);uiTimer=setInterval(updateUI,1000);
   window.addEventListener('resize',drawChart);
+  document.getElementById('fsBtn').onclick=()=>{if(!document.fullscreenElement){document.documentElement.requestFullscreen()}else{document.exitFullscreen()}};
   setupCanvasEvents();
   window.addEventListener('keydown',e=>{
     if(e.key==='='||e.key==='+'){e.preventDefault();zoomChart(-10);}
