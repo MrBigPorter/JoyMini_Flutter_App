@@ -562,7 +562,7 @@ function scanChartSignals() {
     }
   }
 
-  const cool={gc:-99,dc:-99,chase:-99,rt:-99,fake:-99,flight:-99},MIN=8;
+  const cool={gc:-99,dc:-99,chase:-99,rt:-99,fake:-99,flight:-99,proactive:-99,proactive_buy:-99},MIN=8;
   function atrAt(i,p=14){if(i<p+1)return 0;let s=0;
     for(let j=i-p+1;j<=i;j++){const k=k15[j],pk=k15[j-1];s+=Math.max(k.high-k.low,Math.abs(k.high-pk.close),Math.abs(k.low-pk.close));}return s/p;}
 
@@ -620,18 +620,22 @@ function scanChartSignals() {
 	    const majorUp=h4Up||h6Up;
 
 	    // ═══════════════════════════════════════════════════════
-	    // 信号0: CMD趋势预警(不依赖金叉/死叉,提前发现转向)
+	    // 信号0: CMD趋势预警 — 领先指标(不依赖金叉/死叉)
 	    // ═══════════════════════════════════════════════════════
-	    // 资金恶化: CMD从正转负且恶化50%+ → 提前卖出预警(领先死叉12-24h)
-	    // 资金改善: CMD从负转正且改善50%+ → 提前买入预警(领先金叉12-24h)
-	    if(i>24&&i-cool.gc>=MIN&&i-cool.dc>=MIN){
+	    // 冷却: 同方向每簇只出1个,冷却24根(6h)
+	    // 条件: CMD在12h内从显著水平(>bl1k*3)恶化/改善50%+
+	    const coolPA=24;
+	    if(i>48&&Math.abs(c1h)>bl1k*3){
 	      const c12h=v1h(c1hArr,k15[i].time-43200000);
-	      if(c1h>0&&c12h>0&&c1h<c12h*0.5){
-	        // CMD从正大幅下降(恶化50%+) → 提前预警
-	        if(overbought)chartSignals.push({...sigCtx,type:'proactive',icon:'⚠️',label:'资金减弱·预警',color:'#f0b90b'});
-	      }else if(c1h<0&&c12h<0&&c1h>c12h*2){
-	        // CMD从负大幅上升(改善100%+) → 底部关注
-	        if(oversold)chartSignals.push({...sigCtx,type:'proactive_buy',icon:'🔎',label:'资金改善·关注',color:'#0ecb81'});
+	      if(Math.abs(c12h)>bl1k*3){
+	        const declinePct=(c12h-c1h)/Math.abs(c12h);
+	        if(c1h>0&&declinePct>0.5&&i-cool.proactive>=coolPA){
+	          cool.proactive=i;
+	          if(!oversold)chartSignals.push({...sigCtx,type:'proactive',icon:'⚠️',label:'资金减弱·预警',color:'#f0b90b'});
+	        }else if(c1h<0&&declinePct<-0.5&&i-cool.proactive_buy>=coolPA){
+	          cool.proactive_buy=i;
+	          if(!overbought)chartSignals.push({...sigCtx,type:'proactive_buy',icon:'🔎',label:'资金改善·关注',color:'#0ecb81'});
+	        }
 	      }
 	    }
 	    // ═══════════════════════════════════════════════════════
