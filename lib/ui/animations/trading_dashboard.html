@@ -620,6 +620,21 @@ function scanChartSignals() {
 	    const majorUp=h4Up||h6Up;
 
 	    // ═══════════════════════════════════════════════════════
+	    // 信号0: CMD趋势预警(不依赖金叉/死叉,提前发现转向)
+	    // ═══════════════════════════════════════════════════════
+	    // 资金恶化: CMD从正转负且恶化50%+ → 提前卖出预警(领先死叉12-24h)
+	    // 资金改善: CMD从负转正且改善50%+ → 提前买入预警(领先金叉12-24h)
+	    if(i>24&&i-cool.gc>=MIN&&i-cool.dc>=MIN){
+	      const c12h=v1h(c1hArr,k15[i].time-43200000);
+	      if(c1h>0&&c12h>0&&c1h<c12h*0.5){
+	        // CMD从正大幅下降(恶化50%+) → 提前预警
+	        if(overbought)chartSignals.push({...sigCtx,type:'proactive',icon:'⚠️',label:'资金减弱·预警',color:'#f0b90b'});
+	      }else if(c1h<0&&c12h<0&&c1h>c12h*2){
+	        // CMD从负大幅上升(改善100%+) → 底部关注
+	        if(oversold)chartSignals.push({...sigCtx,type:'proactive_buy',icon:'🔎',label:'资金改善·关注',color:'#0ecb81'});
+	      }
+	    }
+	    // ═══════════════════════════════════════════════════════
 	    // 信号1: 金叉 (含弱势/买入/追高)
 	    // ═══════════════════════════════════════════════════════
 	    if(ma15[i-1]<=m60p&&ma15[i]>m60&&Math.abs(ma15[i]-m60)>xGap&&i-cool.gc>=MIN){
@@ -641,8 +656,9 @@ function scanChartSignals() {
 	      cool.dc=i;
 	      if(oversold){
 	        // 超卖区死叉=假信号(数据:跌15%涨15%对半开)
+	        // 但! 如果已经跌了很深还出死叉,要看改善还是恶化
 	        if(cmdImproving)chartSignals.push({...sigCtx,type:'dc_warn',icon:'🔶',label:'死叉(超卖·资金改善)',color:'#f0b90b'});
-	        else chartSignals.push({...sigCtx,type:'dc_warn',icon:'🔶',label:'死叉(超卖·观望)',color:'#f0b90b'});
+	        else if(cmdWorsening)chartSignals.push({...sigCtx,type:'dc_warn',icon:'🔶',label:'死叉(超卖·观望)',color:'#f0b90b'});
 	      }else if(overbought){
 	        // 超买区死叉=真信号(数据:涨1%跌27%)
 	        if(cmdWorsening)chartSignals.push({...sigCtx,type:'dc',icon:'💀',label:'死叉←卖出(超买)',color:'#f6465d'});
@@ -1157,10 +1173,38 @@ function generateExportData(){
   L.push('');
   const kCur=allKlines[chartTF];const tfLabel={'15m':'15M','1h':'1H','4h':'4H','1d':'24H'}[chartTF]||chartTF;
   if(kCur&&kCur.length>0){
-    L.push('=== 3. '+tfLabel+' K线数据（'+kCur.length+'根）===');
-    L.push('时间\t开\t高\t低\t收\t成交量\t单KCMD');
+    L.push('=== 3. '+tfLabel+' K线数据（'+kCur.length+'根，含均线+资金流）===');
+    L.push('时间\t开\t高\t低\t收\t成交量\t单KCMD\tMA15\tMA60');
+    const d15=tfData['15m'],d1h=tfData['1h'];
+    const ma15Arr=d15?.maArray||[],ma1hArr=d1h?.maArray||[];
+    const k1hData=allKlines['1h']||[];
+    function alignMA1h(ts){
+      if(!k1hData.length||!ma1hArr.length)return null;
+      let lo=0,hi=k1hData.length-1;
+      while(lo<hi-1){const mid=(lo+hi)>>1;if(k1hData[mid].time<=ts)lo=mid;else hi=mid;}
+      const ai=Math.abs(k1hData[lo].time-ts)<Math.abs(k1hData[hi].time-ts)?lo:hi;
+      return ai>=0&&ai<ma1hArr.length&&ma1hArr[ai]!==null?ma1hArr[ai]:null;
+    }
     const mfCur=kCur.map(k=>(k.close-k.open)*k.volume);
-    kCur.forEach((k,i)=>{L.push(fmtDT(k.time)+'\t'+k.open.toFixed(2)+'\t'+k.high.toFixed(2)+'\t'+k.low.toFixed(2)+'\t'+k.close.toFixed(2)+'\t'+k.volume.toFixed(4)+'\t'+fmtVol(mfCur[i]));});
+    kCur.forEach((k,i)=>{
+      const ma15v=i>=29&&i<ma15Arr.length?ma15Arr[i]:null;
+      const ma60v=alignMA1h(k.time);
+      L.push(fmtDT(k.time)+'\t'+k.open.toFixed(2)+'\t'+k.high.toFixed(2)+'\t'+k.low.toFixed(2)+'\t'+k.close.toFixed(2)+'\t'+k.volume.toFixed(4)+'\t'+fmtVol(mfCur[i])+'\t'+(ma15v!==null?'$'+ma15v.toFixed(2):'—')+'\t'+(ma60v!==null?'$'+ma60v.toFixed(2):'—'));});
+    L.push('');
+  }
+  // MA30历史(各周期最近60根)
+  const maKeys=['15m','1h','4h','6h','8h','12h','1d'];
+  const maLabels={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'24H'};
+  for(const mk of maKeys){
+    const mkData=allKlines[mk];const md=tfData[mk];
+    if(!mkData||mkData.length<30||!md||!md.maArray)continue;
+    const marr=md.maArray;
+    L.push('=== MA'+maLabels[mk]+' 最近'+Math.min(60,marr.length)+'根SMA30 ===');
+    L.push('序号\t时间\tSMA30');
+    const start=Math.max(0,marr.length-60);
+    for(let mi=start;mi<marr.length;mi++){
+      if(marr[mi]===null)continue;
+      L.push((mi-start+1)+'\t'+fmtDT(mkData[mi].time)+'\t$'+marr[mi].toFixed(2));}
     L.push('');
   }
   L.push('=== 4. 全部信号 ===');
