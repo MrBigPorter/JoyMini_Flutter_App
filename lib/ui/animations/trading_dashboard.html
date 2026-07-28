@@ -1097,18 +1097,20 @@ function startWS(){
 
 function detectRegime(){
   const kl=allKlines[chartTF];if(!kl||kl.length<96)return{regime:'⏳',desc:'等待数据',confidence:0};
-  const last=kl.slice(-96);let pos=0,neg=0,flips=0,prev=0;
-  for(let i=0;i<last.length;i++){const mf=(last[i].close-last[i].open)*last[i].volume;
-    if(mf>0)pos++;else if(mf<0)neg++;
-    if(i>0&&(mf>0)!==(prev>0)&&prev!==0)flips++;prev=mf;}
-  const ratio=pos/Math.max(1,neg);const hi=Math.max(...last.map(k=>k.high)),lo=Math.min(...last.map(k=>k.low));
-  const range=(hi-lo)/(lo||1)*100;const net=((last[last.length-1].close-last[0].close)/last[0].close)*100;
+  // 跟随图表: scrolled?使用历史段;否则用最新96根
+  const viewEnd=kl.length-Math.min(chartOffset||0,kl.length-96);
+  const viewStart=Math.max(0,viewEnd-96);
+  const last=kl.slice(viewStart,viewEnd);const p=last.map(k=>k.close);const hi=Math.max(...p),lo=Math.min(...p);
+  const rng=(hi-lo)/lo*100;const net=(p[p.length-1]-p[0])/p[0]*100;
+  const h1=Math.max(...p.slice(0,48)),h2=Math.max(...p.slice(48));
+  const l1=Math.min(...p.slice(0,48)),l2=Math.min(...p.slice(48));
+  let maUp=0,maDn=0;
+  for(const k of['15m','1h','4h','6h','8h','12h','1d']){const d=tfData[k];if(d&&d.ma){if(p[p.length-1]>d.ma)maUp++;else maDn++;}}
   let regime,desc,conf;
-  if(pos>neg*2&&flips<20&&range>2){regime='🟢';desc='趋势上涨';conf=0.8;}
-  else if(neg>pos*2&&flips<20&&range>2){regime='🔴';desc='趋势下跌';conf=0.8;}
-  else if(range<2&&flips>30){regime='⚪';desc='窄幅震荡';conf=0.3;}
-  else if(flips>25){regime='🟡';desc='宽幅震荡';conf=0.5;}
-  else{regime='🔶';desc='方向不明';conf=0.4;}
+  if(h2>h1&&l2>l1&&net>1&&maUp>=5){regime='🟢';desc='趋势上涨';conf=0.8;}
+  else if(h2<h1&&l2<l1&&net<-1&&maDn>=5){regime='🔴';desc='趋势下跌';conf=0.8;}
+  else if(rng<1.5){regime='⚪';desc='窄幅震荡';conf=0.3;}
+  else{regime='🟡';desc='宽幅震荡';conf=0.5;}
   return{regime,desc,confidence:conf};
 }
 function updateUI(){
