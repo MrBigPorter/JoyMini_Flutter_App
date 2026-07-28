@@ -192,23 +192,23 @@
   <div class="ma-legend" id="maLegend"></div>
 </div>
 
-<div class="chart-wrap" style="height:180px;margin-bottom:6px;">
+<div class="chart-wrap" style="height:300px;margin-bottom:6px;">
   <div style="display:flex;justify-content:space-between;padding:2px 12px;font-size:10px;color:#848e9c;border-bottom:1px solid #1e2d50;">
-    <span>📊 4H 周期</span>
+    <span>📊 4H (最近60根)</span>
     <span id="sub4hLabel"></span>
   </div>
   <div class="chart-inner">
-    <canvas id="chartCanvas4h" style="height:150px;"></canvas>
+    <canvas id="chartCanvas4h" style="height:270px;"></canvas>
   </div>
 </div>
 
-<div class="chart-wrap" style="height:180px;margin-bottom:6px;">
+<div class="chart-wrap" style="height:300px;margin-bottom:6px;">
   <div style="display:flex;justify-content:space-between;padding:2px 12px;font-size:10px;color:#848e9c;border-bottom:1px solid #1e2d50;">
-    <span>📊 1D 周期</span>
+    <span>📊 1D (最近60根)</span>
     <span id="sub1dLabel"></span>
   </div>
   <div class="chart-inner">
-    <canvas id="chartCanvas1d" style="height:150px;"></canvas>
+    <canvas id="chartCanvas1d" style="height:270px;"></canvas>
   </div>
 </div>
 
@@ -910,7 +910,7 @@ function drawMiniChart(tf,canvasId,labelId){
   const kls=allKlines[tf];if(!kls||kls.length<20||!state.price)return;
   const rect=canvas.parentElement.getBoundingClientRect();
   const DPR=window.devicePixelRatio||1;
-  const w=rect.width,h=150;
+  const w=rect.width,h=270;
   canvas.width=w*DPR;canvas.height=h*DPR;
   canvas.style.width=w+'px';canvas.style.height=h+'px';
   const ctx=canvas.getContext('2d');
@@ -918,38 +918,20 @@ function drawMiniChart(tf,canvasId,labelId){
   const pad={top:10,bottom:10,left:50,right:10};
   const cw=w-pad.left-pad.right,ch=h-pad.top-pad.bottom;
   ctx.clearRect(0,0,w,h);
-  // Calculate visible range (sync with main chart time)
-  const mainKls=allKlines[chartTF];if(!mainKls)return;
-  const mainEnd=mainKls.length-chartOffset;
-  const mainStart=Math.max(0,mainEnd-chartBarCount);
-  const mainTimeStart=mainKls[mainStart].time;
-  const mainTimeEnd=mainKls[Math.min(mainEnd,mainKls.length-1)].time;
-  // Find corresponding candles in this timeframe
-  let si=0,ei=kls.length-1;
-  for(let i=0;i<kls.length;i++){if(kls[i].time>=mainTimeStart){si=Math.max(0,i-2);break;}}
-  for(let i=kls.length-1;i>=0;i--){if(kls[i].time<=mainTimeEnd){ei=Math.min(kls.length-1,i+2);break;}}
-  const vis=kls.slice(si,ei+1);if(vis.length<3)return;
-  const N=vis.length;
+  // 固定显示最近60根K线(4H=15天,1D=60天)
+  const barCnt=60;
+  const vis=kls.slice(-barCnt);const N=vis.length;
   let maxP=-Infinity,minP=Infinity;
   for(const k of vis){if(k.high>maxP)maxP=k.high;if(k.low<minP)minP=k.low;}
+  for(const cfg of MA_CONFIG){const d=tfData[cfg.key];if(d&&d.ma&&!isNaN(d.ma)){if(d.ma>maxP)maxP=d.ma;if(d.ma<minP)minP=d.ma;}}
   const range=maxP-minP||maxP*0.02;maxP+=range*0.1;minP-=range*0.1;
   const actualR=maxP-minP;
   function yPos(p){return pad.top+ch-((p-minP)/actualR)*ch;}
   function xPos(i){return pad.left+(i/(N-1))*cw;}
-  // Grid
   ctx.strokeStyle='rgba(30,45,80,0.2)';ctx.lineWidth=1;
   for(let i=0;i<=2;i++){const y=pad.top+(ch/2)*i;
     ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);ctx.stroke();}
-  // Candles
-  const candleW=Math.max(1.5,(cw/N)*0.6);
-  for(let i=0;i<N;i++){const k=vis[i];const x=xPos(i);
-    const up=k.close>=k.open;
-    ctx.strokeStyle=up?'#0ecb81':'#f6465d';ctx.fillStyle=up?'#0ecb81':'#f6465d';
-    ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(x,yPos(k.high));ctx.lineTo(x,yPos(k.low));ctx.stroke();
-    ctx.fillRect(x-candleW/2,yPos(Math.max(k.close,k.open)),candleW,Math.max(1,Math.abs(yPos(k.close)-yPos(k.open))));
-  }
-  // 7 MA lines
+  // 7 MA lines (draw FIRST so candles are on top)
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma)continue;
     const maKls=allKlines[cfg.key];const maArr=d.maArray;
@@ -968,7 +950,15 @@ function drawMiniChart(tf,canvasId,labelId){
     }
     ctx.stroke();
   }
-  // Label
+  // Candles
+  const candleW=Math.max(1.5,(cw/N)*0.6);
+  for(let i=0;i<N;i++){const k=vis[i];const x=xPos(i);
+    const up=k.close>=k.open;
+    ctx.strokeStyle=up?'#0ecb81':'#f6465d';ctx.fillStyle=up?'#0ecb81':'#f6465d';
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,yPos(k.high));ctx.lineTo(x,yPos(k.low));ctx.stroke();
+    ctx.fillRect(x-candleW/2,yPos(Math.max(k.close,k.open)),candleW,Math.max(1,Math.abs(yPos(k.close)-yPos(k.open))));
+  }
   const el=document.getElementById(labelId);if(el)el.textContent=vis[0].time?new Date(vis[0].time).toLocaleDateString()+'~'+new Date(vis[vis.length-1].time).toLocaleDateString():'';
 }
 
