@@ -562,7 +562,7 @@ function scanChartSignals() {
     }
   }
 
-  const cool={gc:-99,dc:-99,chase:-99,rt:-99,fake:-99,flight:-99,proactive:-99,proactive_buy:-99},MIN=8;
+  const cool={gc:-99,dc:-99,chase:-99,rt:-99,fake:-99,flight:-99,proactive:-99,proactive_buy:-99,proactive_sell:-99,proactive_improve:-99},MIN=8;
   function atrAt(i,p=14){if(i<p+1)return 0;let s=0;
     for(let j=i-p+1;j<=i;j++){const k=k15[j],pk=k15[j-1];s+=Math.max(k.high-k.low,Math.abs(k.high-pk.close),Math.abs(k.low-pk.close));}return s/p;}
 
@@ -632,12 +632,26 @@ function scanChartSignals() {
 	      const c12h=v1h(c1hArr,k15[i].time-43200000);
 	      if(Math.abs(c12h)>bl1k*3){
 	        const declinePct=(c12h-c1h)/Math.abs(c12h);
+	        // 1. CMD从正转负 → 紧急卖出信号(领先死叉26h,几乎在顶部)
+	        const c1h_prev=v1h(c1hArr,k15[i-1].time);
+	        if(c1h_prev>0&&c1h<=0&&!oversold&&i-cool.proactive_sell>=coolPA){
+	          cool.proactive_sell=i;
+	          chartSignals.push({...sigCtx,type:'proactive_sell',icon:'🔴',label:'资金转空·卖出',color:'#f6465d'});
+	        }
+	        // 2. CMD从负转正 → 紧急买入信号(领先金叉)
+	        if(c1h_prev<0&&c1h>=0&&!overbought&&i-cool.proactive_buy>=coolPA){
+	          cool.proactive_buy=i;
+	          chartSignals.push({...sigCtx,type:'proactive_buy',icon:'🟢',label:'资金转多·买入',color:'#0ecb81'});
+	        }
+	        // 3. CMD正但下降50%+ → 资金减弱预警(早期)
 	        if(c1h>0&&declinePct>0.5&&i-cool.proactive>=coolPA){
 	          cool.proactive=i;
 	          if(!oversold)chartSignals.push({...sigCtx,type:'proactive',icon:'⚠️',label:'资金减弱·预警',color:'#f0b90b'});
-	        }else if(c1h<0&&declinePct<-0.5&&i-cool.proactive_buy>=coolPA){
-	          cool.proactive_buy=i;
-	          if(!overbought)chartSignals.push({...sigCtx,type:'proactive_buy',icon:'🔎',label:'资金改善·关注',color:'#0ecb81'});
+	        }
+	        // 4. CMD负但回升50%+ → 资金改善关注(早期)
+	        if(c1h<0&&declinePct<-0.5&&i-cool.proactive_improve>=coolPA){
+	          cool.proactive_improve=i;
+	          if(!overbought)chartSignals.push({...sigCtx,type:'proactive_improve',icon:'🔎',label:'资金改善·关注',color:'#0ecb81'});
 	        }
 	      }
 	    }
