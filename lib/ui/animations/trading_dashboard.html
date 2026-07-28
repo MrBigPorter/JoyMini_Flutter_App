@@ -918,8 +918,8 @@ function drawMiniChart(tf,canvasId,labelId){
   const pad={top:10,bottom:10,left:50,right:10};
   const cw=w-pad.left-pad.right,ch=h-pad.top-pad.bottom;
   ctx.clearRect(0,0,w,h);
-  // 固定显示最近60根K线(4H=15天,1D=60天)
-  const barCnt=60;
+  // 可读K线数量: 4H=168根(28天),1D=90根(3个月)
+  const barCnt=tf==='4h'?168:90;
   const vis=kls.slice(-barCnt);const N=vis.length;
   let maxP=-Infinity,minP=Infinity;
   for(const k of vis){if(k.high>maxP)maxP=k.high;if(k.low<minP)minP=k.low;}
@@ -928,10 +928,11 @@ function drawMiniChart(tf,canvasId,labelId){
   const actualR=maxP-minP;
   function yPos(p){return pad.top+ch-((p-minP)/actualR)*ch;}
   function xPos(i){return pad.left+(i/(N-1))*cw;}
-  ctx.strokeStyle='rgba(30,45,80,0.2)';ctx.lineWidth=1;
+  // 网格
+  ctx.strokeStyle='rgba(30,45,80,0.15)';ctx.lineWidth=1;
   for(let i=0;i<=2;i++){const y=pad.top+(ch/2)*i;
     ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);ctx.stroke();}
-  // 7 MA lines (draw FIRST so candles are on top)
+  // 7 MA lines
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma)continue;
     const maKls=allKlines[cfg.key];const maArr=d.maArray;
@@ -951,13 +952,25 @@ function drawMiniChart(tf,canvasId,labelId){
     ctx.stroke();
   }
   // Candles
-  const candleW=Math.max(1.5,(cw/N)*0.6);
+  const candleW=Math.max(2,(cw/N)*0.6);
   for(let i=0;i<N;i++){const k=vis[i];const x=xPos(i);
     const up=k.close>=k.open;
     ctx.strokeStyle=up?'#0ecb81':'#f6465d';ctx.fillStyle=up?'#0ecb81':'#f6465d';
     ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(x,yPos(k.high));ctx.lineTo(x,yPos(k.low));ctx.stroke();
-    ctx.fillRect(x-candleW/2,yPos(Math.max(k.close,k.open)),candleW,Math.max(1,Math.abs(yPos(k.close)-yPos(k.open))));
+    ctx.fillRect(x-candleW/2,Math.min(yPos(k.open),yPos(k.close)),candleW,Math.max(1,Math.abs(yPos(k.close)-yPos(k.open))));
+  }
+  // 位置高亮标记
+  const mainKls=allKlines[chartTF];if(mainKls&&mainKls.length){
+    const mEnd=mainKls.length-chartOffset;const mSt=Math.max(0,mEnd-chartBarCount);
+    const tSt=mainKls[mSt].time,tEd=mainKls[Math.min(mEnd,mainKls.length-1)].time;
+    let hx=-1;
+    for(let i=0;i<N;i++){if(vis[i].time>=tSt&&vis[i].time<=tEd){hx=i;break;}}
+    if(hx>=0){
+      const mx=xPos(hx);const bw=cw/N*0.5;
+      ctx.fillStyle='rgba(240,185,11,0.2)';ctx.fillRect(mx-bw,pad.top,bw*2,ch);
+      ctx.strokeStyle='rgba(240,185,11,0.7)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(mx-bw,pad.top+ch);ctx.lineTo(mx,pad.top+ch+6);ctx.lineTo(mx+bw,pad.top+ch);ctx.closePath();ctx.fill();ctx.stroke();}
   }
   const el=document.getElementById(labelId);if(el)el.textContent=vis[0].time?new Date(vis[0].time).toLocaleDateString()+'~'+new Date(vis[vis.length-1].time).toLocaleDateString():'';
 }
