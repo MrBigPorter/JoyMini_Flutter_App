@@ -768,17 +768,34 @@ function scanChartSignals() {
 // ---------- FETCH ----------
 async function fetchKlines(tf, limit) {
   if(!limit)limit=1000;
-  const m=1000;let all=[],et=Date.now();
+  const m=1000;let all=[];
   const st=yearFilter>2000?new Date(yearFilter,0,1).getTime():0;
-  while(all.length<limit&&et>0){
-    const url="https://api.binance.com/api/v3/klines?symbol="+SYMBOL+"&interval="+tf+"&limit="+Math.min(m,limit-all.length)+(et?"&endTime="+et:"");
-    try{
-      const r=await fetch(url);if(!r.ok)break;
-      const d=await r.json();if(!d||!d.length)break;
-      all=[...d.map(k=>({time:k[0],open:parseFloat(k[1]),high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4]),volume:parseFloat(k[5])})),...all];
-      et=d[0][0]-1;if(d.length<m)break;
-    }catch(e){break;}
-    await new Promise(r=>setTimeout(r,200));
+  if(st>0){
+    // 按年份正向取: 从st开始往前取到足够数据
+    let et=st;const maxEt=Date.now();
+    while(all.length<limit&&et<maxEt){
+      const url="https://api.binance.com/api/v3/klines?symbol="+SYMBOL+"&interval="+tf+"&limit="+Math.min(m,limit-all.length)+(et?"&startTime="+et:"");
+      try{
+        const r=await fetch(url);if(!r.ok)break;
+        const d=await r.json();if(!d||!d.length)break;
+        all=all.concat(d.map(k=>({time:k[0],open:parseFloat(k[1]),high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4]),volume:parseFloat(k[5])})));
+        et=d[d.length-1][0]+1;if(d.length<m)break;
+      }catch(e){break;}
+      await new Promise(r=>setTimeout(r,200));
+    }
+  }else{
+    // 默认反向取(最新数据)
+    let et=Date.now();
+    while(all.length<limit&&et>0){
+      const url="https://api.binance.com/api/v3/klines?symbol="+SYMBOL+"&interval="+tf+"&limit="+Math.min(m,limit-all.length)+(et?"&endTime="+et:"");
+      try{
+        const r=await fetch(url);if(!r.ok)break;
+        const d=await r.json();if(!d||!d.length)break;
+        all=[...d.map(k=>({time:k[0],open:parseFloat(k[1]),high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4]),volume:parseFloat(k[5])})),...all];
+        et=d[0][0]-1;if(d.length<m)break;
+      }catch(e){break;}
+      await new Promise(r=>setTimeout(r,200));
+    }
   }
   return all;
 }
