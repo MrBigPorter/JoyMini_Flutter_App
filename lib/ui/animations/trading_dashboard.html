@@ -1117,7 +1117,7 @@ function drawChart() {
     ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
     ctx.beginPath();ctx.moveTo(sepX+2,lb.my);ctx.lineTo(sepX+2,lb.my);ctx.stroke();
     // 虚线到标签
-    ctx.beginPath();ctx.moveTo(sepX,lb.my);ctx.lineTo(rX,lb.my);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(sepX,lb.my);ctx.lineTo(bx2+4,lb.my);ctx.stroke();ctx.setLineDash([]);
     // 小圆点标记MA位置
     ctx.fillStyle=c;ctx.beginPath();ctx.arc(sepX,lb.my,2.5,0,Math.PI*2);ctx.fill();
     // 标签背景框
