@@ -1247,7 +1247,7 @@ async function refreshAll(){
     const cfg=MA_CONFIG.find(m=>m.key===key);
     const rest=(key==='1m'||key==='5m'||key==='30m'||key==='2h'||key==='3d'||key==='1w')?key:cfg?cfg.rest:key;
     try{
-      const klines=await fetchKlines(rest,maxHistory);
+      const klines=await fetchKlines(rest,yrLim);
       if(klines.length>=20){allKlines[key]=klines;if(cfg||key===chartTF){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}loaded++;}
     }catch(e){}
   }));
@@ -1295,7 +1295,6 @@ async function init(){
   refreshTimer=setInterval(refreshAll,60000);uiTimer=setInterval(updateUI,1000);
   window.addEventListener('resize',drawChart);
   document.getElementById('fsBtn').onclick=()=>{if(!document.fullscreenElement){document.documentElement.requestFullscreen()}else{document.exitFullscreen()}};
-  setupCanvasEvents();
   window.addEventListener('keydown',e=>{
     if(e.key==='='||e.key==='+'){e.preventDefault();zoomChart(-10);}
     if(e.key==='-'){e.preventDefault();zoomChart(10);}
