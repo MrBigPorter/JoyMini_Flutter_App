@@ -1264,7 +1264,7 @@ function switchCoin(symbolId){
   updateUI();
   (async()=>{try{const t=await fetchTicker();if(t)Object.assign(state,t);}catch(_){}
     await refreshAll();startWS();
-    refreshTimer=setInterval(refreshAll,60000);uiTimer=setInterval(updateUI,1000);})();
+    refreshTimer=setInterval(refreshAll,15000);uiTimer=setInterval(updateUI,1000);})();
 }
 
 function startWS(){
@@ -1569,7 +1569,7 @@ async function init(){
     '<div class="ma-legend-item" style="color:#f0b90b"><span>🚨</span>追高等回踩</div>';
   try{const t=await fetchTicker();if(t)Object.assign(state,t);}catch(e){}
   await refreshAll();startWS();
-  refreshTimer=setInterval(refreshAll,60000);uiTimer=setInterval(updateUI,1000);
+  refreshTimer=setInterval(refreshAll,15000);uiTimer=setInterval(updateUI,1000);
   window.addEventListener('resize',drawChart);
   document.getElementById('fsBtn').onclick=()=>{if(!document.fullscreenElement){document.documentElement.requestFullscreen()}else{document.exitFullscreen()}};
   window.addEventListener('keydown',e=>{
