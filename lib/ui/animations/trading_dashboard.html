@@ -1094,35 +1094,48 @@ function drawChart() {
     }
     ctx.stroke();
   }
-  // 右側MA标签(碰撞检测)
+  // 右側MA标签(箭头指向+彩色背景)
   const maLbs=[];
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
-    const ly=yPos(d.ma);const txt=cfg.key.toUpperCase();
-    ctx.font='bold 8.5px Inter,monospace';const t1=ctx.measureText(txt+' ').width;
-    ctx.font='8.5px Inter,monospace';
-    const t2=ctx.measureText('$'+d.ma.toFixed(2)+' ').width;
-    const cmdS=(d.cmd>0?'+':'')+fmtVol(d.cmd);
-    const t3=ctx.measureText(cmdS+' ').width;
-    const t4=ctx.measureText(fmtMult(d.mult)).width;
-    maLbs.push({cfg,ly,tw:t1+t2+t3+t4+8,th:14,txt,cmdS,d,origLy:ly});
+    const ly=yPos(d.ma);
+    const label=cfg.key.toUpperCase();
+    const val=' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
+    ctx.font='bold 8.5px Inter,sans-serif';
+    const tw=ctx.measureText(label+val).width+16;
+    maLbs.push({cfg,ly,tw,th:18,label,val,d,origX:W-10,origY:ly});
   }
+  // 按Y排序+防碰撞
   maLbs.sort((a,b)=>a.ly-b.ly);
   for(let i=1;i<maLbs.length;i++){const p=maLbs[i-1],c=maLbs[i];
-    if(c.ly-p.ly<p.th+2)c.ly=p.ly+p.th+2;}
+    if(c.ly-p.ly<20)c.ly=p.ly+20;}
+  // 边界限制
+  const maxY=pad.top+ch-20;
+  for(const lb of maLbs)if(lb.ly>maxY)lb.ly=maxY;
+  const minY=pad.top+20;
+  for(const lb of maLbs)if(lb.ly<minY)lb.ly=minY;
+  // 绘制
+  const lx=W-pad.right-8;
   for(const lb of maLbs){
-    let cx=W-pad.right+5;const ly=lb.ly;
-    ctx.font='bold 8.5px Inter,monospace';ctx.fillStyle=lb.cfg.color;
-    ctx.fillText(lb.txt,cx,ly+3);cx+=ctx.measureText(lb.txt+' ').width;
-    ctx.font='8.5px Inter,monospace';ctx.fillStyle='#e0e6f0';
-    ctx.fillText('$'+lb.d.ma.toFixed(2),cx,ly+3);cx+=ctx.measureText('$'+lb.d.ma.toFixed(2)+' ').width;
-    ctx.fillStyle=lb.d.cmd>0?'#0ecb81':'#f6465d';
-    ctx.fillText(lb.cmdS,cx,ly+3);cx+=ctx.measureText(lb.cmdS+' ').width;
-    ctx.fillStyle=Math.abs(lb.d.mult)>4?(lb.d.mult>0?'#0ecb81':'#f6465d'):'#848e9c';
-    ctx.fillText(fmtMult(lb.d.mult),cx,ly+3);
-    if(Math.abs(lb.ly-lb.origLy)>2){
-      ctx.strokeStyle=lb.d.color||lb.cfg.color;ctx.lineWidth=1;ctx.setLineDash([2,3]);
-      ctx.beginPath();ctx.moveTo(W-pad.right+2,lb.origLy);ctx.lineTo(W-pad.right+2,lb.ly+2);ctx.stroke();ctx.setLineDash([]);}
+    const ly=lb.ly;const c=lb.cfg.color;
+    const bx=lx-lb.tw,by=ly-9;
+    // 箭头线(从标签到实际MA位置)
+    ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(lx-2,ly);ctx.lineTo(lx-2,lb.origY);ctx.stroke();ctx.setLineDash([]);
+    // 箭头头
+    if(Math.abs(ly-lb.origY)>5){
+      ctx.fillStyle=c;
+      const dir=lb.origY>ly?1:-1;
+      ctx.beginPath();ctx.moveTo(lx-2,lb.origY-dir*3);ctx.lineTo(lx-5,lb.origY-dir*6);ctx.lineTo(lx+1,lb.origY-dir*6);ctx.closePath();ctx.fill();
+    }
+    // 背景标签
+    ctx.fillStyle=c+'30';ctx.strokeStyle=c;ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(bx,by,lb.tw,18,4);ctx.fill();ctx.stroke();
+    // 文字
+    ctx.font='bold 8.5px Inter,sans-serif';ctx.fillStyle=lb.d.color||c;
+    ctx.fillText(lb.label,bx+4,by+12);
+    ctx.font='8.5px Inter,sans-serif';ctx.fillStyle='#e0e6f0';
+    ctx.fillText(lb.val,bx+4+ctx.measureText(lb.label+' ').width,by+12);
   }
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
