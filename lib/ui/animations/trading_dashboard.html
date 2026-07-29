@@ -1100,7 +1100,7 @@ function drawChart() {
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
     const txt=cfg.key.toUpperCase()+' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
-    maTag.push({cfg,my:yPos(d.ma),txt,d});
+    const my0=yPos(d.ma);maTag.push({cfg,my:my0,origMy:my0,txt,d});
   }
   // 按MA位置定位+防碰撞
   const tagW=180,tagH=20;
@@ -1117,9 +1117,9 @@ function drawChart() {
     const by=lb.my;const c=lb.cfg.color;const bx=W-tagW-22;
     // 箭头(从MA位置到标签)
     ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
-    ctx.beginPath();ctx.moveTo(W-238,lb.my+tagH/2);ctx.lineTo(bx-2,by+tagH/2);ctx.stroke();ctx.setLineDash([]);
-    // 小圆点
-    ctx.fillStyle=c;ctx.beginPath();ctx.arc(W-238,lb.my+tagH/2,2.5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.moveTo(W-238,lb.origMy);ctx.lineTo(bx-2,by+tagH/2);ctx.stroke();ctx.setLineDash([]);
+    // 小圆点(在原始MA位置)
+    ctx.fillStyle=c;ctx.beginPath();ctx.arc(W-238,lb.origMy,2.5,0,Math.PI*2);ctx.fill();
     // 标签框
     ctx.fillStyle='rgba(13,19,33,0.92)';ctx.strokeStyle=c;ctx.lineWidth=1;
     ctx.beginPath();ctx.roundRect(bx,by,tagW,tagH,4);ctx.fill();ctx.stroke();
