@@ -1093,17 +1093,36 @@ function drawChart() {
       if(!started){ctx.moveTo(x,y);started=true;}else{ctx.lineTo(x,y);}
     }
     ctx.stroke();
-    // 右側標籤
-    const ly=yPos(d.ma);let cx=W-pad.right+5;
-    ctx.font='bold 8.5px Inter,monospace';ctx.fillStyle=cfg.color;
-    ctx.fillText(cfg.key.toUpperCase(),cx,ly+3);cx+=ctx.measureText(cfg.key.toUpperCase()+' ').width;
+  }
+  // 右側MA标签(碰撞检测)
+  const maLbs=[];
+  for(const cfg of MA_CONFIG){
+    const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
+    const ly=yPos(d.ma);const txt=cfg.key.toUpperCase();
+    ctx.font='bold 8.5px Inter,monospace';const t1=ctx.measureText(txt+' ').width;
+    ctx.font='8.5px Inter,monospace';
+    const t2=ctx.measureText('$'+d.ma.toFixed(2)+' ').width;
+    const cmdS=(d.cmd>0?'+':'')+fmtVol(d.cmd);
+    const t3=ctx.measureText(cmdS+' ').width;
+    const t4=ctx.measureText(fmtMult(d.mult)).width;
+    maLbs.push({cfg,ly,tw:t1+t2+t3+t4+8,th:14,txt,cmdS,d,origLy:ly});
+  }
+  maLbs.sort((a,b)=>a.ly-b.ly);
+  for(let i=1;i<maLbs.length;i++){const p=maLbs[i-1],c=maLbs[i];
+    if(c.ly-p.ly<p.th+2)c.ly=p.ly+p.th+2;}
+  for(const lb of maLbs){
+    let cx=W-pad.right+5;const ly=lb.ly;
+    ctx.font='bold 8.5px Inter,monospace';ctx.fillStyle=lb.cfg.color;
+    ctx.fillText(lb.txt,cx,ly+3);cx+=ctx.measureText(lb.txt+' ').width;
     ctx.font='8.5px Inter,monospace';ctx.fillStyle='#e0e6f0';
-    ctx.fillText('$'+d.ma.toFixed(2),cx,ly+3);cx+=ctx.measureText('$'+d.ma.toFixed(2)+' ').width;
-    ctx.fillStyle=d.cmd>0?'#0ecb81':'#f6465d';
-    const cmdStr=(d.cmd>0?'+':'')+fmtVol(d.cmd);
-    ctx.fillText(cmdStr,cx,ly+3);cx+=ctx.measureText(cmdStr+' ').width;
-    ctx.fillStyle=Math.abs(d.mult)>4?(d.mult>0?'#0ecb81':'#f6465d'):'#848e9c';
-    ctx.fillText(fmtMult(d.mult),cx,ly+3);
+    ctx.fillText('$'+lb.d.ma.toFixed(2),cx,ly+3);cx+=ctx.measureText('$'+lb.d.ma.toFixed(2)+' ').width;
+    ctx.fillStyle=lb.d.cmd>0?'#0ecb81':'#f6465d';
+    ctx.fillText(lb.cmdS,cx,ly+3);cx+=ctx.measureText(lb.cmdS+' ').width;
+    ctx.fillStyle=Math.abs(lb.d.mult)>4?(lb.d.mult>0?'#0ecb81':'#f6465d'):'#848e9c';
+    ctx.fillText(fmtMult(lb.d.mult),cx,ly+3);
+    if(Math.abs(lb.ly-lb.origLy)>2){
+      ctx.strokeStyle=lb.d.color||lb.cfg.color;ctx.lineWidth=1;ctx.setLineDash([2,3]);
+      ctx.beginPath();ctx.moveTo(W-pad.right+2,lb.origLy);ctx.lineTo(W-pad.right+2,lb.ly+2);ctx.stroke();ctx.setLineDash([]);}
   }
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
