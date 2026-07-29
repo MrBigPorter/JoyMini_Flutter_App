@@ -983,7 +983,7 @@ function drawChart() {
   const ctx=canvas.getContext('2d');
   ctx.scale(DPR,DPR);
   const W=w,H=h;
-  const pad={top:20,bottom:24,left:55,right:0};
+  const pad={top:20,bottom:24,left:55,right:210};
   const cw=W-pad.left-pad.right,ch=H-pad.top-pad.bottom;
   ctx.clearRect(0,0,W,H);
   const klines=allKlines[chartTF];
@@ -1094,35 +1094,37 @@ function drawChart() {
     }
     ctx.stroke();
   }
-  // MA标签(最右边,飞出去,箭头指向MA)
+  // MA标签(210px右边空间,箭头指向MA线位置)
   const maR=[];
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
     const my=yPos(d.ma);
     const txt=cfg.key.toUpperCase()+' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
-    ctx.font='bold 7.5px Inter,sans-serif';
-    const tw=ctx.measureText(txt).width+10;
-    maR.push({cfg,my,tw,th:15,txt,d});
+    ctx.font='bold 8px Inter,sans-serif';
+    const tw=ctx.measureText(txt).width+14;
+    maR.push({cfg,my,tw,th:17,txt,d});
   }
-  // 从右上角往下排,锚点在W-2(最右边缘)
-  let ry=pad.top+8;
-  for(let i=0;i<maR.length;i++){
-    const lb=maR[i];
-    const bx=W-lb.tw-4,by=ry-7;const c=lb.cfg.color;
-    // 箭头(从标签左边缘到MA位置)
-    ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([2,3]);
-    ctx.beginPath();ctx.moveTo(bx-2,ry);ctx.lineTo(bx-2,lb.my);ctx.stroke();ctx.setLineDash([]);
-    if(Math.abs(ry-lb.my)>4){
-      ctx.fillStyle=c;
-      const dir=lb.my>ry?1:-1;
-      ctx.beginPath();ctx.moveTo(bx-2,lb.my-dir*3);ctx.lineTo(bx-5,lb.my-dir*6);ctx.lineTo(bx+1,lb.my-dir*6);ctx.closePath();ctx.fill();
-    }
-    // 背景框(在K线上方浮动)
-    ctx.fillStyle='rgba(13,19,33,0.9)';ctx.strokeStyle=c;ctx.lineWidth=1;
-    ctx.beginPath();ctx.roundRect(bx,by,lb.tw,15,3);ctx.fill();ctx.stroke();
-    ctx.font='bold 7.5px Inter,sans-serif';ctx.fillStyle=c;
-    ctx.fillText(lb.txt,bx+3,by+11);
-    ry+=16;
+  // 排序+防碰撞(在210px空间内)
+  maR.sort((a,b)=>a.my-b.my);
+  const rX=W-200; // 标签在右边空间内
+  for(let i=1;i<maR.length;i++){const p=maR[i-1],c=maR[i];
+    if(c.my-p.my<18)c.my=p.my+18;}
+  // 绘制
+  for(const lb of maR){
+    const by=lb.my-8;const c=lb.cfg.color;
+    // 箭头(从标签左缘连线到MA在K线区域的实际位置)
+    const sepX=W-210; // K线区域和标签区域的分界线
+    ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(sepX+2,lb.my);ctx.lineTo(sepX+2,lb.my);ctx.stroke();
+    // 虚线到标签
+    ctx.beginPath();ctx.moveTo(sepX,lb.my);ctx.lineTo(rX,lb.my);ctx.stroke();ctx.setLineDash([]);
+    // 小圆点标记MA位置
+    ctx.fillStyle=c;ctx.beginPath();ctx.arc(sepX,lb.my,2.5,0,Math.PI*2);ctx.fill();
+    // 标签背景框
+    ctx.fillStyle='rgba(13,19,33,0.92)';ctx.strokeStyle=c;ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(rX,by,lb.tw,17,4);ctx.fill();ctx.stroke();
+    ctx.font='bold 8px Inter,sans-serif';ctx.fillStyle=c;
+    ctx.fillText(lb.txt,rX+4,by+12);
   }
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
