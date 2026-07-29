@@ -443,9 +443,15 @@ function calcTF(key, klines, price) {
     if(k.high>k.low){const bp=(k.close-k.low)/(k.high-k.low);cvd+=k.volume*(bp-(1-bp));}
     cmd+=(k.close-k.open)*k.volume;
   }
-  // 战力分母 = SMA20 of |单根CMD| (匹配Pine Script算法)
+  // 战力分母 = SMA20 of |24K累计CMD| (匹配Pine: ta.sma(cmd,20))
   const mfDeltas=klines.map(k=>(k.close-k.open)*k.volume);
-  const absSma=mfDeltas.slice(-20).reduce((a,b)=>a+Math.abs(b),0)/20;
+  // 总流入/总流出(最近24根)
+  const mf24=mfDeltas.slice(-24);let totalIn=0,totalOut=0;
+  for(const mf of mf24){if(mf>0)totalIn+=mf;else totalOut+=Math.abs(mf);}
+  // 逐K线24K累计CMD(滑动窗口)
+  const cmdArr=[];let ws=0;
+  for(let wi=0;wi<mfDeltas.length;wi++){ws+=mfDeltas[wi];if(wi>=24)ws-=mfDeltas[wi-24];if(wi>=23)cmdArr.push(ws);}
+  const absSma=cmdArr.length>=20?cmdArr.slice(-20).reduce((a,b)=>a+Math.abs(b),0)/20:Math.abs(cmd);
   const safeBase=Math.max(10,absSma||10);
   const mult=Math.max(-10,Math.min(10,cmd/safeBase));
   let stochK=50;
@@ -461,7 +467,7 @@ function calcTF(key, klines, price) {
     let s=0;for(let j=i-29;j<=i;j++)s+=c[j];
     maArray.push(s/30);
   }
-  return {ma:maVal,cvd,cmd,mult,gap,stochK,rate,mfCur,isAboveMa:price>maVal,isBull:cmd>0&&mult>0,maArray};
+  return {ma:maVal,cvd,cmd,mult,gap,stochK,rate,mfCur,mfPrev,totalIn,totalOut,isAboveMa:price>maVal,isBull:cmd>0&&mult>0,maArray};
 }
 
 function calcFusion(td) {
@@ -546,7 +552,7 @@ function scanChartSignals() {
   }
   for(let i=0;i<k15.length;i++){
     if(i<20){mult15[i]=0;continue;}
-    let sm=0;for(let j=i-19;j<=i;j++)sm+=Math.abs(mf15[j]);
+    let sm=0;for(let j=i-19;j<=i;j++)sm+=Math.abs(cmd15[j]);
     const sb=Math.max(10,sm/20);mult15[i]=sb>0?Math.max(-10,Math.min(10,cmd15[i]/sb)):0;
   }
 
@@ -1095,52 +1101,113 @@ function drawChart() {
     }
     ctx.stroke();
   }
-  // MA标签(按时间对齐到最后一根可见K线)
+  // MA标签(按时间对齐,固定高度紧凑文案)
   const maTag=[];
   const mKls=allKlines[chartTF];
   const mV=Math.min(mKls.length,chartBarCount);
   const mO=Math.max(0,mKls.length-mV);
   const off=Math.min(chartOffset||0,mO);
-  const lastTime=mKls[mKls.length-off-1].time;
-  for(const cfg of MA_CONFIG){
-    const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
-    const txt=cfg.key.toUpperCase()+' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
-    // 按时间找对应K线索引
-    let ai=-1;
-    const mk=allKlines[cfg.key];
-    if(mk&&d.maArray){
-      let lo=0,hi=mk.length-1;
-      while(lo<hi-1){const mid=(lo+hi)>>1;if(mk[mid].time<=lastTime)lo=mid;else hi=mid;}
-      const ld=Math.abs(mk[lo].time-lastTime),hd=Math.abs(mk[hi].time-lastTime);
-      ai=ld<hd?lo:hi;
+  const lastK=mKls[mKls.length-off-1];const lastTime=lastK.time;
+  for(let ci=0;ci<MA_CONFIG.length;ci++){
+    const cfg=MA_CONFIG[ci];const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
+    let ai=-1;const mk=allKlines[cfg.key];
+    if(mk&&d.maArray){let lo=0,hi=mk.length-1;while(lo<hi-1){const mid=(lo+hi)>>1;if(mk[mid].time<=lastTime)lo=mid;else hi=mid;}
+      const ld=Math.abs(mk[lo].time-lastTime),hd=Math.abs(mk[hi].time-lastTime);ai=ld<hd?lo:hi;}
+    const alignMa=(ai>=0&&d.maArray&&ai<d.maArray.length)?d.maArray[ai]:null;
+    if(alignMa===null||isNaN(alignMa))continue;
+    const my0=yPos(alignMa);
+    // --- 逐MA指标(用d.ma最新值, alignMa只用于Y坐标) ---
+    const cmd=d.cmd||0,mfCur=d.mfCur||0,mfPrev=d.mfPrev||0,mult=d.mult||0;
+    const latestMa=d.ma;
+    const priceDev=((state.price-latestMa)/latestMa)*100;
+    const devStr=(priceDev>=0?'+':'')+priceDev.toFixed(1)+'%';
+    const devClr=priceDev>0.5?'#0ecb81':priceDev<-0.5?'#f6465d':'#e0e6f0';
+    const moneyDiff=cmd-mfPrev;const mfPos=moneyDiff>0;
+    // 需要(最新均线间距)
+    const nextCfg=ci<MA_CONFIG.length-1?MA_CONFIG[ci+1]:null;
+    const nextMa=nextCfg&&tfData[nextCfg.key]?tfData[nextCfg.key].ma:state.price;
+    const need=Math.abs(latestMa-nextMa)*1000;
+    // 增速比+emoji
+    const speedRatio=need>0?Math.abs(cmd)/need:0;
+    let speedEmoji='🛑';if(cmd>0&&speedRatio>=3)speedEmoji='🚀';else if(cmd>0&&speedRatio>=1)speedEmoji='🚗';else if(cmd>0)speedEmoji='⚠️';
+    // 倍数emoji
+    let multEmoji='⚪';if(mult>8)multEmoji='🈵飞';else if(mult>5)multEmoji='🈵跑';else if(mult>3)multEmoji='🈵';else if(mult>1.5)multEmoji='跑';else if(mult>0)multEmoji='飞';
+    // 净流向+变化方向(紧凑)
+    let dirEmoji=cmd>0?'🟢':'🔴';
+    const curMf=d.mfCur||0;const inStr=curMf>0?fmtVol(curMf).slice(1):'0',outStr=curMf<0?fmtVol(Math.abs(curMf)).slice(1):'0';
+    let netStr=dirEmoji+' 净'+(cmd>=0?'+':'')+fmtVol(cmd);
+    let chgStr='';if(cmd>0&&mfPos)chgStr='增仓';else if(cmd>0&&!mfPos)chgStr='减仓';else if(cmd<0&&mfPos)chgStr='回补';else chgStr='恶化';
+    // 偷偷
+    const stealthOut=cmd>0&&mfCur<0?Math.abs(mfCur):0;
+    const stealthIn=cmd<0&&mfCur>0?mfCur:0;
+    // 上级支撑
+    let supTxt='';
+    if(cmd<need&&nextCfg&&tfData[nextCfg.key]){
+      const nd=tfData[nextCfg.key];const deficit=need-cmd;
+      const ndEl=(nd.mfCur||0)-(nd.mfPrev||0);const nCum=Math.abs(nd.cmd||0);
+      const hR=deficit>0?Math.abs(ndEl)/deficit:0;
+      let sm='走';if(hR>=3)sm='飞';else if(hR>=1)sm='跑';
+      if(ndEl>=deficit)supTxt='❌'+sm+'('+nextCfg.label+'杠)';
+      else if(nCum>=deficit)supTxt='❌走('+nextCfg.label+'底仓)';
+      else supTxt='❌全线告急';
     }
-    const maVal=(ai>=0&&d.maArray&&ai<d.maArray.length)?d.maArray[ai]:null;
-    if(maVal===null||isNaN(maVal))continue;
-    const my0=yPos(maVal);maTag.push({cfg,my:my0,origMy:my0,txt,d,maVal});
+    // --- 4行固定布局(紧凑文案) ---
+    const lines=[];
+    const LH=12;
+    // L0: [TF] (+X.X%)
+    lines.push({y:10,font:'bold 9px Inter,sans-serif',parts:[
+      {t:cfg.key.toUpperCase()+' ',c:cfg.color},{t:'('+devStr+')',c:devClr}]});
+    // L1: 净+XX | 入XX 出XX
+    const chgClr=cmd>=0?'#0ecb81':'#f6465d';
+    lines.push({y:10+LH*1,font:'7.5px Inter,sans-serif',parts:[
+      {t:netStr+'  ',c:chgClr},{t:'入'+inStr+'  ',c:'#0ecb81'},{t:'出'+outStr,c:'#f6465d'}]});
+    // L2: 需 | 倍数
+    let l2=need>0?'需'+fmtVol(need).slice(1):'需—';
+    let multLbl='';if(mult>8)multLbl='爆';else if(mult>5)multLbl='强';else if(mult>3)multLbl='中';else if(mult>1.5)multLbl='弱';else if(mult>0)multLbl='微';
+    l2+='  '+multLbl+' '+mult.toFixed(1)+'x';
+    lines.push({y:10+LH*2,font:'7.5px Inter,sans-serif',t:l2,c:'#e0e6f0'});
+    // L3: 负→距平衡/止血  或  偷偷  或  支撑
+    let l3='';
+    if(cmd<0){
+      l3=mfPos?('🔄 距平衡差: '+fmtVol(Math.abs(cmd)).slice(1)):('🚧 距止血回补: +'+fmtVol(Math.abs(cmd)).slice(1));
+    }else if(stealthOut>0||stealthIn>0){
+      if(stealthOut>0)l3+='⇣'+fmtVol(stealthOut).slice(1)+'  ';
+      if(stealthIn>0)l3+='⇡'+fmtVol(stealthIn).slice(1);
+    }else if(supTxt){
+      l3=supTxt;
+    }
+    lines.push({y:10+LH*3,font:'7.5px Inter,sans-serif',t:l3,c:cmd<0?'#f0b90b':(stealthOut>0?'#f6465d':(stealthIn>0?'#0ecb81':'#848e9c'))});
+    const tagH=54;
+    maTag.push({cfg,my:my0,origMy:my0,tagH,lines});
   }
-  // 按MA位置定位+防碰撞
-  const tagW=180,tagH=20;
+  // 按MA位置定位+防碰撞(距离约束算法)
+  const tagW=180;const tagH=52;
+  const tMin=pad.top+2,tMax=pad.top+ch-tagH-4;
   maTag.sort((a,b)=>a.my-b.my);
-  for(let i=1;i<maTag.length;i++){
-    const p=maTag[i-1],c=maTag[i];
-    if(c.my-p.my<tagH+4)c.my=p.my+tagH+4;
+  // Pass1: 下推-确保最小间距
+  for(let i=1;i<maTag.length;i++){const p=maTag[i-1],c=maTag[i];if(c.my-p.my<tagH+4)c.my=p.my+tagH+4;}
+  // Pass2: 顶部裁剪
+  for(const lb of maTag){if(lb.my<tMin)lb.my=tMin;}
+  // Pass3: 底部溢出→等比压缩(保留MA原始间距比例)
+  const bot=maTag[maTag.length-1];
+  if(bot&&bot.my+tagH>tMax){
+    const origBot=bot.my+tagH,origTop=maTag[0].my;
+    const span=origBot-origTop,target=tMax+tagH-tMin;
+    if(span>0){const ratio=target/span;maTag.forEach((lb,i)=>{lb.my=tMin+(lb.my-origTop)*ratio;});}
+    else{const step=(tMax-tMin)/(maTag.length-1||1);maTag.forEach((lb,i)=>{lb.my=tMin+i*step;});}
   }
-  // 边界限制
-  const tMin=pad.top+2,tMax=pad.top+ch-tagH-2;
-  for(const lb of maTag){if(lb.my<tMin)lb.my=tMin;if(lb.my+tagH>tMax)lb.my=tMax-tagH;}
   // 绘制
   for(const lb of maTag){
     const by=lb.my;const c=lb.cfg.color;const bx=W-tagW-22;
-    // 箭头(从MA位置到标签)
     ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
-    ctx.beginPath();ctx.moveTo(W-238,lb.origMy);ctx.lineTo(bx-2,by+tagH/2);ctx.stroke();ctx.setLineDash([]);
-    // 小圆点(在原始MA位置)
+    ctx.beginPath();ctx.moveTo(W-238,lb.origMy);ctx.lineTo(bx-2,by+lb.tagH/2);ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle=c;ctx.beginPath();ctx.arc(W-238,lb.origMy,2.5,0,Math.PI*2);ctx.fill();
-    // 标签框
     ctx.fillStyle='rgba(13,19,33,0.92)';ctx.strokeStyle=c;ctx.lineWidth=1;
-    ctx.beginPath();ctx.roundRect(bx,by,tagW,tagH,4);ctx.fill();ctx.stroke();
-    ctx.font='bold 8.5px Inter,sans-serif';ctx.textAlign='center';ctx.fillStyle=c;
-    ctx.fillText(lb.cfg.key.toUpperCase()+' $'+(lb.maVal||lb.d.ma).toFixed(0)+' '+(lb.d.cmd>0?'+':'')+fmtVol(lb.d.cmd),bx+tagW/2,by+13);ctx.textAlign='left';
+    ctx.beginPath();ctx.roundRect(bx,by,tagW,lb.tagH,4);ctx.fill();ctx.stroke();
+    for(const ln of lb.lines){
+      if(ln.parts){let lx=bx+4;for(const p of ln.parts){ctx.fillStyle=p.c;ctx.font=ln.font;ctx.textAlign='left';ctx.fillText(p.t,lx,by+ln.y);lx+=ctx.measureText(p.t).width;}}
+      else if(ln.t){ctx.fillStyle=ln.c;ctx.font=ln.font;ctx.textAlign='left';ctx.fillText(ln.t,bx+4,by+ln.y);}
+    }
   }
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
