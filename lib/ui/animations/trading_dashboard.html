@@ -361,7 +361,7 @@ function openDB(){return new Promise((res,rej)=>{
   r.onsuccess=e=>{db=e.target.result;res(db);};r.onerror=e=>rej(e);});}
 async function saveSnapshot(){
   if(!db)try{await openDB();}catch(e){return}
-  const ks=['15m','1h','4h','6h','8h','12h','1d'];const data={ts:Date.now(),symbol:SYMBOL,price:state.price,tf:{}};
+  const ks=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];const data={ts:Date.now(),symbol:SYMBOL,price:state.price,tf:{}};
   for(const k of ks){const d=tfData[k];if(!d)continue;data.tf[k]={ma:d.ma,cmd:d.cmd,mult:d.mult,totalIn:d.totalIn,totalOut:d.totalOut,mfCur:d.mfCur};}
   try{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).add(data);
     // 清理旧数据
@@ -400,6 +400,7 @@ const TF_INTERVALS = [
   { id:'1d',  rest:'1d',  label:'1d'  },
   { id:'3d',  rest:'3d',  label:'3d'  },
   { id:'1w',  rest:'1w',  label:'1w'  },
+  { id:'1M',  rest:'1M',  label:'1M'  },
 ];
 
 const SYMBOLS = [
@@ -421,7 +422,8 @@ const MA_CONFIG = [
   { key:'12h', label:'12H', color:'#a855f7', period:30, rest:'12h', lw:2 },
   { key:'1d',  label:'24H', color:'#ec4899', period:30, rest:'1d',  lw:2 },
 ];
-const TF_KEYS = ['15m','1h','4h','6h','8h','12h','1d'];
+const TF_KEYS = ['15m','1h','4h','6h','8h','12h','1d','1w','1M'];
+const BG_KEYS = ['1w','1M']; // 大周期背景数据(不显示标签,仅供分析)
 
 // ---------- HELPERS ----------
 function fmtPrice(v) { return (v===undefined||isNaN(v))?'—':'$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:2}); }
@@ -681,7 +683,7 @@ function scanChartSignals() {
 	    // ═══════════════════════════════════════════════════════
 
 	    // ── MA位置计数: 价格在几条MA之上? (0~7) ──
-	    const tfKeys=['15m','1h','4h','6h','8h','12h','1d'];
+	    const tfKeys=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];
 	    let aboveCount=0;
 	    for(const key of tfKeys){const d=tfData[key];if(d&&d.ma&&p>d.ma)aboveCount++;}
 	    const belowCount=7-aboveCount;
@@ -1314,7 +1316,7 @@ function detectRegime(){
   const h1=Math.max(...p.slice(0,48)),h2=Math.max(...p.slice(48));
   const l1=Math.min(...p.slice(0,48)),l2=Math.min(...p.slice(48));
   let maUp=0,maDn=0;
-  for(const k of['15m','1h','4h','6h','8h','12h','1d']){const d=tfData[k];if(d&&d.ma){if(p[p.length-1]>d.ma)maUp++;else maDn++;}}
+  for(const k of['15m','1h','4h','6h','8h','12h','1d','1w','1M']){const d=tfData[k];if(d&&d.ma){if(p[p.length-1]>d.ma)maUp++;else maDn++;}}
   let regime,desc,conf;
   if(h2>h1&&l2>l1&&net>1&&maUp>=5){regime='🟢';desc='趋势上涨';conf=0.8;}
   else if(h2<h1&&l2<l1&&net<-1&&maDn>=5){regime='🔴';desc='趋势下跌';conf=0.8;}
@@ -1324,8 +1326,8 @@ function detectRegime(){
 }
 function analyzeMarket(){
   const p=state.price;if(!p||!tfData['15m']||!dataReady)return null;
-  const tfK=['15m','1h','4h','6h','8h','12h','1d'];
-  let b=0,be=0,tm=0,levels=[];const LAB={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D'};
+  const tfK=['15m','1h','4h','6h','8h','12h','1d','1w','1M','1w','1M'];
+  let b=0,be=0,tm=0,levels=[];const LAB={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D','1w':'1W','1M':'1M','1w':'1W','1M':'1M'};
   for(const k of tfK){const d=tfData[k];if(!d)continue;
     if(d.cmd>0)b++;else be++;
     tm+=Math.abs(d.mult||0);
@@ -1480,7 +1482,7 @@ function generateExportData(){
   let L=[];L.push('=== PORTER 全量分析数据 ===');
   L.push('导出: '+new Date().toLocaleString()+'  币种: '+SYMBOL+'  价格: $'+pp+'  周期: '+chartTF);L.push('');
   L.push('=== 1. 全周期指标 ===');L.push('周期\t方向\tMA30\tCMD\t战力\tStochK\tCVD\t加速度\t资金Δ');
-  const tks=['15m','1h','4h','6h','8h','12h','1d'],tlb=['15M','1H','4H','6H','8H','12H','24H'];
+  const tks=['15m','1h','4h','6h','8h','12h','1d','1w','1M'],tlb=['15M','1H','4H','6H','8H','12H','24H'];
   tks.forEach((k,i)=>{const d=tfData[k];if(!d)return;
     const mv=ma(k);const dir=p>mv?'▲涨':'▼跌';
     L.push(tlb[i]+'\t'+dir+'\t'+(mv?'$'+mv.toFixed(2):'—')+'\t'+fmtVol(d.cmd||0)+'\t'+fmtMult(d.mult||0)+'\tK'+((d.stochK||50).toFixed(0))+'\t'+fmtVol(d.cvd||0)+'\t'+((d.rate||0).toFixed(1))+'%\t'+fmtVol(d.mfCur||0));});
@@ -1511,7 +1513,7 @@ function generateExportData(){
     L.push('');
   }
   // MA30历史(各周期最近60根)
-  const maKeys=['15m','1h','4h','6h','8h','12h','1d'];
+  const maKeys=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];
   const maLabels={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'24H'};
   for(const mk of maKeys){
     const mkData=allKlines[mk];const md=tfData[mk];
@@ -1546,11 +1548,11 @@ async function refreshAll(){
   if(typeof isLoadingData==='undefined')var isLoadingData=false;
   if(isLoadingData)return;
   isLoadingData=true;let loaded=0;
-  const allTF=new Set([chartTF,...TF_KEYS]);
+  const allTF=new Set([chartTF,...TF_KEYS,...BG_KEYS]);
   // 年份过滤
   await Promise.all([...allTF].map(async key=>{
     const cfg=MA_CONFIG.find(m=>m.key===key);
-    const rest=(key==='1m'||key==='5m'||key==='30m'||key==='2h'||key==='3d'||key==='1w')?key:cfg?cfg.rest:key;
+    const rest=(key==='1m'||key==='5m'||key==='30m'||key==='2h'||key==='3d'||key==='1w'||key==='1M')?key:cfg?cfg.rest:key;
     try{
       const klines=await fetchKlines(rest,maxHistory);
       if(klines.length>=20){allKlines[key]=klines;if(cfg||key===chartTF){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}loaded++;}
@@ -1627,7 +1629,7 @@ async function init(){
   document.getElementById('fsBtn').onclick=()=>{if(!document.fullscreenElement){document.documentElement.requestFullscreen()}else{document.exitFullscreen()}};
   document.getElementById('copyTagsBtn').onclick=()=>{
     let txt='📊 Porter 多周期分析\n';
-    const ks=['15m','1h','4h','6h','8h','12h','1d'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D'};
+    const ks=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D'};
     for(const k of ks){const d=tfData[k];if(!d)continue;
       const cmd=d.cmd||0,mfCur=d.mfCur||0,mult=d.mult||0;
       const totalIn=fmtVol(d.totalIn||0).slice(1),totalOut=fmtVol(d.totalOut||0).slice(1);
@@ -1639,7 +1641,7 @@ async function init(){
     }
     txt+='---\n价格: $'+state.price.toFixed(2)+' | '+new Date().toLocaleTimeString();
     navigator.clipboard.writeText(txt).then(()=>{const btn=document.getElementById('copyTagsBtn');btn.textContent='✅';setTimeout(()=>btn.textContent='📋',2000);});
-  };document.getElementById('copyHistBtn').onclick=async()=>{const btn=document.getElementById('copyHistBtn');btn.textContent='⏳';const history=await getHistory(MAX_DAYS);const ks=['15m','1h','4h','6h','8h','12h','1d'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D'};let txt='📊 Porter 多周期分析报告 ('+MAX_DAYS+'天数据)\n时间: '+new Date().toLocaleString()+' | '+SYMBOL+' $'+state.price.toFixed(2)+'\n\n【字段说明】\nMA=该周期SMA30均线价 | 净(CMD)=24K累计净资金流(正=净流入,负=净流出) | 入/出=24K内总买入/卖出量 | 速(speedRatio)=|净|÷均线缺口(>1够突破,<1不够) | 倍(mult)=当前资金流强度vs近期平均(>3强,≈1正常,<1弱)\n\n=== 当前数据 ===\n';for(const k of ks){const d=tfData[k];if(!d)continue;const cmd=d.cmd||0;const need=Math.abs(d.ma-(tfData[ks[ks.indexOf(k)+1]]?.ma||state.price))*1000;const sr=need>0?Math.abs(cmd)/need:0;txt+=lb[k]+': $'+d.ma.toFixed(0)+' | 净'+(cmd>=0?'+':'')+fmtVol(cmd)+' | 入'+fmtVol(d.totalIn||0).slice(1)+' 出'+fmtVol(d.totalOut||0).slice(1)+' | 速'+sr.toFixed(1)+'x | 倍'+(d.mult||0).toFixed(1)+'x\n';}if(history.length>0){txt+='\n=== '+history.length+'条历史趋势(净额变化) ===\n时间\t';for(const k of ks)txt+=lb[k]+'\t';txt+='价格\n';for(const h of history.slice(-200)){txt+=new Date(h.ts).toLocaleString()+' ';for(const k of ks){const t=h.tf[k];txt+=(t?((t.cmd||0)>=0?'+':'')+fmtVol(t.cmd||0):'—')+'\t';}txt+='$'+(h.price||0).toFixed(2)+'\n';}}txt+='\n---\n【分析要求】\n1. 解读各周期资金流结构（谁在买谁在卖，多空矛盾点）\n2. 分析价格与各周期MA的位置关系（支撑/阻力在哪）\n3. 判断当前趋势强度和可持续性（速+倍组合）\n4. 指出关键信号（如背离、拐头、密集区）\n5. 当前位置能不能买/能不能卖？会不会被套？如果是高位追多风险多大？\n6. 给出具体交易计划（方向、入场点位、止损位、目标位）\n7. 【宏观背景】结合你已知的近期Fed利率预期、DXY走势、BTC ETF流入/流出、地缘政治等宏观因素综合判断';navigator.clipboard.writeText(txt).then(()=>{btn.textContent='✅';setTimeout(()=>btn.textContent='📋📊',2000);});};
+  };document.getElementById('copyHistBtn').onclick=async()=>{const btn=document.getElementById('copyHistBtn');btn.textContent='⏳';const history=await getHistory(MAX_DAYS);const ks=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D'};let txt='📊 Porter 多周期分析报告 ('+MAX_DAYS+'天数据)\n时间: '+new Date().toLocaleString()+' | '+SYMBOL+' $'+state.price.toFixed(2)+'\n\n【字段说明】\nMA=该周期SMA30均线价 | 净(CMD)=24K累计净资金流(正=净流入,负=净流出) | 入/出=24K内总买入/卖出量 | 速(speedRatio)=|净|÷均线缺口(>1够突破,<1不够) | 倍(mult)=当前资金流强度vs近期平均(>3强,≈1正常,<1弱)\n\n=== 当前数据 ===\n';for(const k of ks){const d=tfData[k];if(!d)continue;const cmd=d.cmd||0;const need=Math.abs(d.ma-(tfData[ks[ks.indexOf(k)+1]]?.ma||state.price))*1000;const sr=need>0?Math.abs(cmd)/need:0;txt+=lb[k]+': $'+d.ma.toFixed(0)+' | 净'+(cmd>=0?'+':'')+fmtVol(cmd)+' | 入'+fmtVol(d.totalIn||0).slice(1)+' 出'+fmtVol(d.totalOut||0).slice(1)+' | 速'+sr.toFixed(1)+'x | 倍'+(d.mult||0).toFixed(1)+'x\n';}if(history.length>0){txt+='\n=== '+history.length+'条历史趋势(净额变化) ===\n时间\t';for(const k of ks)txt+=lb[k]+'\t';txt+='价格\n';for(const h of history.slice(-200)){txt+=new Date(h.ts).toLocaleString()+' ';for(const k of ks){const t=h.tf[k];txt+=(t?((t.cmd||0)>=0?'+':'')+fmtVol(t.cmd||0):'—')+'\t';}txt+='$'+(h.price||0).toFixed(2)+'\n';}}txt+='\n---\n【分析要求】\n1. 解读各周期资金流结构（谁在买谁在卖，多空矛盾点）\n2. 分析价格与各周期MA的位置关系（支撑/阻力在哪）\n3. 判断当前趋势强度和可持续性（速+倍组合）\n4. 指出关键信号（如背离、拐头、密集区）\n5. 当前位置能不能买/能不能卖？会不会被套？如果是高位追多风险多大？\n6. 给出具体交易计划（方向、入场点位、止损位、目标位）\n7. 【宏观背景】结合你已知的近期Fed利率预期、DXY走势、BTC ETF流入/流出、地缘政治等宏观因素综合判断';navigator.clipboard.writeText(txt).then(()=>{btn.textContent='✅';setTimeout(()=>btn.textContent='📋📊',2000);});};
   window.addEventListener('keydown',e=>{
     if(e.key==='='||e.key==='+'){e.preventDefault();zoomChart(-10);}
     if(e.key==='-'){e.preventDefault();zoomChart(10);}
