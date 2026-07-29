@@ -443,16 +443,14 @@ function calcTF(key, klines, price) {
     if(k.high>k.low){const bp=(k.close-k.low)/(k.high-k.low);cvd+=k.volume*(bp-(1-bp));}
     cmd+=(k.close-k.open)*k.volume;
   }
-  // 战力分母 = SMA20 of |per-candle CMD|
-  let ch=[];
-  for(let jj=Math.max(0,klines.length-43);jj<klines.length;jj++){let s=0;for(let kk=Math.max(0,jj-23);kk<=jj;kk++)s+=(klines[kk].close-klines[kk].open)*klines[kk].volume;ch.push(s);}
-  const absSma=ch.length>=20?ch.slice(-20).reduce((a,b)=>a+Math.abs(b),0)/20:Math.abs(cmd);
+  // 战力分母 = SMA20 of |单根CMD| (匹配Pine Script算法)
+  const mfDeltas=klines.map(k=>(k.close-k.open)*k.volume);
+  const absSma=mfDeltas.slice(-20).reduce((a,b)=>a+Math.abs(b),0)/20;
   const safeBase=Math.max(10,absSma||10);
   const mult=Math.max(-10,Math.min(10,cmd/safeBase));
   let stochK=50;
   if(klines.length>=15){const sl=klines.slice(-14);const mn=Math.min(...sl.map(k=>k.low)),mx=Math.max(...sl.map(k=>k.high));
     if(mx!==mn)stochK=((klines[klines.length-1].close-mn)/(mx-mn))*100;}
-  const mfDeltas=klines.map(k=>(k.close-k.open)*k.volume);
   const mfCur=mfDeltas[mfDeltas.length-1]||0,mfPrev=mfDeltas.length>=2?mfDeltas[mfDeltas.length-2]:0;
   const rate=mfPrev!==0?((mfCur-mfPrev)/Math.abs(mfPrev))*100:0;
   const gap=Math.abs(c[c.length-1]*1000)-cmd;
@@ -547,8 +545,8 @@ function scanChartSignals() {
     cmd15.push(s);
   }
   for(let i=0;i<k15.length;i++){
-    if(i<43){mult15[i]=0;continue;}
-    let sm=0;for(let j=i-19;j<=i;j++)sm+=Math.abs(cmd15[j]);
+    if(i<20){mult15[i]=0;continue;}
+    let sm=0;for(let j=i-19;j<=i;j++)sm+=Math.abs(mf15[j]);
     const sb=Math.max(10,sm/20);mult15[i]=sb>0?Math.max(-10,Math.min(10,cmd15[i]/sb)):0;
   }
 
@@ -784,7 +782,7 @@ async function fetchKlines(tf, limit) {
     // 按年份正向取: 从st开始往前取到足够数据
     let et=st;const maxEt=Date.now();
     while(all.length<limit&&et<maxEt){
-      const url="https://api.binance.com/api/v3/klines?symbol="+SYMBOL+"&interval="+tf+"&limit="+Math.min(m,limit-all.length)+(et?"&startTime="+et:"");
+      const url="https://fapi.binance.com/fapi/v1/klines?symbol="+SYMBOL+"&interval="+tf+"&limit="+Math.min(m,limit-all.length)+(et?"&startTime="+et:"");
       try{
         const r=await fetch(url);if(!r.ok)break;
         const d=await r.json();if(!d||!d.length)break;
@@ -797,7 +795,7 @@ async function fetchKlines(tf, limit) {
     // 默认反向取(最新数据)
     let et=Date.now();
     while(all.length<limit&&et>0){
-      const url="https://api.binance.com/api/v3/klines?symbol="+SYMBOL+"&interval="+tf+"&limit="+Math.min(m,limit-all.length)+(et?"&endTime="+et:"");
+      const url="https://fapi.binance.com/fapi/v1/klines?symbol="+SYMBOL+"&interval="+tf+"&limit="+Math.min(m,limit-all.length)+(et?"&endTime="+et:"");
       try{
         const r=await fetch(url);if(!r.ok)break;
         const d=await r.json();if(!d||!d.length)break;
@@ -810,7 +808,7 @@ async function fetchKlines(tf, limit) {
   return all;
 }
 async function fetchTicker() {
-  const url="https://api.binance.com/api/v3/ticker/24hr?symbol="+SYMBOL;
+  const url="https://fapi.binance.com/fapi/v1/ticker/24hr?symbol="+SYMBOL;
   const res=await fetch(url);const d=await res.json();
   return {price:parseFloat(d.lastPrice),open:parseFloat(d.openPrice),high:parseFloat(d.highPrice),low:parseFloat(d.lowPrice),volume:parseFloat(d.volume),change:parseFloat(d.priceChange),changePercent:parseFloat(d.priceChangePercent)};
 }
@@ -1154,7 +1152,7 @@ function switchCoin(symbolId){
 }
 
 function startWS(){
-  try{ws=new WebSocket('wss://stream.binance.com:9443/ws/'+WS_SYMBOL+'@ticker');
+  try{ws=new WebSocket('wss://fstream.binance.com/ws/'+WS_SYMBOL+'@ticker');
     ws.onopen=()=>document.getElementById('connDot').className='conn-dot ok';
     ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.e==='24hrTicker'){state.price=parseFloat(d.c);state.change24h=parseFloat(d.p);state.changePct24h=parseFloat(d.P);updateUI();}}catch(_){}};
     ws.onclose=()=>{document.getElementById('connDot').className='conn-dot err';setTimeout(startWS,3000);};
