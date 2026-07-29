@@ -1056,7 +1056,8 @@ function drawChart() {
     else if(s.t==='dc'){ctx.strokeStyle=s.color;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(x-5,my+8);ctx.lineTo(x+5,my+2);ctx.moveTo(x+5,my+8);ctx.lineTo(x-5,my+2);ctx.stroke();}
     else{ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(x,my+(s.t==='dc_warn'?-4:4),2.5,0,Math.PI*2);ctx.fill();}
     const ly=dir===-1?my+off:my-off;
-    const bx=x-s.tw/2,by=dir===-1?ly:ly-s.th;
+    let bx=x-s.tw/2;const by=dir===-1?ly:ly-s.th;
+    if(bx+s.tw>W-245){bx=W-245-s.tw;}
     ctx.strokeStyle=s.color;ctx.lineWidth=1;ctx.setLineDash([3,4]);
     if(off>s.baseOff){const ky=dir===-1?my+s.baseOff:my-s.baseOff;
       ctx.beginPath();ctx.moveTo(x,dir===-1?my+4:my-4);ctx.lineTo(x,ky);ctx.lineTo(x+Math.min(15,off-s.baseOff),ky);
@@ -1131,7 +1132,7 @@ function drawChart() {
   ctx.strokeStyle='rgba(224,230,240,0.4)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
   ctx.beginPath();ctx.moveTo(pad.left,py);ctx.lineTo(W-pad.right,py);ctx.stroke();ctx.setLineDash([]);
   ctx.fillStyle='#e0e6f0';ctx.font='bold 9px Inter,monospace';ctx.textAlign='left';
-  ctx.fillText('$'+state.price.toFixed(2),W-245,py-4);
+  ctx.textAlign='right';ctx.fillText('$'+state.price.toFixed(2),W-248,py-4);ctx.textAlign='left';
   // 滚动条
   const scrollH=6,scrollY=pad.top+ch+4;
   ctx.fillStyle='rgba(30,45,80,0.5)';
