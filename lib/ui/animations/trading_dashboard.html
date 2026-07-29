@@ -1029,11 +1029,11 @@ function drawChart() {
   const pad={top:20,bottom:24,left:55,right:240};
   const cw=W-pad.left-pad.right,ch=H-pad.top-pad.bottom;
   ctx.clearRect(0,0,W,H);
-  const klines=allKlines[chartTF];
+  let klines=allKlines[chartTF];
   if(!klines||klines.length<20||!state.price||!dataReady){
-    ctx.fillStyle='#5a6270';ctx.font='14px Inter,sans-serif';ctx.textAlign='center';
-    ctx.fillText(dataReady?'等待K线数据...':'⏳加载中...',W/2,H/2);
-    return;
+    klines=allKlines[chartTF]&&allKlines[chartTF].length>=20?allKlines[chartTF]:null;
+    if(!klines){ctx.fillStyle='#5a6270';ctx.font='14px Inter,sans-serif';ctx.textAlign='center';
+    ctx.fillText('⏳加载中...',W/2,H/2);return;}
   }
   const maxVis=Math.min(klines.length,chartBarCount);
   const maxOffset=Math.max(0,klines.length-maxVis);
@@ -1157,7 +1157,7 @@ function drawChart() {
     const cmd=d.cmd||0,mfCur=d.mfCur||0,mfPrev=d.mfPrev||0,mult=d.mult||0;
     const latestMa=d.ma;
     const priceDev=((state.price-latestMa)/latestMa)*100;
-    const devStr=(priceDev>=0?'+':'')+priceDev.toFixed(1)+'%';
+    const devStr=((priceDev||0)>=0?'+':'')+(priceDev||0).toFixed(1)+'%';
     const devClr=priceDev>0.5?'#0ecb81':priceDev<-0.5?'#f6465d':'#e0e6f0';
     const moneyDiff=cmd-mfPrev;const mfPos=moneyDiff>0;
     // 需要(最新均线间距)
@@ -1203,7 +1203,7 @@ function drawChart() {
     l2+='  '+me+mult.toFixed(1)+'x';
     lines.push({y:10+LH*2,font:'7.5px Inter,sans-serif',t:l2,c:'#e0e6f0'});
     // L3: 变化方向+辅助(不重复倍数,因为L2已显示)
-    const mom=d.cmdMom5||0,prevmom=d.prevMom5||0;const pct=Math.round(Math.abs(mom)*100);
+    const mom=d.cmdMom5||0,prevmom=d.prevMom5||0;const pct=Math.round(Math.abs(mom)*100)||0;
     let aux='',l3='';
     if(cmd<0)aux=mfPos?"🔄距平衡":"恶"+fmtVol(Math.abs(mfCur)).slice(1);
     else if(stealthOut>0||stealthIn>0){if(stealthOut>0)aux='⇣'+fmtVol(stealthOut).slice(1);if(stealthIn>0)aux+=' ⇡'+fmtVol(stealthIn).slice(1);}
@@ -1548,18 +1548,19 @@ async function refreshAll(){
   if(typeof isLoadingData==='undefined')var isLoadingData=false;
   if(isLoadingData)return;
   isLoadingData=true;let loaded=0;
-  // 主周期(必须快)
-  await Promise.all([chartTF,...TF_KEYS].map(async key=>{
-    const cfg=MA_CONFIG.find(m=>m.key===key);
-    const rest=cfg?cfg.rest:key;
-    try{
-      const klines=await fetchKlines(rest,maxHistory);
-      if(klines.length>=20){allKlines[key]=klines;if(cfg||key===chartTF){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}loaded++;}
-    }catch(e){}
-  }));
-  if(loaded>0){fusionScore=calcFusion(tfData);signals=analyzeSignals(tfData,state.price);scanChartSignals();dataReady=true;document.getElementById('loadStatus').textContent='✅ '+loaded+'周期 信号'+chartSignals.length+'个';document.getElementById('loadStatus').style.color='#0ecb81';}
-  else{document.getElementById('loadStatus').textContent='❌ 加载失败';document.getElementById('loadStatus').style.color='#f6465d';}
-  isLoadingData=false;updateUI();
+  try{
+    await Promise.all([chartTF,...TF_KEYS].map(async key=>{
+      const cfg=MA_CONFIG.find(m=>m.key===key);
+      const rest=cfg?cfg.rest:key;
+      try{
+        const klines=await fetchKlines(rest,maxHistory);
+        if(klines.length>=20){allKlines[key]=klines;if(cfg||key===chartTF){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}loaded++;}
+      }catch(e){}
+    }));
+    if(loaded>0){fusionScore=calcFusion(tfData);signals=analyzeSignals(tfData,state.price);scanChartSignals();dataReady=true;document.getElementById('loadStatus').textContent='✅ '+loaded+'周期 信号'+chartSignals.length+'个';document.getElementById('loadStatus').style.color='#0ecb81';}
+    else{document.getElementById('loadStatus').textContent='❌ 加载失败';document.getElementById('loadStatus').style.color='#f6465d';}
+  }finally{
+    isLoadingData=false;updateUI();}
   // 大周期(后台静默拉取,不影响图表)
   for(const key of BG_KEYS){try{
     const klines=await fetchKlines(key,500);
