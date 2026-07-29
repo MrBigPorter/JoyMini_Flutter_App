@@ -1108,7 +1108,7 @@ function drawChart() {
   for(let i=0;i<maTag.length;i++){
     const lb=maTag[i];
     const sy=startY+i*(tagH+gap);
-    const bx=W-tagW-10,by=sy;const c=lb.cfg.color;
+    const bx=W-tagW-22,by=sy;const c=lb.cfg.color;
     // 箭头(从MA小圆点到标签)
     ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
     ctx.beginPath();ctx.moveTo(W-215,lb.my);ctx.lineTo(bx-2,by+tagH/2);ctx.stroke();ctx.setLineDash([]);
