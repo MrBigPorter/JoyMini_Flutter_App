@@ -1247,7 +1247,7 @@ async function refreshAll(){
     const cfg=MA_CONFIG.find(m=>m.key===key);
     const rest=(key==='1m'||key==='5m'||key==='30m'||key==='2h'||key==='3d'||key==='1w')?key:cfg?cfg.rest:key;
     try{
-      const klines=await fetchKlines(rest,yrLim);
+      const klines=await fetchKlines(rest,maxHistory);
       if(klines.length>=20){allKlines[key]=klines;if(cfg||key===chartTF){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}loaded++;}
     }catch(e){}
   }));
