@@ -168,6 +168,14 @@
       <span class="conn-dot ld" id="connDot"></span>
       <span id="loadStatus" style="font-size:10px;color:#f0b90b;">加载中...</span>
       <span id="marketState" style="font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(30,45,80,0.4);font-weight:600;">⏳</span>
+      <select id="yearSelect" style="background:#1a1f35;color:#e0e6f0;border:1px solid #1e2d50;border-radius:4px;padding:2px 6px;font-size:10px;font-family:inherit;cursor:pointer;">
+        <option value="2000">全部</option>
+        <option value="2022">2022</option>
+        <option value="2023">2023</option>
+        <option value="2024">2024</option>
+        <option value="2025">2025</option>
+        <option value="2026" selected>2026</option>
+      </select>
       <button id="fsBtn" style="background:transparent;color:#848e9c;border:1px solid rgba(132,142,156,0.3);border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer;font-family:inherit;" title="全屏">⛶</button>
     </div>
   </div>
@@ -312,7 +320,7 @@ let chartSignals = []; // detected buy/sell markers: {idx, type, label, color, i
 
 // Chart settings
 let chartTF = '15m';         // current candle resolution
-let chartBarCount = 80;let subBar4h=336,subBar1d=180;
+let chartBarCount = 80;let subBar4h=336,subBar1d=180;let yearFilter=2026;
 let chartOffset = 0;         // scroll offset: 0 = latest, >0 = older
 let maxHistory = 10000;      // max candles to fetch (15m~3.5月, 1h~14月, 4h~4.5年)
 let crosshairPos = null;     // {x, y} in canvas coords
@@ -742,6 +750,7 @@ function scanChartSignals() {
 async function fetchKlines(tf, limit) {
   if(!limit)limit=1000;
   const m=1000;let all=[],et=Date.now();
+  const st=yearFilter>2000?new Date(yearFilter,0,1).getTime():0;
   while(all.length<limit&&et>0){
     const url="https://api.binance.com/api/v3/klines?symbol="+SYMBOL+"&interval="+tf+"&limit="+Math.min(m,limit-all.length)+(et?"&endTime="+et:"");
     try{
@@ -1354,6 +1363,7 @@ async function refreshAll(){
   if(isLoadingData)return;
   isLoadingData=true;let loaded=0;
   const allTF=new Set([chartTF,...TF_KEYS]);
+  // 年份过滤
   await Promise.all([...allTF].map(async key=>{
     const cfg=MA_CONFIG.find(m=>m.key===key);
     const rest=(key==='1m'||key==='5m'||key==='30m'||key==='2h'||key==='3d'||key==='1w')?key:cfg?cfg.rest:key;
@@ -1369,6 +1379,7 @@ async function refreshAll(){
 
 async function init(){
   document.getElementById('symSelect').addEventListener('change',e=>switchCoin(e.target.value));
+  document.getElementById('yearSelect').onchange=function(){yearFilter=parseInt(this.value);refreshAll();};
   function zoomChart(delta){const k=allKlines[chartTF];if(!k)return;
     const mv=Math.min(k.length,chartBarCount);
     const oc=chartOffset+mv/2;
