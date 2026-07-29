@@ -241,7 +241,9 @@
 <div style="margin-bottom:4px;display:flex;gap:4px;">
   <button id="exportBtn" style="background:transparent;color:#f0b90b;border:1px solid rgba(240,185,11,0.3);border-radius:4px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">📋 复制数据</button>
   <button id="downloadBtn" style="background:transparent;color:#0ecb81;border:1px solid rgba(14,203,129,0.3);border-radius:4px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">💾 下载文件</button>
+  <button id="btBtn" style="background:transparent;color:#f0b90b;border:1px solid rgba(240,185,11,0.3);border-radius:4px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">📊 回测</button>
 </div>
+<div id="btResults" style="background:#0f1629;border:1px solid #1e2d50;border-radius:6px;padding:10px 14px;margin-bottom:6px;display:none;"></div>
 <div id="exportPanel" style="display:none;background:#0f1629;border:1px solid #1e2d50;border-radius:8px;padding:10px 14px;margin-bottom:10px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
     <span style="font-size:12px;color:#f0b90b;font-weight:600;">📊 分析数据</span>
@@ -921,6 +923,36 @@ function setupCanvasEvents() {
     else document.getElementById('sigDetail').style.display='none';
   });
 }
+// ---------- BACKTEST ----------
+function runBacktest(){
+  const el=document.getElementById('btResults');const old=[...chartSignals];scanChartSignals();
+  const sigs=chartSignals.filter(s=>s.type==='rt'||s.type==='flight');chartSignals=old;
+  if(!sigs.length){el.innerHTML='<div style="color:#848e9c;padding:10px;text-align:center;">无信号可回测</div>';el.style.display='block';return;}
+  const k15=allKlines['15m'];if(!k15)return;
+  function gp(ts,h){const t=ts+h*3600000;for(let i=0;i<k15.length;i++){if(Math.abs(k15[i].time-t)<900000)return k15[i].close;}return null;}
+  let hui={ok:0,total:0,rets:[]},chu={ok:0,total:0,rets:[]};
+  for(const s of sigs){
+    const p0=s.price||0;if(!p0)continue;
+    const p24=gp(s.time,24);if(!p24)continue;
+    const ret=(p24-p0)/p0*100;
+    if(s.type==='rt'){hui.total++;if(ret>1)hui.ok++;hui.rets.push(ret);}
+    else{chu.total++;if(ret<-1)chu.ok++;chu.rets.push(ret);}
+  }
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h3 style="font-size:12px;color:#f0b90b;margin:0">📊 回测结果(24h持有)</h3></div>';
+  for(const{lb,stats}of[{lb:'✅回踩(买入)',stats:hui},{lb:'🔻出逃(卖出)',stats:chu}]){
+    if(!stats.total)continue;
+    const wr=stats.total?(stats.ok/stats.total*100).toFixed(1):'0';
+    const avg=stats.rets.length?(stats.rets.reduce((a,b)=>a+b,0)/stats.rets.length).toFixed(2):'0';
+    const best=stats.rets.length?Math.max(...stats.rets).toFixed(2):'0';
+    const worst=stats.rets.length?Math.min(...stats.rets).toFixed(2):'0';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:4px;background:rgba(30,45,80,0.12);padding:6px 8px;border-radius:4px;font-size:11px;"><div><div style="color:#848e9c">'+lb+'</div><div style="font-weight:700">'+stats.total+'次</div></div><div><div style="color:#848e9c">胜率</div><div style="font-weight:700;color:'+(wr>=50?'#0ecb81':'#f6465d')+'">'+wr+'%</div></div><div><div style="color:#848e9c">平均</div><div style="font-weight:700;color:'+(avg>=0?'#0ecb81':'#f6465d')+'">'+avg+'%</div></div><div><div style="color:#848e9c">最好/最差</div><div style="font-weight:700">'+best+'%/'+worst+'%</div></div></div>';
+  }
+  const a=hui.rets.concat(chu.rets).filter(r=>!isNaN(r));
+  if(a.length>1){const sr=(a.reduce((s,v)=>s+v,0)/a.length)/(Math.sqrt(a.reduce((s,v)=>s+(v-a.reduce((s2,v2)=>s2+v2,0)/a.length)**2,0)/(a.length-1))||1)*Math.sqrt(365);
+  html+='<div style="font-size:10px;color:#848e9c;padding:4px 8px;border-top:1px solid #1e2d50;margin-top:4px;">夏普比: '+sr.toFixed(2)+' | 总信号: '+a.length+'次</div>';}
+  el.innerHTML=html;el.style.display='block';
+}
+
 // ---------- MINI CHART (4H/1D) ----------
 function drawMiniChart(tf,canvasId,labelId){
   const canvas=document.getElementById(canvasId);if(!canvas)return;
@@ -1397,6 +1429,7 @@ async function init(){
   document.getElementById('zoom4hOut').onclick=()=>{subBar4h=Math.min(2000,subBar4h+50);drawChart();};
   document.getElementById('zoom1dIn').onclick=()=>{subBar1d=Math.max(30,subBar1d-30);drawChart();};
   document.getElementById('zoom1dOut').onclick=()=>{subBar1d=Math.min(1000,subBar1d+30);drawChart();};
+  document.getElementById('btBtn').onclick=runBacktest;
     document.getElementById('exportBtn').onclick=()=>{document.getElementById('exportContent').textContent=generateExportData();document.getElementById('exportPanel').style.display='block';};
   document.getElementById('downloadBtn').onclick=()=>{const d=generateExportData();const b=new Blob([d],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='porter_'+SYMBOL+'_'+new Date().toISOString().slice(0,10)+'.txt';a.click();URL.revokeObjectURL(a.href);};
   document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(document.getElementById('exportContent').textContent).then(()=>{document.getElementById('copyBtn').textContent='✅已复制';setTimeout(()=>document.getElementById('copyBtn').textContent='📋复制',2000);});};
