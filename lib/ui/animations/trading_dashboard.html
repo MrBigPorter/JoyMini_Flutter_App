@@ -1117,8 +1117,8 @@ function drawChart() {
     // 标签框(宽度固定180,高度20)
     ctx.fillStyle='rgba(13,19,33,0.92)';ctx.strokeStyle=c;ctx.lineWidth=1;
     ctx.beginPath();ctx.roundRect(bx,by,tagW,tagH,4);ctx.fill();ctx.stroke();
-    ctx.font='bold 8.5px Inter,sans-serif';ctx.fillStyle=c;
-    ctx.fillText(lb.txt,bx+6,by+13);
+    ctx.font='bold 8.5px Inter,sans-serif';ctx.textAlign='center';ctx.fillStyle=c;
+    ctx.fillText(lb.txt,bx+tagW/2,by+13);ctx.textAlign='left';
   }
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
