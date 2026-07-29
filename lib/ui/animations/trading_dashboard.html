@@ -1297,6 +1297,7 @@ async function init(){
     const period=document.getElementById('dlPeriod').value;
     const yrLabel=yr>0?yr:'ALL';
     const yrLim=yr>0?50000:100000;
+    yearFilter=yr; // 同步年份到全局,让fetchKlines使用
     document.getElementById('dlStatus').textContent='⏳ 获取'+yrLabel+'/'+period+'...';
     const saved={};
     try{
