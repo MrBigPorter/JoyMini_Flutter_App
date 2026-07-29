@@ -1094,38 +1094,31 @@ function drawChart() {
     }
     ctx.stroke();
   }
-  // MA标签(210px右边空间,箭头指向MA线位置)
-  const maR=[];
+  // MA标签(固定宽度180px,均匀垂直分布)
+  const maTag=[];
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
-    const my=yPos(d.ma);
     const txt=cfg.key.toUpperCase()+' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
-    ctx.font='bold 8px Inter,sans-serif';
-    const tw=ctx.measureText(txt).width+22;
-    maR.push({cfg,my,tw,th:20,txt,d});
+    maTag.push({cfg,my:yPos(d.ma),txt,d});
   }
-  // 排序+防碰撞(在210px空间内)
-  maR.sort((a,b)=>a.my-b.my);
-  // 标签右对齐到W边缘
-  for(let i=1;i<maR.length;i++){const p=maR[i-1],c=maR[i];
-    if(c.my-p.my<18)c.my=p.my+18;}
-  // 绘制
-  for(const lb of maR){
-    const by=lb.my-8;const c=lb.cfg.color;
-    // 箭头(从标签左缘连线到MA在K线区域的实际位置)
-    const sepX=W-210; // K线区域和标签区域的分界线
+  // 垂直均匀分布
+  const tagW=180,tagH=20,gap=4;
+  const totalH=maTag.length*(tagH+gap)-gap;
+  const startY=pad.top+(ch-totalH)/2;
+  for(let i=0;i<maTag.length;i++){
+    const lb=maTag[i];
+    const sy=startY+i*(tagH+gap);
+    const bx=W-tagW-10,by=sy;const c=lb.cfg.color;
+    // 箭头(从MA小圆点到标签)
     ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
-    ctx.beginPath();ctx.moveTo(sepX+2,lb.my);ctx.lineTo(sepX+2,lb.my);ctx.stroke();
-    // 虚线到标签
-    const bx2=W-lb.tw-6;
-    ctx.beginPath();ctx.moveTo(sepX,lb.my);ctx.lineTo(bx2+4,lb.my);ctx.stroke();ctx.setLineDash([]);
-    // 小圆点标记MA位置
-    ctx.fillStyle=c;ctx.beginPath();ctx.arc(sepX,lb.my,2.5,0,Math.PI*2);ctx.fill();
-    // 标签背景框
+    ctx.beginPath();ctx.moveTo(W-215,lb.my);ctx.lineTo(bx-2,by+tagH/2);ctx.stroke();ctx.setLineDash([]);
+    // 小圆点
+    ctx.fillStyle=c;ctx.beginPath();ctx.arc(W-215,lb.my,3,0,Math.PI*2);ctx.fill();
+    // 标签框(宽度固定180,高度20)
     ctx.fillStyle='rgba(13,19,33,0.92)';ctx.strokeStyle=c;ctx.lineWidth=1;
-    ctx.beginPath();ctx.roundRect(bx2,by,lb.tw,20,4);ctx.fill();ctx.stroke();
-    ctx.font='bold 8px Inter,sans-serif';ctx.fillStyle=c;
-    ctx.fillText(lb.txt,bx2+6,by+14);
+    ctx.beginPath();ctx.roundRect(bx,by,tagW,tagH,4);ctx.fill();ctx.stroke();
+    ctx.font='bold 8.5px Inter,sans-serif';ctx.fillStyle=c;
+    ctx.fillText(lb.txt,bx+6,by+13);
   }
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
