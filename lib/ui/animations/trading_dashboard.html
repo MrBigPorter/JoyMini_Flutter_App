@@ -1102,20 +1102,25 @@ function drawChart() {
     const txt=cfg.key.toUpperCase()+' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
     maTag.push({cfg,my:yPos(d.ma),txt,d});
   }
-  // 垂直均匀分布
-  const tagW=180,tagH=20,gap=8;
-  const totalH=maTag.length*(tagH+gap)-gap;
-  const startY=pad.top+(ch-totalH)/2;
-  for(let i=0;i<maTag.length;i++){
-    const lb=maTag[i];
-    const sy=startY+i*(tagH+gap);
-    const bx=W-tagW-22,by=sy;const c=lb.cfg.color;
-    // 箭头(从MA小圆点到标签)
+  // 按MA位置定位+防碰撞
+  const tagW=180,tagH=20;
+  maTag.sort((a,b)=>a.my-b.my);
+  for(let i=1;i<maTag.length;i++){
+    const p=maTag[i-1],c=maTag[i];
+    if(c.my-p.my<tagH+4)c.my=p.my+tagH+4;
+  }
+  // 边界限制
+  const tMin=pad.top+2,tMax=pad.top+ch-tagH-2;
+  for(const lb of maTag){if(lb.my<tMin)lb.my=tMin;if(lb.my+tagH>tMax)lb.my=tMax-tagH;}
+  // 绘制
+  for(const lb of maTag){
+    const by=lb.my;const c=lb.cfg.color;const bx=W-tagW-22;
+    // 箭头(从MA位置到标签)
     ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
-    ctx.beginPath();ctx.moveTo(W-238,lb.my);ctx.lineTo(bx-2,by+tagH/2);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(W-238,lb.my+tagH/2);ctx.lineTo(bx-2,by+tagH/2);ctx.stroke();ctx.setLineDash([]);
     // 小圆点
-    ctx.fillStyle=c;ctx.beginPath();ctx.arc(W-237,lb.my,2,0,Math.PI*2);ctx.fill();
-    // 标签框(宽度固定180,高度20)
+    ctx.fillStyle=c;ctx.beginPath();ctx.arc(W-238,lb.my+tagH/2,2.5,0,Math.PI*2);ctx.fill();
+    // 标签框
     ctx.fillStyle='rgba(13,19,33,0.92)';ctx.strokeStyle=c;ctx.lineWidth=1;
     ctx.beginPath();ctx.roundRect(bx,by,tagW,tagH,4);ctx.fill();ctx.stroke();
     ctx.font='bold 8.5px Inter,sans-serif';ctx.textAlign='center';ctx.fillStyle=c;
