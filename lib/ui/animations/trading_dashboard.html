@@ -341,7 +341,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 // ---------- CONFIG ----------
 let SYMBOL = 'BTCUSDT';
 let WS_SYMBOL = 'btcusdt';
-let ws = null; let refreshTimer = null; let uiTimer = null;
+let ws = null; let refreshTimer = null; let uiTimer = null; let tickerTimer = null;
 let animTick = 0;
 
 let state = { price:0, change24h:0, changePct24h:0 };
@@ -1258,13 +1258,14 @@ function switchCoin(symbolId){
   if(ws){try{ws.close()}catch(_){}ws=null;}
   if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
   if(uiTimer){clearInterval(uiTimer);uiTimer=null;}
+  if(tickerTimer){clearInterval(tickerTimer);tickerTimer=null;}
   SYMBOL=found.id;WS_SYMBOL=found.ws;
   state={price:0,change24h:0,changePct24h:0};tfData={};allKlines={};signals=[];chartSignals=[];fusionScore=0;dataReady=false;
   document.getElementById('loadStatus').textContent='⏳ 切换中...';
   updateUI();
   (async()=>{try{const t=await fetchTicker();if(t)Object.assign(state,t);}catch(_){}
     await refreshAll();startWS();
-    refreshTimer=setInterval(refreshAll,15000);uiTimer=setInterval(updateUI,1000);})();
+    refreshTimer=setInterval(refreshAll,15000);uiTimer=setInterval(updateUI,1000);tickerTimer=setInterval(async()=>{try{const t=await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr?symbol="+SYMBOL).then(r=>r.json());state.price=parseFloat(t.lastPrice);state.change24h=parseFloat(t.priceChange);state.changePct24h=parseFloat(t.priceChangePercent);updateUI();}catch(_){}},5000);tickerTimer=setInterval(async()=>{try{const t=await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr?symbol="+SYMBOL).then(r=>r.json());state.price=parseFloat(t.lastPrice);state.change24h=parseFloat(t.priceChange);state.changePct24h=parseFloat(t.priceChangePercent);updateUI();}catch(_){}},5000);})();
 }
 
 function startWS(){
@@ -1312,10 +1313,24 @@ function analyzeMarket(){
   else if(net>=2){regime='🟡';bias='震荡偏多';}
   else if(net<=-2){regime='🟡';bias='震荡偏空';}
   else{regime='⚪';bias='横盘·方向不明';}
-  // 各周期方向字符串
-  let dirs='';
-  for(const k of tfK){const d=tfData[k];if(!d)dirs+=LAB[k]+'— ';else if(d.cmd>0&&d.mult>0.5)dirs+=LAB[k]+'↗ ';else if(d.cmd<0&&d.mult<-0.5)dirs+=LAB[k]+'↘ ';else dirs+=LAB[k]+'→ ';}
-  return{regime,bias,sup,res,avgM,b,be,dirs,rd,levels};
+  // 各周期MA方向(斜率) + 均线预警
+  let dirs='',warns=[];
+  for(const k of tfK){const d=tfData[k];if(!d){dirs+=LAB[k]+'— ';continue;}
+    const arr=d.maArray;let dir='→',slope=0;
+    if(arr&&arr.length>=4){const c=arr[arr.length-1],p=arr[arr.length-4];if(c&&p&&p>0){slope=(c-p)/p*100;if(slope>0.02)dir='↗';else if(slope<-0.02)dir='↘';}}
+    dirs+=LAB[k]+dir+' ';
+    // 拐头检测:斜率由正转负或由负转正(最近2根 vs 之前2根)
+    if(arr&&arr.length>=6){
+      const c2=arr[arr.length-1],c4=arr[arr.length-3],p2=arr[arr.length-4],p4=arr[arr.length-6];
+      if(c2&&c4&&p2&&p4&&p2>0&&p4>0){
+        const nowSlope=(c2-c4)/p2*100,prevSlope=(c4-p2)/p4*100;
+        if(nowSlope<-0.01&&prevSlope>0.01)warns.push(LAB[k]+'转下');
+        else if(nowSlope>0.01&&prevSlope<-0.01)warns.push(LAB[k]+'转上');}}
+  }
+  let maWarn='';
+  if(warns.length>=2)maWarn=' ⚠️ '+warns.join(' ');
+  else if(warns.length===1)maWarn=' 🔔 '+warns[0];
+  return{regime,bias,sup,res,avgM,b,be,dirs,maWarn,rd,levels};
 }
 function updateUI(){
   const{price,change24h,changePct24h}=state;
