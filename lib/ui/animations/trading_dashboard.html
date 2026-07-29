@@ -1102,7 +1102,7 @@ function drawChart() {
     maTag.push({cfg,my:yPos(d.ma),txt,d});
   }
   // 垂直均匀分布
-  const tagW=180,tagH=20,gap=4;
+  const tagW=180,tagH=20,gap=8;
   const totalH=maTag.length*(tagH+gap)-gap;
   const startY=pad.top+(ch-totalH)/2;
   for(let i=0;i<maTag.length;i++){
