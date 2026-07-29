@@ -250,6 +250,8 @@
   <div class="phase-loading">分析中...</div>
 </div>
 
+<div class="phase-panel" id="marketAnalysis" style="padding:6px 12px;font-size:10px;display:none;"></div>
+
 <div class="chart-wrap" style="margin-bottom:4px;">
   <div class="tf-bar" style="justify-content:space-between;">
     <span>📊 1H CMD资金趋势(30天)</span>
@@ -1295,6 +1297,30 @@ function detectRegime(){
   else{regime='🟡';desc='宽幅震荡';conf=0.5;}
   return{regime,desc,confidence:conf};
 }
+function analyzeMarket(){
+  const p=state.price;if(!p||!tfData['15m']||!dataReady)return null;
+  const tfK=['15m','1h','4h','6h','8h','12h','1d'];
+  let b=0,be=0,tm=0,levels=[];const LAB={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D'};
+  for(const k of tfK){const d=tfData[k];if(!d)continue;
+    if(d.cmd>0)b++;else be++;
+    tm+=Math.abs(d.mult||0);
+    const dist=((p-d.ma)/d.ma)*100;
+    levels.push({key:k,ma:d.ma,cmd:d.cmd,mult:d.mult,dist,above:p>d.ma});}
+  levels.sort((a,b)=>a.ma-b.ma);
+  let sup=null,res=null;
+  for(const lv of levels){if(lv.ma<p)sup=lv;else if(!res&&lv.ma>p)res=lv;}
+  const avgM=tm/tfK.length;const net=b-be;
+  let regime,bias;const rd=detectRegime();
+  if(b>=6&&avgM>2){regime='🟢';bias='趋势上涨';}
+  else if(be>=6&&avgM<1){regime='🔴';bias='趋势下跌';}
+  else if(net>=2){regime='🟡';bias='震荡偏多';}
+  else if(net<=-2){regime='🟡';bias='震荡偏空';}
+  else{regime='⚪';bias='横盘·方向不明';}
+  // 各周期方向字符串
+  let dirs='';
+  for(const k of tfK){const d=tfData[k];if(!d)dirs+=LAB[k]+'— ';else if(d.cmd>0&&d.mult>0.5)dirs+=LAB[k]+'↗ ';else if(d.cmd<0&&d.mult<-0.5)dirs+=LAB[k]+'↘ ';else dirs+=LAB[k]+'→ ';}
+  return{regime,bias,sup,res,avgM,b,be,dirs,rd,levels};
+}
 function updateUI(){
   const{price,change24h,changePct24h}=state;
   document.getElementById('priceDisplay').textContent=fmtPrice(price);
@@ -1322,6 +1348,19 @@ function updateUI(){
   document.getElementById('regimeDesc').textContent=adv;
   const ms=document.getElementById('marketState');if(ms)ms.innerHTML=rd.regime+' '+rd.desc+' <span style="color:#f0b90b;font-weight:600">| '+adv+'</span>';
   document.getElementById('lastUpdate').textContent='最后更新: '+new Date().toLocaleTimeString();
+  // 多周期分析
+  const ma=analyzeMarket();
+  const maEl=document.getElementById('marketAnalysis');
+  if(ma&&maEl){
+    maEl.style.display='block';
+    let h='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">';
+    h+=ma.regime+' <b>'+ma.bias+'</b>';
+    h+=' <span style="color:#848e9c">| 多'+ma.b+' 空'+ma.be+' 均战力'+ma.avgM.toFixed(1)+'x</span>';
+    if(ma.sup)h+=' | ⬇ <span style="color:#0ecb81">$'+ma.sup.ma.toFixed(0)+'</span>('+ma.sup.key.toUpperCase()+')';
+    if(ma.res)h+=' | ⬆ <span style="color:#f6465d">$'+ma.res.ma.toFixed(0)+'</span>('+ma.res.key.toUpperCase()+')';
+    h+='</div><div style="color:#5a6270;font-size:9px;margin-top:2px;">'+ma.dirs+'</div>';
+    maEl.innerHTML=h;
+  }else if(maEl)maEl.style.display='none';
   analyzePhases();drawChart();drawCmdTrend();
 }
 
