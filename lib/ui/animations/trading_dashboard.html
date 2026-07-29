@@ -1379,7 +1379,10 @@ async function refreshAll(){
 
 async function init(){
   document.getElementById('symSelect').addEventListener('change',e=>switchCoin(e.target.value));
-  document.getElementById('yearSelect').onchange=function(){yearFilter=parseInt(this.value);refreshAll();};
+  document.getElementById('yearSelect').onchange=function(){yearFilter=parseInt(this.value);
+    // 选早年时自动切到4H(15M只能看104天)
+    if(yearFilter>0&&yearFilter<2026&&chartTF==='15m'){chartTF='4h';document.querySelectorAll('.tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf==='4h'));}
+    refreshAll();};
   function zoomChart(delta){const k=allKlines[chartTF];if(!k)return;
     const mv=Math.min(k.length,chartBarCount);
     const oc=chartOffset+mv/2;
