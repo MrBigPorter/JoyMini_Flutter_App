@@ -169,6 +169,7 @@
       <span id="loadStatus" style="font-size:10px;color:#f0b90b;">加载中...</span>
       <span id="marketState" style="font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(30,45,80,0.4);font-weight:600;">⏳</span>
 <button id="fsBtn" style="background:transparent;color:#848e9c;border:1px solid rgba(132,142,156,0.3);border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer;font-family:inherit;" title="全屏">⛶</button>
+<button id="copyTagsBtn" style="background:transparent;color:#0ecb81;border:1px solid rgba(14,203,129,0.3);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:inherit;" title="复制标签数据">📋</button>
     </div>
   </div>
   <div class="price-display">
@@ -1265,7 +1266,7 @@ function switchCoin(symbolId){
   updateUI();
   (async()=>{try{const t=await fetchTicker();if(t)Object.assign(state,t);}catch(_){}
     await refreshAll();startWS();
-    refreshTimer=setInterval(refreshAll,15000);uiTimer=setInterval(updateUI,1000);tickerTimer=setInterval(async()=>{try{const t=await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr?symbol="+SYMBOL).then(r=>r.json());state.price=parseFloat(t.lastPrice);state.change24h=parseFloat(t.priceChange);state.changePct24h=parseFloat(t.priceChangePercent);updateUI();}catch(_){}},5000);tickerTimer=setInterval(async()=>{try{const t=await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr?symbol="+SYMBOL).then(r=>r.json());state.price=parseFloat(t.lastPrice);state.change24h=parseFloat(t.priceChange);state.changePct24h=parseFloat(t.priceChangePercent);updateUI();}catch(_){}},5000);})();
+    refreshTimer=setInterval(refreshAll,15000);uiTimer=setInterval(updateUI,1000);tickerTimer=setInterval(async()=>{try{const t=await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr?symbol="+SYMBOL).then(r=>r.json());state.price=parseFloat(t.lastPrice);state.change24h=parseFloat(t.priceChange);state.changePct24h=parseFloat(t.priceChangePercent);updateUI();}catch(_){}},3000);})();
 }
 
 function startWS(){
@@ -1584,9 +1585,24 @@ async function init(){
     '<div class="ma-legend-item" style="color:#f0b90b"><span>🚨</span>追高等回踩</div>';
   try{const t=await fetchTicker();if(t)Object.assign(state,t);}catch(e){}
   await refreshAll();startWS();
-  refreshTimer=setInterval(refreshAll,15000);uiTimer=setInterval(updateUI,1000);
+  refreshTimer=setInterval(refreshAll,15000);uiTimer=setInterval(updateUI,1000);tickerTimer=setInterval(async()=>{try{const t=await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr?symbol="+SYMBOL).then(r=>r.json());state.price=parseFloat(t.lastPrice);state.change24h=parseFloat(t.priceChange);state.changePct24h=parseFloat(t.priceChangePercent);updateUI();}catch(_){}},3000);
   window.addEventListener('resize',drawChart);
   document.getElementById('fsBtn').onclick=()=>{if(!document.fullscreenElement){document.documentElement.requestFullscreen()}else{document.exitFullscreen()}};
+  document.getElementById('copyTagsBtn').onclick=()=>{
+    let txt='📊 Porter 多周期分析\n';
+    const ks=['15m','1h','4h','6h','8h','12h','1d'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D'};
+    for(const k of ks){const d=tfData[k];if(!d)continue;
+      const cmd=d.cmd||0,mfCur=d.mfCur||0,mult=d.mult||0;
+      const totalIn=fmtVol(d.totalIn||0).slice(1),totalOut=fmtVol(d.totalOut||0).slice(1);
+      txt+=lb[k]+': $'+d.ma.toFixed(0)+' | 净'+(cmd>=0?'+':'')+fmtVol(cmd)+' | 入'+totalIn+' 出'+totalOut+' | '+(cmd>0?'🟢':'🔴');
+      // speed ratio
+      const need=Math.abs(d.ma-(tfData[ks[ks.indexOf(k)+1]]?.ma||state.price))*1000;
+      const sr=need>0?Math.abs(cmd)/need:0;
+      txt+=' | 速'+sr.toFixed(1)+'x | 倍'+mult.toFixed(1)+'x\n';
+    }
+    txt+='---\n价格: $'+state.price.toFixed(2)+' | '+new Date().toLocaleTimeString();
+    navigator.clipboard.writeText(txt).then(()=>{const btn=document.getElementById('copyTagsBtn');btn.textContent='✅';setTimeout(()=>btn.textContent='📋',2000);});
+  };
   window.addEventListener('keydown',e=>{
     if(e.key==='='||e.key==='+'){e.preventDefault();zoomChart(-10);}
     if(e.key==='-'){e.preventDefault();zoomChart(10);}
