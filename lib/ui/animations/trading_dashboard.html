@@ -1548,19 +1548,23 @@ async function refreshAll(){
   if(typeof isLoadingData==='undefined')var isLoadingData=false;
   if(isLoadingData)return;
   isLoadingData=true;let loaded=0;
-  const allTF=new Set([chartTF,...TF_KEYS,...BG_KEYS]);
-  // 年份过滤
-  await Promise.all([...allTF].map(async key=>{
+  // 主周期(必须快)
+  await Promise.all([chartTF,...TF_KEYS].map(async key=>{
     const cfg=MA_CONFIG.find(m=>m.key===key);
-    const rest=(key==='1m'||key==='5m'||key==='30m'||key==='2h'||key==='3d'||key==='1w'||key==='1M')?key:cfg?cfg.rest:key;
+    const rest=cfg?cfg.rest:key;
     try{
       const klines=await fetchKlines(rest,maxHistory);
-      if(klines.length>=20){allKlines[key]=klines;if(cfg||key===chartTF||BG_KEYS.includes(key)){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}loaded++;}
+      if(klines.length>=20){allKlines[key]=klines;if(cfg||key===chartTF){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}loaded++;}
     }catch(e){}
   }));
   if(loaded>0){fusionScore=calcFusion(tfData);signals=analyzeSignals(tfData,state.price);scanChartSignals();dataReady=true;document.getElementById('loadStatus').textContent='✅ '+loaded+'周期 信号'+chartSignals.length+'个';document.getElementById('loadStatus').style.color='#0ecb81';}
   else{document.getElementById('loadStatus').textContent='❌ 加载失败';document.getElementById('loadStatus').style.color='#f6465d';}
   isLoadingData=false;updateUI();
+  // 大周期(后台静默拉取,不影响图表)
+  for(const key of BG_KEYS){try{
+    const klines=await fetchKlines(key,500);
+    if(klines.length>=20){allKlines[key]=klines;const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}
+  }catch(e){}}
 }
 
 async function init(){
