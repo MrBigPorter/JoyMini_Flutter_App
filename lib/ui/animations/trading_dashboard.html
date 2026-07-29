@@ -171,6 +171,7 @@
 <button id="fsBtn" style="background:transparent;color:#848e9c;border:1px solid rgba(132,142,156,0.3);border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer;font-family:inherit;" title="全屏">⛶</button>
 <button id="copyTagsBtn" style="background:transparent;color:#0ecb81;border:1px solid rgba(14,203,129,0.3);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:inherit;" title="复制标签数据">📋</button>
 <button id="dsBtn" style="background:transparent;color:#a855f7;border:1px solid rgba(168,133,247,0.3);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:inherit;" title="DeepSeek分析">🤖</button>
+<button id="copyHistBtn" style="background:transparent;color:#0ecb81;border:1px solid rgba(14,203,129,0.3);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:inherit;" title="复制含7天历史">📋📊</button>
     </div>
   </div>
   <div class="price-display">
@@ -352,6 +353,30 @@ let tfData = {};
 let allKlines = {};
 let signals = []; let fusionScore = 0; let dataReady = false;
 let chartSignals = []; // detected buy/sell markers: {idx, type, label, color, icon}
+// ---------- IndexedDB 快照(15分钟) ----------
+let db=null;let lastSnapshotTime=0;const DB_NAME='porter_audit',STORE='snapshots',MAX_DAYS=7;
+function openDB(){return new Promise((res,rej)=>{
+  const r=indexedDB.open(DB_NAME,1);
+  r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(STORE)){const s=d.createObjectStore(STORE,{keyPath:'id',autoIncrement:true});s.createIndex('ts','ts',{unique:false});}};
+  r.onsuccess=e=>{db=e.target.result;res(db);};r.onerror=e=>rej(e);});}
+async function saveSnapshot(){
+  if(!db)try{await openDB();}catch(e){return}
+  const ks=['15m','1h','4h','6h','8h','12h','1d'];const data={ts:Date.now(),symbol:SYMBOL,price:state.price,tf:{}};
+  for(const k of ks){const d=tfData[k];if(!d)continue;data.tf[k]={ma:d.ma,cmd:d.cmd,mult:d.mult,totalIn:d.totalIn,totalOut:d.totalOut,mfCur:d.mfCur};}
+  try{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).add(data);
+    // 清理旧数据
+    const cutoff=Date.now()-MAX_DAYS*86400000;const idx=tx.objectStore(STORE).index('ts');const range=IDBKeyRange.upperBound(cutoff);
+    idx.openCursor(range).onsuccess=e=>{const cursor=e.target.result;if(cursor){cursor.delete();cursor.continue();}};
+  }catch(e){}
+}
+async function getHistory(days){
+  if(!db)try{await openDB();}catch(e){return[]}
+  const cutoff=Date.now()-days*86400000;const results=[];
+  try{const tx=db.transaction(STORE,'readonly');const idx=tx.objectStore(STORE).index('ts');
+    const range=IDBKeyRange.lowerBound(cutoff);
+    return new Promise(res=>{idx.getAll(range).onsuccess=e=>res(e.target.result.sort((a,b)=>a.ts-b.ts));});}
+  catch(e){return[]}
+}
 
 // Chart settings
 let chartTF = '15m';         // current candle resolution
@@ -1383,6 +1408,8 @@ function updateUI(){
     h+='</div><div style="color:#5a6270;font-size:9px;margin-top:2px;">'+ma.dirs+'</div>';
     maEl.innerHTML=h;
   }else if(maEl)maEl.style.display='none';
+  // 15分钟快照
+  if(Date.now()-lastSnapshotTime>900000&&dataReady){lastSnapshotTime=Date.now();saveSnapshot();}
   analyzePhases();drawChart();drawCmdTrend();
 }
 
@@ -1612,7 +1639,7 @@ async function init(){
     }
     txt+='---\n价格: $'+state.price.toFixed(2)+' | '+new Date().toLocaleTimeString();
     navigator.clipboard.writeText(txt).then(()=>{const btn=document.getElementById('copyTagsBtn');btn.textContent='✅';setTimeout(()=>btn.textContent='📋',2000);});
-  };
+  };document.getElementById('copyHistBtn').onclick=async()=>{const btn=document.getElementById('copyHistBtn');btn.textContent='⏳';const history=await getHistory(MAX_DAYS);const ks=['15m','1h','4h','6h','8h','12h','1d'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D'};let txt='📊 Porter 多周期分析报告 ('+MAX_DAYS+'天数据)\n时间: '+new Date().toLocaleString()+' | '+SYMBOL+' $'+state.price.toFixed(2)+'\n\n=== 当前数据 ===\n';for(const k of ks){const d=tfData[k];if(!d)continue;const cmd=d.cmd||0;const need=Math.abs(d.ma-(tfData[ks[ks.indexOf(k)+1]]?.ma||state.price))*1000;const sr=need>0?Math.abs(cmd)/need:0;txt+=lb[k]+': $'+d.ma.toFixed(0)+' | 净'+(cmd>=0?'+':'')+fmtVol(cmd)+' | 入'+fmtVol(d.totalIn||0).slice(1)+' 出'+fmtVol(d.totalOut||0).slice(1)+' | 速'+sr.toFixed(1)+'x | 倍'+(d.mult||0).toFixed(1)+'x\n';}if(history.length>0){txt+='\n=== '+history.length+'条历史趋势 ===\n时间\t';for(const k of ks)txt+=lb[k]+'净\t';txt+='价格\n';for(const h of history.slice(-200)){txt+=new Date(h.ts).toLocaleString()+' ';for(const k of ks){const t=h.tf[k];txt+=(t?((t.cmd||0)>=0?'+':'')+fmtVol(t.cmd||0):'—')+'\t';}txt+='$'+(h.price||0).toFixed(2)+'\n';}}txt+='\n---\n请分析多周期资金流结构、趋势变化、关键矛盾点、支撑阻力位和交易建议。';navigator.clipboard.writeText(txt).then(()=>{btn.textContent='✅';setTimeout(()=>btn.textContent='📋📊',2000);});};
   window.addEventListener('keydown',e=>{
     if(e.key==='='||e.key==='+'){e.preventDefault();zoomChart(-10);}
     if(e.key==='-'){e.preventDefault();zoomChart(10);}
