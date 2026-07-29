@@ -926,4 +926,33 @@ class Api {
     await Http.post('/api/v1/chat/settings/clear-history', data: req.toJson());
     return true;
   }
+
+  /// AI 确认卡片 → 执行操作
+  /// 根据 action 类型调对应的客户端 API
+  static Future<void> confirmAction(String action, Map<String, dynamic> params) async {
+    switch (action) {
+      case 'withdraw':
+        await walletWithdrawApply(WalletWithdrawApplyDto(
+          amount: (params['amount'] as num).toDouble(),
+          channelId: (params['channelId'] as num).toInt(),
+          account: params['account'] as String? ?? '',
+          accountName: params['accountName'] as String? ?? '',
+        ));
+        break;
+      case 'claim_coupon':
+        await claimCouponApi(params['couponId'] as String);
+        break;
+      case 'redeem_code':
+        await redeemCouponApi(params['code'] as String);
+        break;
+      case 'draw':
+        await luckyDrawExecuteApi(params['ticketId'] as String);
+        break;
+      case 'delete_address':
+        await Http.delete('/api/v1/client/address/delete/${params['addressId']}');
+        break;
+      default:
+        throw Exception('Unknown action: $action');
+    }
+  }
 }

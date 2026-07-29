@@ -26,6 +26,8 @@ import '../../toast/radix_toast.dart';
 import '../call/call_page.dart';
 import '../components/chat_bubble.dart';
 import '../components/chat_input/modern_chat_input_bar.dart';
+import '../models/ai_action_model.dart';
+import '../components/bubbles/ai_confirm_card.dart';
 import '../models/chat_ui_model.dart';
 import '../models/conversation.dart';
 import '../models/selection_types.dart';
@@ -206,6 +208,15 @@ class _ChatPageState extends ConsumerState<ChatPage> with ChatPageLogic {
                             itemCount: itemCount,
                             itemBuilder: (context, index) {
                               // 流式气泡：始终在 index 0（reverse: true 的最底部 = 最新位置）
+                              // 确认卡片优先级高于流式气泡
+                              if (chatState.confirmData != null && index == 0) {
+                                return _buildConfirmCard(
+                                  context, chatState,
+                                  conversationId: widget.conversationId,
+                                  onClearConfirm: () => ref.read(chatViewModelProvider(widget.conversationId).notifier).clearConfirm(),
+                                  onConfirmAction: () => ref.read(chatViewModelProvider(widget.conversationId).notifier).confirmAction(),
+                                );
+                              }
                               if (hasStreamingBubble) {
                                 if (index == 0) {
                                   return _buildStreamingBubble(

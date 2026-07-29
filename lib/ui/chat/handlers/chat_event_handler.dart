@@ -9,6 +9,7 @@ import 'package:flutter_app/ui/chat/providers/conversation_provider.dart';
 import 'package:flutter_app/core/api/lucky_api.dart';
 import 'package:flutter_app/core/constants/socket_events.dart';
 
+import '../models/ai_action_model.dart';
 import '../models/conversation.dart';
 import '../providers/chat_view_model.dart';
 import '../repository/message_repository.dart';
@@ -238,14 +239,10 @@ class ChatEventHandler {
 
         case SocketEvents.aiDone:
           debugPrint(
-            '[ChatEventHandler] AI done, saving ${_aiResponseBuffer.length} chars to DB',
+            '[ChatEventHandler] AI done, ${_aiResponseBuffer.length} chars streamed',
           );
           vmNotifier.clearAiStreaming();
-          _saveAiMessage(
-            _aiResponseBuffer,
-            messageId: data['id'] as String?,
-            seqId: data['seqId'] as int?,
-          );
+          // AI 回复改走 CHAT_MESSAGE 通道（公共流水线），不再手动保存
           _aiResponseBuffer = '';
           _lastAiStep = '';
           break;
@@ -277,6 +274,12 @@ class ChatEventHandler {
             DateTime.now().millisecondsSinceEpoch,
           );
           break;
+        case SocketEvents.aiConfirm:
+          final confirmData = AiConfirmData.fromJson(
+            Map<String, dynamic>.from(data as Map),
+          );
+          vmNotifier.setConfirm(confirmData);
+          break;
       }
     } catch (_) {
       // ChatViewModel may not be available yet; fallback to DB-only path
@@ -292,11 +295,8 @@ class ChatEventHandler {
         _aiResponseBuffer += token;
         break;
       case SocketEvents.aiDone:
-        _saveAiMessage(
-          _aiResponseBuffer,
-          messageId: data['id'] as String?,
-          seqId: data['seqId'] as int?,
-        );
+        // AI 回复改走 CHAT_MESSAGE 通道（公共流水线）
+        // 不再手动保存，避免和 pipeline 重复写入
         _aiResponseBuffer = '';
         break;
       case SocketEvents.aiTransfer:

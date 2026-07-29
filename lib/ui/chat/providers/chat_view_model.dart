@@ -8,6 +8,7 @@ import '../models/conversation.dart';
 import '../providers/conversation_provider.dart';
 import '../repository/message_repository.dart';
 import '../services/database/local_database_service.dart';
+import '../models/ai_action_model.dart';
 
 class ChatListState {
   final List<ChatUiModel> messages;
@@ -19,6 +20,9 @@ class ChatListState {
   final bool isAiStreaming;
   final String currentAiToken;
   final String aiStatusText;
+  final AiConfirmData? confirmData;
+  final ConfirmCardStatus confirmCardStatus;
+  final String? confirmErrorMessage;
 
   ChatListState({
     this.messages = const [],
@@ -28,6 +32,9 @@ class ChatListState {
     this.isAiStreaming = false,
     this.currentAiToken = '',
     this.aiStatusText = '',
+    this.confirmData = null,
+    this.confirmCardStatus = ConfirmCardStatus.pending,
+    this.confirmErrorMessage = null,
   });
 
   ChatListState copyWith({
@@ -38,6 +45,9 @@ class ChatListState {
     bool? isAiStreaming,
     String? currentAiToken,
     String? aiStatusText,
+    AiConfirmData? confirmData,
+    ConfirmCardStatus? confirmCardStatus,
+    String? confirmErrorMessage,
     bool clearAiError = false,
   }) {
     return ChatListState(
@@ -48,6 +58,11 @@ class ChatListState {
       isAiStreaming: isAiStreaming ?? this.isAiStreaming,
       currentAiToken: currentAiToken ?? this.currentAiToken,
       aiStatusText: aiStatusText ?? this.aiStatusText,
+      confirmData: confirmData ?? this.confirmData,
+      confirmCardStatus: confirmCardStatus ?? this.confirmCardStatus,
+      confirmErrorMessage: clearAiError
+          ? null
+          : (confirmErrorMessage ?? this.confirmErrorMessage),
     );
   }
 }
@@ -280,11 +295,10 @@ class ChatViewModel extends StateNotifier<ChatListState> {
   Future<void> _saveApiMessages(List<dynamic> apiMsgs) async {
     final currentUserId = ref.read(userProvider)?.id;
     final uiMsgs = apiMsgs
-        .map((m) => ChatUiModelMapper.fromApiModel(
-              m,
-              conversationId,
-              currentUserId,
-            ))
+        .map(
+          (m) =>
+              ChatUiModelMapper.fromApiModel(m, conversationId, currentUserId),
+        )
         .toList();
 
     // Architectural Defense: Uses saveBatch to prevent overwriting local HD images
@@ -384,6 +398,38 @@ class ChatViewModel extends StateNotifier<ChatListState> {
       isAiStreaming: false,
       currentAiToken: '',
       aiStatusText: '',
+    );
+  }
+
+  void setConfirm(AiConfirmData data) {
+    state = state.copyWith(
+      confirmData: data,
+      confirmCardStatus: ConfirmCardStatus.pending,
+    );
+  }
+
+  Future<void> confirmAction() async {
+    final confirm = state.confirmData;
+    if (confirm == null) return;
+    state = state.copyWith(confirmCardStatus: ConfirmCardStatus.loading);
+    try {
+      await Api.confirmAction(confirm.action, confirm.summary);
+      state = state.copyWith(
+        confirmData: null,
+        confirmCardStatus: ConfirmCardStatus.success,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        confirmCardStatus: ConfirmCardStatus.failed,
+        confirmErrorMessage: e.toString(),
+      );
+    }
+  }
+
+  void clearConfirm() {
+    state = state.copyWith(
+      confirmData: null,
+      confirmCardStatus: ConfirmCardStatus.pending,
     );
   }
 

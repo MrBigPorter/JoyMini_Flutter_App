@@ -237,24 +237,31 @@ Widget _buildStreamingBubble(BuildContext context, ChatListState chatState) {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Avatar slot (small, consistent with ChatBubble layout)
+        // Avatar slot (内置图标，不加载网络图片)
         Container(
-          width: 32.w,
-          height: 32.w,
+          width: 40.w,
+          height: 40.w,
           margin: EdgeInsets.only(right: 8.w),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(6.r),
-            color: Colors.grey[200],
+            color: const Color(0xFFF5F5F5),
           ),
-          child: Icon(Icons.support_agent, color: Colors.grey[400], size: 18.sp),
+          child: Icon(Icons.support_agent, color: const Color(0xFF9E9E9E), size: 24.sp),
         ),
         // Bubble content
         Flexible(
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
             decoration: BoxDecoration(
-              color: context.bgSecondary,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(12.r),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  offset: const Offset(0, 1),
+                  blurRadius: 4,
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,8 +295,9 @@ Widget _buildStreamingBubble(BuildContext context, ChatListState chatState) {
                   Text(
                     chatState.currentAiToken,
                     style: TextStyle(
-                      fontSize: 15.sp,
-                      color: context.textPrimary900,
+                      fontSize: 16.sp,
+                      color: Colors.black87,
+                      height: 1.4,
                     ),
                   ),
                   SizedBox(height: 2),
@@ -344,6 +352,26 @@ class _BlinkingCursorState extends State<_BlinkingCursor>
       ),
     );
   }
+}
+
+// --- Component: AI Confirm Card ---
+Widget _buildConfirmCard(
+  BuildContext context,
+  ChatListState chatState, {
+  required String conversationId,
+  required VoidCallback onClearConfirm,
+  required VoidCallback onConfirmAction,
+}) {
+  final confirm = chatState.confirmData;
+  if (confirm == null) return const SizedBox.shrink();
+  return AiConfirmCard(
+    key: ValueKey('confirm_\${confirm.confirmToken}'),
+    data: confirm,
+    status: chatState.confirmCardStatus,
+    errorMessage: chatState.confirmErrorMessage,
+    onConfirm: onConfirmAction,
+    onCancel: onClearConfirm,
+  );
 }
 
 // --- Component: Bottom Loading Indicator ---

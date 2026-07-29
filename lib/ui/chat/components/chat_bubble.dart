@@ -153,15 +153,17 @@ class ChatBubble extends ConsumerWidget {
 
   /// Avatar rendering with fallback icon
   Widget _buildAvatar(String? url) {
-    if (url == null || url.isEmpty) {
+    // Flutter 不渲染 SVG，跳过 Dicebear 等矢量头像
+    final bool isSvg = url != null && (url.endsWith('.svg') || url.contains('dicebear'));
+    if (url == null || url.isEmpty || isSvg) {
       return Container(
         width: 40.w,
         height: 40.w,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6.r),
-          color: Colors.grey[200],
+          color: const Color(0xFFF5F5F5),
         ),
-        child: Icon(Icons.person, color: Colors.grey[400], size: 24.sp),
+        child: Icon(Icons.person, color: const Color(0xFF9E9E9E), size: 24.sp),
       );
     }
     return ClipRRect(
