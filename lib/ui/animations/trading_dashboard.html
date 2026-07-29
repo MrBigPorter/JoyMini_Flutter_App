@@ -168,15 +168,7 @@
       <span class="conn-dot ld" id="connDot"></span>
       <span id="loadStatus" style="font-size:10px;color:#f0b90b;">加载中...</span>
       <span id="marketState" style="font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(30,45,80,0.4);font-weight:600;">⏳</span>
-      <select id="yearSelect" style="background:#1a1f35;color:#e0e6f0;border:1px solid #1e2d50;border-radius:4px;padding:2px 6px;font-size:10px;font-family:inherit;cursor:pointer;">
-        <option value="2000">全部</option>
-        <option value="2022">2022</option>
-        <option value="2023">2023</option>
-        <option value="2024">2024</option>
-        <option value="2025">2025</option>
-        <option value="2026" selected>2026</option>
-      </select>
-      <button id="fsBtn" style="background:transparent;color:#848e9c;border:1px solid rgba(132,142,156,0.3);border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer;font-family:inherit;" title="全屏">⛶</button>
+<button id="fsBtn" style="background:transparent;color:#848e9c;border:1px solid rgba(132,142,156,0.3);border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer;font-family:inherit;" title="全屏">⛶</button>
     </div>
   </div>
   <div class="price-display">
@@ -228,6 +220,32 @@
   </div>
 </div>
 
+<div class="chart-wrap" style="margin-bottom:4px;">
+  <div class="tf-bar" style="justify-content:space-between;">
+    <span>📥 历史数据下载</span>
+  </div>
+  <div style="display:flex;gap:8px;padding:10px 14px;align-items:center;flex-wrap:wrap;">
+    <span style="font-size:11px;color:#848e9c;">年份</span>
+    <select id="dlYear" style="background:#1a1f35;color:#e0e6f0;border:1px solid #1e2d50;border-radius:4px;padding:4px 8px;font-size:11px;font-family:inherit;">
+      <option value="2000">全部</option>
+      <option value="2022">2022</option>
+      <option value="2023">2023</option>
+      <option value="2024">2024</option>
+      <option value="2025">2025</option>
+      <option value="2026" selected>2026</option>
+    </select>
+    <span style="font-size:11px;color:#848e9c;">周期</span>
+    <select id="dlPeriod" style="background:#1a1f35;color:#e0e6f0;border:1px solid #1e2d50;border-radius:4px;padding:4px 8px;font-size:11px;font-family:inherit;">
+      <option value="15m">15分钟</option>
+      <option value="1h">1小时</option>
+      <option value="4h">4小时</option>
+      <option value="1d">日线</option>
+    </select>
+    <button id="dlBtn" style="background:transparent;color:#0ecb81;border:1px solid rgba(14,203,129,0.3);border-radius:4px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">📥 下载</button>
+    <span id="dlStatus" style="font-size:10px;color:#848e9c;"></span>
+  </div>
+</div>
+
 <div class="phase-panel" id="phasePanel">
   <div class="phase-loading">分析中...</div>
 </div>
@@ -240,7 +258,7 @@
 </div>
 <div style="margin-bottom:4px;display:flex;gap:4px;">
   <button id="exportBtn" style="background:transparent;color:#f0b90b;border:1px solid rgba(240,185,11,0.3);border-radius:4px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">📋 复制数据</button>
-  <button id="downloadBtn" style="background:transparent;color:#0ecb81;border:1px solid rgba(14,203,129,0.3);border-radius:4px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">💾 下载文件</button>
+  
   <button id="btBtn" style="background:transparent;color:#f0b90b;border:1px solid rgba(240,185,11,0.3);border-radius:4px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">📊 回测</button>
 </div>
 <div id="btResults" style="background:#0f1629;border:1px solid #1e2d50;border-radius:6px;padding:10px 14px;margin-bottom:6px;display:none;"></div>
@@ -1258,7 +1276,6 @@ async function refreshAll(){
 
 async function init(){
   document.getElementById('symSelect').addEventListener('change',e=>switchCoin(e.target.value));
-  document.getElementById('yearSelect').onchange=function(){yearFilter=parseInt(this.value);refreshAll();};
   function zoomChart(delta){const k=allKlines[chartTF];if(!k)return;
     const mv=Math.min(k.length,chartBarCount);
     const oc=chartOffset+mv/2;
@@ -1275,24 +1292,28 @@ async function init(){
   document.getElementById('zoom1dOut').onclick=()=>{subBar1d=Math.min(1000,subBar1d+30);drawChart();};
   document.getElementById('btBtn').onclick=runBacktest;
     document.getElementById('exportBtn').onclick=()=>{document.getElementById('exportContent').textContent=generateExportData();document.getElementById('exportPanel').style.display='block';};
-  document.getElementById('downloadBtn').onclick=async()=>{
-    const yr=parseInt(document.getElementById('yearSelect').value);
+  document.getElementById('dlBtn').onclick=async()=>{
+    const yr=parseInt(document.getElementById('dlYear').value);
+    const period=document.getElementById('dlPeriod').value;
     const yrLabel=yr>0?yr:'ALL';
-    if(yr>0&&yr<2026||yr===0){
-      const yrLim=yr>0?50000:100000;
-      document.getElementById('loadStatus').textContent='⏳ 获取全量数据('+yrLabel+')...';document.getElementById('loadStatus').style.color='#f0b90b';
-      for(const key of[chartTF,...TF_KEYS.filter(k=>k!==chartTF)]){
-        const cfg=MA_CONFIG.find(m=>m.key===key);
-        const rest=cfg?cfg.rest:key;
-        try{const klines=await fetchKlines(rest,yrLim);
-          if(klines.length>=20){allKlines[key]=klines;if(cfg||key===chartTF){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}}
-        }catch(e){}
-      }
-      fusionScore=calcFusion(tfData);chartSignals=[];scanChartSignals();dataReady=true;
-    }
-    const d=generateExportData();const b=new Blob([d],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);
-    a.download='porter_'+SYMBOL+'_'+yrLabel+'_'+chartTF+'.txt';a.click();URL.revokeObjectURL(a.href);
-    document.getElementById('loadStatus').textContent='✅ 已下载 '+yrLabel+'/'+chartTF;document.getElementById('loadStatus').style.color='#0ecb81';
+    const yrLim=yr>0?50000:100000;
+    document.getElementById('dlStatus').textContent='⏳ 获取'+yrLabel+'/'+period+'...';
+    const oldKls=allKlines[period]?[...allKlines[period]]:null;
+    try{
+      const cfg=MA_CONFIG.find(m=>m.key===period);const rest=cfg?cfg.rest:period;
+      const klines=await fetchKlines(rest,yrLim);
+      if(klines.length<20){document.getElementById('dlStatus').textContent='❌ 无数据';return;}
+      document.getElementById('dlStatus').textContent='⏳ 生成信号...';
+      allKlines[period]=klines;
+      const oldTF=chartTF;chartTF=period;
+      const m=calcTF(period,klines,state.price);if(m)tfData[period]=m;
+      fusionScore=calcFusion(tfData);chartSignals=[];scanChartSignals();
+      const txt=generateExportData();
+      chartTF=oldTF;if(oldKls)allKlines[period]=oldKls;
+      const b=new Blob([txt],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');
+      a.href=URL.createObjectURL(b);a.download='porter_'+SYMBOL+'_'+yrLabel+'_'+period+'.txt';a.click();URL.revokeObjectURL(a.href);
+      document.getElementById('dlStatus').textContent='✅ 已下载 '+yrLabel+'/'+period+' ('+klines.length+'根)';
+    }catch(e){document.getElementById('dlStatus').textContent='❌ 失败';if(oldKls)allKlines[period]=oldKls;}
   };
   document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(document.getElementById('exportContent').textContent).then(()=>{document.getElementById('copyBtn').textContent='✅已复制';setTimeout(()=>document.getElementById('copyBtn').textContent='📋复制',2000);});};
   const tfBar=document.getElementById('tfBar');
