@@ -1278,7 +1278,25 @@ async function init(){
   document.getElementById('zoom1dOut').onclick=()=>{subBar1d=Math.min(1000,subBar1d+30);drawChart();};
   document.getElementById('btBtn').onclick=runBacktest;
     document.getElementById('exportBtn').onclick=()=>{document.getElementById('exportContent').textContent=generateExportData();document.getElementById('exportPanel').style.display='block';};
-  document.getElementById('downloadBtn').onclick=()=>{const d=generateExportData();const b=new Blob([d],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='porter_'+SYMBOL+'_'+new Date().toISOString().slice(0,10)+'.txt';a.click();URL.revokeObjectURL(a.href);};
+  document.getElementById('downloadBtn').onclick=async()=>{
+    const yr=parseInt(document.getElementById('yearSelect').value);
+    const yrLabel=yr>0?yr:'ALL';
+    if(yr>0&&yr<2026||yr===0){
+      const yrLim=yr>0?50000:100000;
+      document.getElementById('loadStatus').textContent='⏳ 获取全量数据('+yrLabel+')...';document.getElementById('loadStatus').style.color='#f0b90b';
+      for(const key of[chartTF,...TF_KEYS.filter(k=>k!==chartTF)]){
+        const cfg=MA_CONFIG.find(m=>m.key===key);
+        const rest=cfg?cfg.rest:key;
+        try{const klines=await fetchKlines(rest,yrLim);
+          if(klines.length>=20){allKlines[key]=klines;if(cfg||key===chartTF){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}}
+        }catch(e){}
+      }
+      fusionScore=calcFusion(tfData);chartSignals=[];scanChartSignals();dataReady=true;
+    }
+    const d=generateExportData();const b=new Blob([d],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);
+    a.download='porter_'+SYMBOL+'_'+yrLabel+'_'+chartTF+'.txt';a.click();URL.revokeObjectURL(a.href);
+    document.getElementById('loadStatus').textContent='✅ 已下载 '+yrLabel+'/'+chartTF;document.getElementById('loadStatus').style.color='#0ecb81';
+  };
   document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(document.getElementById('exportContent').textContent).then(()=>{document.getElementById('copyBtn').textContent='✅已复制';setTimeout(()=>document.getElementById('copyBtn').textContent='📋复制',2000);});};
   const tfBar=document.getElementById('tfBar');
   TF_INTERVALS.forEach(tf=>{const btn=document.createElement('button');btn.className='tf-btn'+(tf.id===chartTF?' active':'');btn.dataset.tf=tf.id;btn.textContent=tf.label;btn.addEventListener('click',()=>setChartTF(tf.id));tfBar.appendChild(btn);});
