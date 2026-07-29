@@ -983,7 +983,7 @@ function drawChart() {
   const ctx=canvas.getContext('2d');
   ctx.scale(DPR,DPR);
   const W=w,H=h;
-  const pad={top:20,bottom:24,left:55,right:210};
+  const pad={top:20,bottom:24,left:55,right:0};
   const cw=W-pad.left-pad.right,ch=H-pad.top-pad.bottom;
   ctx.clearRect(0,0,W,H);
   const klines=allKlines[chartTF];
@@ -1094,47 +1094,35 @@ function drawChart() {
     }
     ctx.stroke();
   }
-  // 右側MA标签(槽位分布+箭头指向)
-  const maSlot=[];
+  // MA标签(最右边,飞出去,箭头指向MA)
+  const maR=[];
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
     const my=yPos(d.ma);
-    const label=cfg.key.toUpperCase();
-    const val=' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
-    ctx.font='bold 8.5px Inter,sans-serif';
-    const tw=ctx.measureText(label+val).width+20;
-    maSlot.push({cfg,my,tw,label,val,d});
+    const txt=cfg.key.toUpperCase()+' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
+    ctx.font='bold 7.5px Inter,sans-serif';
+    const tw=ctx.measureText(txt).width+10;
+    maR.push({cfg,my,tw,th:15,txt,d});
   }
-  // 按MA的Y排序
-  maSlot.sort((a,b)=>a.my-b.my);
-  // 右侧分配7个等距槽位(不重叠)
-  const slotCount=maSlot.length;const slotH=ch/slotCount;
-  const slotX=W-pad.right-5;
-  for(let i=0;i<maSlot.length;i++){
-    const lb=maSlot[i];
-    // 槽位Y=从顶部到底部均匀分布
-    const slotY=pad.top+i*slotH+slotH/2+4;
-    const bx=slotX-lb.tw,by=slotY-9;
-    const c=lb.cfg.color;
-    // 箭头线(从槽位到实际MA位置)
-    ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
-    ctx.beginPath();ctx.moveTo(slotX-2,slotY);ctx.lineTo(slotX-2,lb.my);ctx.stroke();ctx.setLineDash([]);
-    // 箭头头
-    if(Math.abs(slotY-lb.my)>4){
+  // 从右上角往下排,锚点在W-2(最右边缘)
+  let ry=pad.top+8;
+  for(let i=0;i<maR.length;i++){
+    const lb=maR[i];
+    const bx=W-lb.tw-4,by=ry-7;const c=lb.cfg.color;
+    // 箭头(从标签左边缘到MA位置)
+    ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([2,3]);
+    ctx.beginPath();ctx.moveTo(bx-2,ry);ctx.lineTo(bx-2,lb.my);ctx.stroke();ctx.setLineDash([]);
+    if(Math.abs(ry-lb.my)>4){
       ctx.fillStyle=c;
-      const dir=lb.my>slotY?1:-1;
-      ctx.beginPath();ctx.moveTo(slotX-2,lb.my-dir*3);ctx.lineTo(slotX-6,lb.my-dir*7);ctx.lineTo(slotX+2,lb.my-dir*7);ctx.closePath();ctx.fill();
+      const dir=lb.my>ry?1:-1;
+      ctx.beginPath();ctx.moveTo(bx-2,lb.my-dir*3);ctx.lineTo(bx-5,lb.my-dir*6);ctx.lineTo(bx+1,lb.my-dir*6);ctx.closePath();ctx.fill();
     }
-    // 圆角标签背景(均线颜色半透明)
-    const alpha=(i%2==0)?'0.25':'0.20';
-    const rgb=c==='#3b82f6'?'59,130,246':c==='#f6465d'?'246,70,93':c==='#f0b90b'?'240,185,11':c==='#ff8c00'?'255,140,0':c==='#e0e6f0'?'224,230,240':c==='#a78bfa'?'167,139,250':c==='#ec4899'?'236,72,153':'132,142,156';
-    ctx.fillStyle='rgba('+rgb+','+alpha+')';ctx.strokeStyle=c;ctx.lineWidth=1;
-    ctx.beginPath();ctx.roundRect(bx,by,lb.tw,18,5);ctx.fill();ctx.stroke();
-    // 文字
-    ctx.font='bold 8.5px Inter,sans-serif';ctx.fillStyle=c;
-    let tx=bx+5;ctx.fillText(lb.label,tx,by+12);tx+=ctx.measureText(lb.label+' ').width;
-    ctx.font='8.5px Inter,sans-serif';ctx.fillStyle='#e0e6f0';
-    ctx.fillText(lb.val,tx,by+12);
+    // 背景框(在K线上方浮动)
+    ctx.fillStyle='rgba(13,19,33,0.9)';ctx.strokeStyle=c;ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(bx,by,lb.tw,15,3);ctx.fill();ctx.stroke();
+    ctx.font='bold 7.5px Inter,sans-serif';ctx.fillStyle=c;
+    ctx.fillText(lb.txt,bx+3,by+11);
+    ry+=16;
   }
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
@@ -1147,7 +1135,7 @@ function drawChart() {
   ctx.strokeStyle='rgba(224,230,240,0.4)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
   ctx.beginPath();ctx.moveTo(pad.left,py);ctx.lineTo(W-pad.right,py);ctx.stroke();ctx.setLineDash([]);
   ctx.fillStyle='#e0e6f0';ctx.font='bold 9px Inter,monospace';ctx.textAlign='left';
-  ctx.fillText('现价 $'+state.price.toFixed(2),W-pad.right+5,py-4);
+  ctx.fillText('$'+state.price.toFixed(2),W-60,py-4);
   // 滚动条
   const scrollH=6,scrollY=pad.top+ch+4;
   ctx.fillStyle='rgba(30,45,80,0.5)';
