@@ -170,6 +170,7 @@
       <span id="marketState" style="font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(30,45,80,0.4);font-weight:600;">⏳</span>
 <button id="fsBtn" style="background:transparent;color:#848e9c;border:1px solid rgba(132,142,156,0.3);border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer;font-family:inherit;" title="全屏">⛶</button>
 <button id="copyTagsBtn" style="background:transparent;color:#0ecb81;border:1px solid rgba(14,203,129,0.3);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:inherit;" title="复制标签数据">📋</button>
+<button id="dsBtn" style="background:transparent;color:#a855f7;border:1px solid rgba(168,133,247,0.3);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:inherit;" title="DeepSeek分析">🤖</button>
     </div>
   </div>
   <div class="price-display">
@@ -179,6 +180,7 @@
 </div>
 
 <div class="phase-panel" id="marketAnalysis" style="padding:4px 10px;font-size:10px;display:none;margin-bottom:3px;"></div>
+<div class="phase-panel" id="dsResult" style="padding:6px 10px;font-size:10px;display:none;margin-bottom:3px;"></div>
 
 <!-- Chart with TV-style interface -->
 <div class="chart-wrap">
@@ -1314,24 +1316,32 @@ function analyzeMarket(){
   else if(net>=2){regime='🟡';bias='震荡偏多';}
   else if(net<=-2){regime='🟡';bias='震荡偏空';}
   else{regime='⚪';bias='横盘·方向不明';}
-  // 各周期MA方向(斜率) + 均线预警
-  let dirs='',warns=[];
-  for(const k of tfK){const d=tfData[k];if(!d){dirs+=LAB[k]+'— ';continue;}
-    const arr=d.maArray;let dir='→',slope=0;
-    if(arr&&arr.length>=4){const c=arr[arr.length-1],p=arr[arr.length-4];if(c&&p&&p>0){slope=(c-p)/p*100;if(slope>0.02)dir='↗';else if(slope<-0.02)dir='↘';}}
-    dirs+=LAB[k]+dir+' ';
-    // 拐头检测:斜率由正转负或由负转正(最近2根 vs 之前2根)
+  // 各周期MA方向(斜率) + 排列 + 均线预警
+  let dirs="",warns=[];let alBull=0,alBear=0;
+  for(const k of tfK){const d=tfData[k];if(!d){dirs+=LAB[k]+"— ";continue;}
+    const arr=d.maArray;let dir="→",slope=0;
+    if(arr&&arr.length>=4){const c=arr[arr.length-1],p=arr[arr.length-4];if(c&&p&&p>0){slope=(c-p)/p*100;if(slope>0.02)dir="↗";else if(slope<-0.02)dir="↘";}}
+    dirs+=LAB[k]+dir+" ";
     if(arr&&arr.length>=6){
       const c2=arr[arr.length-1],c4=arr[arr.length-3],p2=arr[arr.length-4],p4=arr[arr.length-6];
       if(c2&&c4&&p2&&p4&&p2>0&&p4>0){
         const nowSlope=(c2-c4)/p2*100,prevSlope=(c4-p2)/p4*100;
-        if(nowSlope<-0.01&&prevSlope>0.01)warns.push(LAB[k]+'转下');
-        else if(nowSlope>0.01&&prevSlope<-0.01)warns.push(LAB[k]+'转上');}}
+        if(nowSlope<-0.01&&prevSlope>0.01)warns.push(LAB[k]+"转下");
+        else if(nowSlope>0.01&&prevSlope<-0.01)warns.push(LAB[k]+"转上");}}
+    const idx=tfK.indexOf(k);if(idx<tfK.length-1){const nxt=tfData[tfK[idx+1]];if(nxt&&nxt.ma){if(d.ma>nxt.ma)alBull++;else if(d.ma<nxt.ma)alBear++;}}
   }
+  let align="";if(alBull>=5)align="多头排列";else if(alBear>=5)align="空头排列";else if(alBull>=3)align="偏多排列";else if(alBear>=3)align="偏空排列";else align="交叉排列";
+  const maVals=levels.map(l=>l.ma).filter(v=>v);if(maVals.length>2){
+    const maSpread=(Math.max(...maVals)-Math.min(...maVals))/Math.min(...maVals)*100;
+    if(maSpread<1.5)warns.push("MA密集⚡");
+    const pDist=(p-Math.min(...maVals))/Math.min(...maVals)*100;
+    if(pDist>3)warns.push("远离MA⚠️超买");else if(pDist<-3)warns.push("远离MA⚠️超卖");}
+  if(maVals.length>2){const above=levels.filter(l=>l.above).length;const below=levels.length-above;
+    if(above>=3&&below>=3&&alBull<4&&alBear<4)warns.push("MA夹住⏳");}
   let maWarn='';
   if(warns.length>=2)maWarn=' ⚠️ '+warns.join(' ');
   else if(warns.length===1)maWarn=' 🔔 '+warns[0];
-  return{regime,bias,sup,res,avgM,b,be,dirs,maWarn,rd,levels};
+  return{regime,bias,sup,res,avgM,b,be,dirs,align,maWarn,rd,levels};
 }
 function updateUI(){
   const{price,change24h,changePct24h}=state;
