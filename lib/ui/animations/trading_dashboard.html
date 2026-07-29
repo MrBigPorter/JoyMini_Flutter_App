@@ -1106,7 +1106,7 @@ function drawChart() {
   }
   // 排序+防碰撞(在210px空间内)
   maR.sort((a,b)=>a.my-b.my);
-  const rX=W-200; // 标签在右边空间内
+  // 标签右对齐到W边缘
   for(let i=1;i<maR.length;i++){const p=maR[i-1],c=maR[i];
     if(c.my-p.my<18)c.my=p.my+18;}
   // 绘制
@@ -1122,9 +1122,10 @@ function drawChart() {
     ctx.fillStyle=c;ctx.beginPath();ctx.arc(sepX,lb.my,2.5,0,Math.PI*2);ctx.fill();
     // 标签背景框
     ctx.fillStyle='rgba(13,19,33,0.92)';ctx.strokeStyle=c;ctx.lineWidth=1;
-    ctx.beginPath();ctx.roundRect(rX,by,lb.tw,17,4);ctx.fill();ctx.stroke();
+    const bx2=W-lb.tw-6;
+    ctx.beginPath();ctx.roundRect(bx2,by,lb.tw,17,4);ctx.fill();ctx.stroke();
     ctx.font='bold 8px Inter,sans-serif';ctx.fillStyle=c;
-    ctx.fillText(lb.txt,rX+4,by+12);
+    ctx.fillText(lb.txt,bx2+4,by+12);
   }
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
