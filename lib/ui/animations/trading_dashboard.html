@@ -349,7 +349,7 @@ let chartSignals = []; // detected buy/sell markers: {idx, type, label, color, i
 
 // Chart settings
 let chartTF = '15m';         // current candle resolution
-let chartBarCount = 80;let subBar4h=336,subBar1d=180;let yearFilter=0;
+let chartBarCount = 80;let subBar4h=336,subBar1d=180;let yearFilter=0;let cmdBarCnt=720,cmdOff=0;
 let chartOffset = 0;         // scroll offset: 0 = latest, >0 = older
 let maxHistory = 10000;      // max candles to fetch (15m~3.5月, 1h~14月, 4h~4.5年)
 let crosshairPos = null;     // {x, y} in canvas coords
@@ -929,8 +929,11 @@ function drawCmdTrend() {
   const ctx=canvas.getContext('2d');ctx.scale(DPR,DPR);
   const pad={top:20,bottom:20,left:45,right:50};const cw=w-pad.left-pad.right,ch=h-pad.top-pad.bottom;
   ctx.clearRect(0,0,w,h);
-  // 取最近720根1H K线(30天)
-  const last=k1h.slice(-720);const N=last.length;
+  // 取1H K线(可滚动/缩放)
+  const maxV=Math.min(k1h.length,cmdBarCnt);
+  const maxO=Math.max(0,k1h.length-maxV);
+  if(cmdOff>maxO)cmdOff=maxO;if(cmdOff<0)cmdOff=0;
+  const last=k1h.slice(k1h.length-maxV-cmdOff,k1h.length-cmdOff);const N=last.length;
   // 计算每根CMD(单K)
   const mf=last.map(k=>(k.close-k.open)*k.volume);
   const maxCmd=Math.max(...mf.map(Math.abs),1);
@@ -1454,6 +1457,30 @@ async function init(){
     if(e.key==='='||e.key==='+'){e.preventDefault();zoomChart(-10);}
     if(e.key==='-'){e.preventDefault();zoomChart(10);}
   });
+  // CMD图表交互
+  const cmdCanvas=document.getElementById('cmdTrendCanvas');
+  if(cmdCanvas){const cp=cmdCanvas.parentElement;
+    let cmdDrag=false,cmdDx=0,cmdDo=0;
+    cp.addEventListener('wheel',e=>{
+      e.preventDefault();const k=allKlines['1h'];if(!k)return;
+      const mv=Math.min(k.length,cmdBarCnt);
+      const oc=cmdOff+mv/2;
+      if(e.deltaY<0)cmdBarCnt=Math.min(1440,cmdBarCnt+120);
+      else cmdBarCnt=Math.max(120,cmdBarCnt-120);
+      const nm=Math.min(k.length,cmdBarCnt);
+      cmdOff=Math.max(0,Math.min(k.length-nm, Math.round(oc-nm/2)));
+      drawCmdTrend();
+    },{passive:false});
+    cp.addEventListener('mousedown',e=>{cmdDrag=true;cmdDx=e.clientX;cmdDo=cmdOff;cmdCanvas.style.cursor='grabbing';});
+    window.addEventListener('mousemove',e=>{
+      if(!cmdDrag)return;const k=allKlines['1h'];if(!k)return;
+      const mv=Math.min(k.length,cmdBarCnt);
+      cmdOff=Math.round(cmdDo+(cmdDx-e.clientX)*(mv/cp.getBoundingClientRect().width)*1.2);
+      cmdOff=Math.max(0,Math.min(k.length-mv,cmdOff));
+      drawCmdTrend();
+    });
+    window.addEventListener('mouseup',()=>{if(cmdDrag){cmdDrag=false;cmdCanvas.style.cursor='crosshair';}});
+  }
   const cv=document.getElementById('chartCanvas');
   if(cv){const p=cv.parentElement;
     p.addEventListener('wheel',e=>{
