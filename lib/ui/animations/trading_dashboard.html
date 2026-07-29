@@ -1094,48 +1094,47 @@ function drawChart() {
     }
     ctx.stroke();
   }
-  // 右側MA标签(箭头指向+彩色背景)
-  const maLbs=[];
+  // 右側MA标签(槽位分布+箭头指向)
+  const maSlot=[];
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
-    const ly=yPos(d.ma);
+    const my=yPos(d.ma);
     const label=cfg.key.toUpperCase();
     const val=' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
     ctx.font='bold 8.5px Inter,sans-serif';
-    const tw=ctx.measureText(label+val).width+16;
-    maLbs.push({cfg,ly,tw,th:18,label,val,d,origX:W-10,origY:ly});
+    const tw=ctx.measureText(label+val).width+20;
+    maSlot.push({cfg,my,tw,label,val,d});
   }
-  // 按Y排序+防碰撞
-  maLbs.sort((a,b)=>a.ly-b.ly);
-  for(let i=1;i<maLbs.length;i++){const p=maLbs[i-1],c=maLbs[i];
-    if(c.ly-p.ly<20)c.ly=p.ly+20;}
-  // 边界限制
-  const maxY=pad.top+ch-20;
-  for(const lb of maLbs)if(lb.ly>maxY)lb.ly=maxY;
-  const minY=pad.top+20;
-  for(const lb of maLbs)if(lb.ly<minY)lb.ly=minY;
-  // 绘制
-  const lx=W-pad.right-8;
-  for(const lb of maLbs){
-    const ly=lb.ly;const c=lb.cfg.color;
-    const bx=lx-lb.tw,by=ly-9;
-    // 箭头线(从标签到实际MA位置)
+  // 按MA的Y排序
+  maSlot.sort((a,b)=>a.my-b.my);
+  // 右侧分配7个等距槽位(不重叠)
+  const slotCount=maSlot.length;const slotH=ch/slotCount;
+  const slotX=W-pad.right-5;
+  for(let i=0;i<maSlot.length;i++){
+    const lb=maSlot[i];
+    // 槽位Y=从顶部到底部均匀分布
+    const slotY=pad.top+i*slotH+slotH/2+4;
+    const bx=slotX-lb.tw,by=slotY-9;
+    const c=lb.cfg.color;
+    // 箭头线(从槽位到实际MA位置)
     ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([3,3]);
-    ctx.beginPath();ctx.moveTo(lx-2,ly);ctx.lineTo(lx-2,lb.origY);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(slotX-2,slotY);ctx.lineTo(slotX-2,lb.my);ctx.stroke();ctx.setLineDash([]);
     // 箭头头
-    if(Math.abs(ly-lb.origY)>5){
+    if(Math.abs(slotY-lb.my)>4){
       ctx.fillStyle=c;
-      const dir=lb.origY>ly?1:-1;
-      ctx.beginPath();ctx.moveTo(lx-2,lb.origY-dir*3);ctx.lineTo(lx-5,lb.origY-dir*6);ctx.lineTo(lx+1,lb.origY-dir*6);ctx.closePath();ctx.fill();
+      const dir=lb.my>slotY?1:-1;
+      ctx.beginPath();ctx.moveTo(slotX-2,lb.my-dir*3);ctx.lineTo(slotX-6,lb.my-dir*7);ctx.lineTo(slotX+2,lb.my-dir*7);ctx.closePath();ctx.fill();
     }
-    // 背景标签
-    ctx.fillStyle=c+'30';ctx.strokeStyle=c;ctx.lineWidth=1;
-    ctx.beginPath();ctx.roundRect(bx,by,lb.tw,18,4);ctx.fill();ctx.stroke();
+    // 圆角标签背景(均线颜色半透明)
+    const alpha=(i%2==0)?'0.25':'0.20';
+    const rgb=c==='#3b82f6'?'59,130,246':c==='#f6465d'?'246,70,93':c==='#f0b90b'?'240,185,11':c==='#ff8c00'?'255,140,0':c==='#e0e6f0'?'224,230,240':c==='#a78bfa'?'167,139,250':c==='#ec4899'?'236,72,153':'132,142,156';
+    ctx.fillStyle='rgba('+rgb+','+alpha+')';ctx.strokeStyle=c;ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(bx,by,lb.tw,18,5);ctx.fill();ctx.stroke();
     // 文字
-    ctx.font='bold 8.5px Inter,sans-serif';ctx.fillStyle=lb.d.color||c;
-    ctx.fillText(lb.label,bx+4,by+12);
+    ctx.font='bold 8.5px Inter,sans-serif';ctx.fillStyle=c;
+    let tx=bx+5;ctx.fillText(lb.label,tx,by+12);tx+=ctx.measureText(lb.label+' ').width;
     ctx.font='8.5px Inter,sans-serif';ctx.fillStyle='#e0e6f0';
-    ctx.fillText(lb.val,bx+4+ctx.measureText(lb.label+' ').width,by+12);
+    ctx.fillText(lb.val,tx,by+12);
   }
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
