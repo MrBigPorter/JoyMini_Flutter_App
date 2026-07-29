@@ -1095,17 +1095,26 @@ function drawChart() {
     }
     ctx.stroke();
   }
-  // MA标签(使用可见区域最后一根K线的MA值,对齐图表)
+  // MA标签(按时间对齐到最后一根可见K线)
   const maTag=[];
-  const kLines=allKlines[chartTF];
-  const maxV=Math.min(kLines.length,chartBarCount);
-  const maxO=Math.max(0,kLines.length-maxV);
-  const off=Math.min(chartOffset||0,maxO);
-  const lastIdx=kLines.length-off-1;
+  const mKls=allKlines[chartTF];
+  const mV=Math.min(mKls.length,chartBarCount);
+  const mO=Math.max(0,mKls.length-mV);
+  const off=Math.min(chartOffset||0,mO);
+  const lastTime=mKls[mKls.length-off-1].time;
   for(const cfg of MA_CONFIG){
     const d=tfData[cfg.key];if(!d||!d.ma||isNaN(d.ma))continue;
     const txt=cfg.key.toUpperCase()+' $'+d.ma.toFixed(0)+' '+(d.cmd>0?'+':'')+fmtVol(d.cmd);
-    const maVal=d.maArray&&lastIdx<d.maArray.length?d.maArray[lastIdx]:d.ma;
+    // 按时间找对应K线索引
+    let ai=-1;
+    const mk=allKlines[cfg.key];
+    if(mk&&d.maArray){
+      let lo=0,hi=mk.length-1;
+      while(lo<hi-1){const mid=(lo+hi)>>1;if(mk[mid].time<=lastTime)lo=mid;else hi=mid;}
+      const ld=Math.abs(mk[lo].time-lastTime),hd=Math.abs(mk[hi].time-lastTime);
+      ai=ld<hd?lo:hi;
+    }
+    const maVal=(ai>=0&&d.maArray&&ai<d.maArray.length)?d.maArray[ai]:null;
     if(maVal===null||isNaN(maVal))continue;
     const my0=yPos(maVal);maTag.push({cfg,my:my0,origMy:my0,txt,d,maVal});
   }
