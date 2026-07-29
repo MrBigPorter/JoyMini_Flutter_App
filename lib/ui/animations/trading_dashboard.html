@@ -1298,22 +1298,28 @@ async function init(){
     const yrLabel=yr>0?yr:'ALL';
     const yrLim=yr>0?50000:100000;
     document.getElementById('dlStatus').textContent='⏳ 获取'+yrLabel+'/'+period+'...';
-    const oldKls=allKlines[period]?[...allKlines[period]]:null;
+    const saved={};
     try{
-      const cfg=MA_CONFIG.find(m=>m.key===period);const rest=cfg?cfg.rest:period;
-      const klines=await fetchKlines(rest,yrLim);
-      if(klines.length<20){document.getElementById('dlStatus').textContent='❌ 无数据';return;}
+      const allTFs=[period,...TF_KEYS.filter(k=>k!==period)];
+      for(const key of allTFs){
+        const cfg=MA_CONFIG.find(m=>m.key===key);
+        const rest=cfg?cfg.rest:key;
+        try{const klines=await fetchKlines(rest,yrLim);
+          if(klines.length>=20){saved[key]=allKlines[key]?[...allKlines[key]]:null;allKlines[key]=klines;
+            if(cfg||key===period){const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}
+          }
+        }catch(e){}
+      }
       document.getElementById('dlStatus').textContent='⏳ 生成信号...';
-      allKlines[period]=klines;
       const oldTF=chartTF;chartTF=period;
-      const m=calcTF(period,klines,state.price);if(m)tfData[period]=m;
       fusionScore=calcFusion(tfData);chartSignals=[];scanChartSignals();
       const txt=generateExportData();
-      chartTF=oldTF;if(oldKls)allKlines[period]=oldKls;
+      chartTF=oldTF;
+      for(const[k,v]of Object.entries(saved)){if(v!==undefined)allKlines[k]=v;}
       const b=new Blob([txt],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');
       a.href=URL.createObjectURL(b);a.download='porter_'+SYMBOL+'_'+yrLabel+'_'+period+'.txt';a.click();URL.revokeObjectURL(a.href);
-      document.getElementById('dlStatus').textContent='✅ 已下载 '+yrLabel+'/'+period+' ('+klines.length+'根)';
-    }catch(e){document.getElementById('dlStatus').textContent='❌ 失败';if(oldKls)allKlines[period]=oldKls;}
+      document.getElementById('dlStatus').textContent='✅ 已下载 '+yrLabel+'/'+period;
+    }catch(e){document.getElementById('dlStatus').textContent='❌ 失败';for(const[k,v]of Object.entries(saved)){if(v!==undefined)allKlines[k]=v;}}
   };
   document.getElementById('copyBtn').onclick=()=>{navigator.clipboard.writeText(document.getElementById('exportContent').textContent).then(()=>{document.getElementById('copyBtn').textContent='✅已复制';setTimeout(()=>document.getElementById('copyBtn').textContent='📋复制',2000);});};
   const tfBar=document.getElementById('tfBar');
