@@ -775,7 +775,7 @@ function runBacktest(){
   const el=document.getElementById('btResults');const old=[...chartSignals];scanChartSignals();
   const sigs=chartSignals.filter(s=>s.type==='rt'||s.type==='flight');chartSignals=old;
   if(!sigs.length){el.innerHTML='<div style="color:#848e9c;padding:10px;text-align:center;">无信号可回测</div>';el.style.display='block';return;}
-  const k15=allKlines['15m'];if(!k15)return;
+  const k15=allKlines[chartTF];if(!k15)return;
   function gp(ts,h){const t=ts+h*3600000;for(let i=0;i<k15.length;i++){if(Math.abs(k15[i].time-t)<900000)return k15[i].close;}return null;}
   let hui={ok:0,total:0,rets:[]},chu={ok:0,total:0,rets:[]};
   for(const s of sigs){
