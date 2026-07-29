@@ -951,29 +951,31 @@ function drawCmdTrend() {
   // 零线
   ctx.strokeStyle='rgba(132,142,156,0.3)';ctx.lineWidth=1;
   const y0=pad.top+ch/2;ctx.beginPath();ctx.moveTo(pad.left,y0);ctx.lineTo(w-pad.right,y0);ctx.stroke();
-  // CMD柱状图
+  // CMD走势线
+  ctx.strokeStyle='rgba(14,203,129,0.7)';ctx.lineWidth=1.5;
+  ctx.beginPath();var _cmdDraw=false;
   for(let i=0;i<N;i++){
-    const x=pad.left+(i/(N-1))*cw;
-    const barW=Math.max(0.8,cw/N*0.7);
-    const pct=mf[i]/maxCmd;
-    const bh=Math.abs(pct)*(ch/2);
-    const y=mf[i]>0?y0-bh:y0;
-    ctx.fillStyle=mf[i]>0?'rgba(14,203,129,0.5)':'rgba(246,70,93,0.5)';
-    ctx.fillRect(x-barW/2,y,barW,bh);
-  }
+    const x=pad.left+(i/(N-1))*cw,y=y0-(mf[i]/maxCmd)*(ch/2);
+    if(!_cmdDraw){ctx.moveTo(x,y);_cmdDraw=true;}else ctx.lineTo(x,y);}
+  ctx.stroke();
+  // 填充(绿色半透明)
+  ctx.fillStyle='rgba(14,203,129,0.06)';
+  ctx.beginPath();ctx.moveTo(pad.left,y0);
+  for(let i=0;i<N;i++){ctx.lineTo(pad.left+(i/(N-1))*cw,y0-(mf[i]/maxCmd)*(ch/2));}
+  ctx.lineTo(pad.left+cw,y0);ctx.closePath();ctx.fill();
   // MA5趋势线
   ctx.strokeStyle='rgba(240,185,11,0.8)';ctx.lineWidth=2;
-  ctx.beginPath();let st=false;
+  ctx.beginPath();var _cmdDraw=false;
   for(let i=0;i<N;i++){if(cmd5[i]===null)continue;
     const x=pad.left+(i/(N-1))*cw,y=y0-(cmd5[i]/maxCmd)*(ch/2);
-    if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);}
+    if(!_cmdDraw){ctx.moveTo(x,y);_cmdDraw=true;}else ctx.lineTo(x,y);}
   ctx.stroke();
   // MA20趋势线
   ctx.strokeStyle='rgba(98,126,234,0.6)';ctx.lineWidth=1.5;
   ctx.beginPath();st=false;
   for(let i=0;i<N;i++){if(cmd20[i]===null)continue;
     const x=pad.left+(i/(N-1))*cw,y=y0-(cmd20[i]/maxCmd)*(ch/2);
-    if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);}
+    if(!_cmdDraw){ctx.moveTo(x,y);_cmdDraw=true;}else ctx.lineTo(x,y);}
   ctx.stroke();
   // 标签
   ctx.fillStyle='#848e9c';ctx.font='9px Inter,monospace';
