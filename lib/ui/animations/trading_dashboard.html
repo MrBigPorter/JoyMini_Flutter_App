@@ -973,12 +973,11 @@ function runBacktest(){
 // ---------- MOBILE MA BAR ----------
 function drawMobileMABar() {
   const canvas=document.getElementById('chartCanvas');if(!canvas||!isMobile)return;
-  const parent=canvas.parentElement;
+  const chartWrap=canvas.parentElement.parentElement;
   let bar=document.getElementById('mobileMABar');
   if(!bar){bar=document.createElement('div');bar.id='mobileMABar';bar.style.cssText='display:flex;flex-wrap:wrap;gap:2px 8px;padding:3px 6px;font-size:9px;font-family:Inter,system-ui,sans-serif;background:#0d1321;border-top:1px solid #1e2d50;border-bottom:1px solid #1e2d50;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;';
-    // Insert below canvas but inside the parent
     const legend=document.getElementById('maLegend');
-    if(legend)parent.insertBefore(bar,legend);else parent.appendChild(bar);
+    if(legend&&chartWrap.contains(legend))chartWrap.insertBefore(bar,legend);else chartWrap.appendChild(bar);
   }
   const TF_ORDER=['15m','1h','4h','6h','8h','12h','1d'];
   let html='';
