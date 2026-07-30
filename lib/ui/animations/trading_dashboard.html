@@ -1714,6 +1714,8 @@ async function refreshAll(){
     const klines=await fetchKlines(key,500);
     if(klines.length>=20){allKlines[key]=klines;const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}
   }catch(e){}}
+  // OI自动刷新
+  if(SYMBOL==='BTCUSDT'){try{var _o=await fetch('https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=15m&limit=2');var _j=await _o.json();if(_j&&_j.length>=2)window._oiDir=parseFloat(_j[_j.length-1].sumOpenInterest)>parseFloat(_j[0].sumOpenInterest)?'↑':'↓';}catch(_){}}
 }
 
 let isMobile=window.innerWidth<600;
