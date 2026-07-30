@@ -1310,10 +1310,12 @@ function drawChart() {
     // L3: 趋势变化(带时间)
     const cc6=d.cmdChange6||0;const cc6t=cc6>0?'改善':cc6<0?'恶化':'持平';
     const cc6s=fmtVol(Math.abs(cc6)).slice(1);
-    const tfMin={'15m':90,'1h':360,'4h':1440,'6h':2160,'8h':2880,'12h':4320,'1d':8640};
-    const tmLbl={'15m':'90m','1h':'6h','4h':'24h','6h':'36h','8h':'48h','12h':'72h','1d':'6d'};
-    const tm=tmLbl[cfg.key]||'';
-    l3=cc6t+cc6s+' ('+tm+')';
+    // 速率判断(比上一期好还是差)
+    const cc6v=d.cmdMom5||0;
+    const _vel=cc6t+' '+cc6s;
+    const velTxt=cc6v>0.1?'↗加速':cc6v<-0.1?'↘减速':'→平稳';
+    const velClr=cc6v>0&&cc6<0?'#f0b90b':cc6v>0?'#0ecb81':cc6<0?'#f6465d':'#848e9c';
+    l3=_vel+' '+velTxt;
     lines.push({y:10+LH*3,font:'8px Inter,sans-serif',t:'📊 '+l3,c:cc6>0?'#0ecb81':'#f6465d'});
     const tagH=54;
     maTag.push({cfg,my:my0,origMy:my0,tagH,lines});
@@ -1523,17 +1525,23 @@ function updateUI(){
     h+=' <span style="color:#848e9c">| 多'+ma.b+' 空'+ma.be+' 均战力'+ma.avgM.toFixed(1)+'x</span>';
     if(ma.sup)h+=' | ⬇ <span style="color:#0ecb81">$'+ma.sup.ma.toFixed(0)+'</span>('+ma.sup.key.toUpperCase()+')';
     if(ma.res)h+=' | ⬆ <span style="color:#f6465d">$'+ma.res.ma.toFixed(0)+'</span>('+ma.res.key.toUpperCase()+')';
-	    // 买盘指数
+	    // 买盘指数(当前60%+过去40%)
 var _bkW=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];
 var _bw=[0.25,0.20,0.15,0.10,0.08,0.06,0.06,0.05,0.05];
-var _bS=0,_bT=0;
-for(var _bi=0;_bi<_bkW.length;_bi++){var _bd=tfData[_bkW[_bi]];if(_bd&&_bd.mfCur!==undefined){_bS+=_bw[_bi]*(_bd.cmd>0?1:-1);_bT+=_bw[_bi];}}
-var _bI=_bT>0?Math.round(((_bS/_bT+1)/2*100)):50;
+var _bS1=0,_bS2=0,_bT=0,_nNeg=0;
+for(var _bi=0;_bi<_bkW.length;_bi++){var _bd=tfData[_bkW[_bi]];if(_bd){_bT+=_bw[_bi];
+if(_bd.mfCur!==undefined)_bS1+=_bw[_bi]*(_bd.mfCur>0?1:-1);
+if(_bd.cmd!==undefined){_bS2+=_bw[_bi]*(_bd.cmd>0?1:-1);if(_bd.cmd<0)_nNeg++;}}}
+var _bI=_bT>0?Math.round((((_bS1/_bT*0.6+_bS2/_bT*0.4)+1)/2*100)):50;
 var _bC=_bI>=70?'#0ecb81':_bI>=50?'#f0b90b':_bI>=30?'#f0b90b':'#f6465d';
-var _bL=_bI>=70?'强势':_bI>=50?'偏强':_bI>=30?'偏弱':'危险';
+var _bL=_bI>=70?'偏多':_bI>=50?'中性':_bI>=30?'偏弱':'危险';
+var _cA=_bI>=70?'持有':_bI>=50?'观望':_bI>=30?'谨慎':'减仓';
+var _risk=_nNeg>=5?'('+_nNeg+'期流出)':'';
 h+='</div><div style="display:flex;gap:10px;font-size:9px;margin-top:2px;align-items:center;">';
 h+='<span>'+ma.fusionIcon+' '+ma.fusion+'</span>';
 h+='<span style="color:#848e9c">|</span> 买盘指数 <span style="color:'+_bC+';font-weight:700;">'+_bI+'</span> '+_bL;
+h+=' <span style="color:#848e9c">|</span> '+_cA;
+h+=' <span style="color:#f6465d;font-size:8px;">'+_risk+'</span>';
 h+='</div>';
     h+='</div><div style="color:#5a6270;font-size:9px;margin-top:2px;">'+ma.dirs+'</div>';
     maEl.innerHTML=h;
