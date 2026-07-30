@@ -1526,6 +1526,39 @@ function updateUI(){
     for(var _k=0;_k<3;_k++){var _d=tfData[['15m','1h','4h'][_k]];if(_d&&_d.cmdChange6!==undefined){_iS+=Math.max(-100,Math.min(100,_d.cmdChange6/500000*100));_iC++;}}
     var _iA=_iC>0?_iS/_iC:0;
     var _oS=window._oiChg!==undefined?(window._oiChg>0?100:-100):0;
+    // ═══ VPVR成交量分布 ═══
+    var _vp={_sup:'',_res:'',_warn:''};
+    var _vpK=allKlines['15m'];
+    if(_vpK&&_vpK.length>100){
+      var _buck={},_pr=state.price||0;
+      var _minP=_pr*0.9,_maxP=_pr*1.1,_bs=100;
+      for(var _vi=Math.max(0,_vpK.length-1000);_vi<_vpK.length;_vi++){
+        var _k=_vpK[_vi],_lo=Math.max(_minP,Math.floor(_k.low/_bs)*_bs);
+        var _hi=Math.min(_maxP,Math.ceil(_k.high/_bs)*_bs);
+        var _v=_k.volume||0;
+        for(var _b=_lo;_b<_hi;_b+=_bs){_buck[_b]=(_buck[_b]||0)+_v;}}
+      // 找最大volume
+      var _mV=0;for(var _b in _buck){if(_buck[_b]>_mV)_mV=_buck[_b];}
+      if(_mV>0){
+        // 找最近的高量支撑/阻力
+        var _hvnS=0,_hvnR=0,_hvnSV=0,_hvnRV=0;
+        for(var _b in _buck){
+          var _r=_buck[_b]/_mV;
+          if(_r<0.3)continue; // 只算高量
+          var _bp=parseFloat(_b);
+          if(_bp<_pr&&_bp>_hvnS){_hvnS=_bp;_hvnSV=_r;}
+          if(_bp>_pr&&(!_hvnR||_bp<_hvnR)){_hvnR=_bp;_hvnRV=_r;}}
+        // 找中间是否有真空区(LVN < 20% max)
+        var _vac='';
+        if(_hvnS>0){
+          var _gapLo=_hvnS+_bs,_gapHi=_pr-_bs;
+          for(var _b in _buck){
+            var _bp=parseFloat(_b);
+            if(_bp>=_gapLo&&_bp<=_gapHi&&_buck[_b]/_mV>0.2){_gapLo=0;break;}}
+          if(_gapLo>0&&_gapHi>_gapLo)_vac='⚠️下方真空$'+_gapLo.toFixed(0)+'-'+_gapHi.toFixed(0);}
+        if(_hvnS)_vp._sup='⬇$'+_hvnS.toFixed(0)+'(量)';
+        if(_hvnR)_vp._res='⬆$'+_hvnR.toFixed(0)+'(量)';
+        if(_vac)_vp._warn=_vac;}}
     var _f=Math.round(_dS*0.35+_sS*0.25+_iA*0.25+_oS*0.15);
     _f=Math.max(-100,Math.min(100,_f));
     var _fI=_f>20?'🟢':_f<-20?'🔴':'🟡';
@@ -1544,8 +1577,9 @@ function updateUI(){
     h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
     h+=_fI+' <b style="font-size:12px;">'+_fD+'</b>';
     h+=' <span style="font-size:9px;color:#848e9c;">强度'+_fS+'/10</span>';
-    if(_sup)h+=' <span style="font-size:9px;color:#0ecb81;">'+_sup+'</span>';
-    if(_res)h+=' <span style="font-size:9px;color:#f6465d;">'+_res+'</span>';
+    if(_sup||_vp._sup)h+=' <span style="font-size:9px;color:#0ecb81;">'+(_vp._sup||_sup)+'</span>';
+    if(_res||_vp._res)h+=' <span style="font-size:9px;color:#f6465d;">'+(_vp._res||_res)+'</span>';
+    if(_vp._warn)h+=' <span style="font-size:9px;color:#f0b90b;">'+_vp._warn+'</span>';
     h+='</div>';
     h+='<div style="height:3px;background:#1a1f35;border-radius:2px;overflow:hidden;margin:1px 0;">';
     h+='<div style="height:100%;width:'+_bW/2+'%;background:'+_bG+';border-radius:2px;transition:width 0.5s;"></div></div>';
