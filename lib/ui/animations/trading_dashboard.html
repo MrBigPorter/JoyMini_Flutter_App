@@ -1307,18 +1307,12 @@ function drawChart() {
     const _mfcur=d.mfCur||0;const mfclr=_mfcur>0?'#0ecb81':'#f6465d';
     l2+='  |  '+(d.mfCur>0?'买':'卖')+fmtVol(Math.abs(d.mfCur||0));
     lines.push({y:10+LH*2,font:'7.5px Inter,sans-serif',t:l2,c:'#e0e6f0'});
-    // L3: 趋势变化(带时间)
-    const cc6=d.cmdChange6||0;const cc6t=cc6>0?'改善':cc6<0?'恶化':'持平';
-    const cc6s=fmtVol(Math.abs(cc6)).slice(1);
-    // 速率判断(比上一期好还是差)
-    const cc6av=Math.abs(d.cmdMom5||0);
-    const _vel=cc6t+' '+cc6s;
-    var _vn=cc6av>5?10:cc6av>3?9:cc6av>2?8:cc6av>1.2?7:cc6av>0.8?6:cc6av>0.5?5:cc6av>0.3?4:cc6av>0.15?3:cc6av>0.05?2:1;
-    // 同向=增强,反向=减弱
-    var _same=(d.cmdMom5||0)>0&&cc6>0||(d.cmdMom5||0)<0&&cc6<0;
-    var _dTxt=_same?'加强'+_vn:'减弱'+_vn;
-    l3=_vel+' ⏱'+_dTxt;
-    lines.push({y:10+LH*3,font:'8px Inter,sans-serif',t:'📊 '+l3,c:cc6>0?'#0ecb81':'#f6465d'});
+    // L3: 状态(有利/谨慎/危险)
+    var _cmdOk=d.cmd>0,_mfOk=(d.mfCur||0)>0;
+    var _st=_cmdOk&&_mfOk?'✅有利':'⚠️谨慎';
+    if(!_cmdOk&&!_mfOk)_st='❌危险';
+    l3=_st;
+    lines.push({y:10+LH*3,font:'8px Inter,sans-serif',t:l3,c:_cmdOk&&_mfOk?'#0ecb81':_cmdOk||_mfOk?'#f0b90b':'#f6465d'});
     const tagH=54;
     maTag.push({cfg,my:my0,origMy:my0,tagH,lines});
   }
