@@ -1327,8 +1327,8 @@ function drawChart() {
     // 简短结论
     const vd=cmd>0?'📈偏多':'📉偏空';
     if(vd)l3+=(l3?' ':'')+vd;
-    const cc6=d.cmdChange6||0;const cc6c=cc6>=0?'#0ecb81':'#f6465d';const cc6s=(cc6>=0?'+':'')+fmtVol(cc6).slice(1);
-    l3+=' | 6期<span style="color:'+cc6c+'">'+cc6s+'</span>';
+    const cc6=d.cmdChange6||0;const cc6t=cc6>0?'改善':cc6<0?'恶化':'持平';const cc6s=fmtVol(Math.abs(cc6)).slice(1);
+    l3+=' | 6期'+cc6t+cc6s;
     lines.push({y:10+LH*3,font:'7.5px Inter,sans-serif',t:l3,c:cmd<0?'#f0b90b':(stealthOut>0?'#f6465d':(stealthIn>0?'#0ecb81':'#848e9c'))});
     const tagH=54;
     maTag.push({cfg,my:my0,origMy:my0,tagH,lines});
