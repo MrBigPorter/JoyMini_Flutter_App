@@ -1307,10 +1307,9 @@ function drawChart() {
     const _mfcur=d.mfCur||0;const mfclr=_mfcur>0?'#0ecb81':'#f6465d';
     l2+='  |  '+(d.mfCur>0?'买':'卖')+fmtVol(Math.abs(d.mfCur||0));
     lines.push({y:10+LH*2,font:'7.5px Inter,sans-serif',t:l2,c:'#e0e6f0'});
-    // L3: 状态(有利/谨慎/危险)
+    // L3: 动作(持有/减仓/观望/清仓)
     var _cmdOk=d.cmd>0,_mfOk=(d.mfCur||0)>0;
-    var _st=_cmdOk&&_mfOk?'✅有利':'⚠️谨慎';
-    if(!_cmdOk&&!_mfOk)_st='❌危险';
+    var _st=_cmdOk&&_mfOk?'✅持有':_cmdOk&&!_mfOk?'⚠️减仓':!_cmdOk&&_mfOk?'👀观望':'❌清仓';
     l3=_st;
     lines.push({y:10+LH*3,font:'8px Inter,sans-serif',t:l3,c:_cmdOk&&_mfOk?'#0ecb81':_cmdOk||_mfOk?'#f0b90b':'#f6465d'});
     const tagH=54;
