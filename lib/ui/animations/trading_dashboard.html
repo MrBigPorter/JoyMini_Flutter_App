@@ -530,7 +530,7 @@ function calcTF(key, klines, price) {
     let s=0;for(let j=i-29;j<=i;j++)s+=c[j];
     maArray.push(s/30);
   }
-  return {ma:maVal,cvd,cmd,mult,gap,stochK,rate,mfCur,mfPrev,totalIn,totalOut,cmdMom5,prevMom5,isAboveMa:price>maVal,isBull:cmd>0&&mult>0,maArray};
+  const cmdChange6=cmdArr.length>=6?cmdArr[cmdArr.length-1]-cmdArr[Math.max(0,cmdArr.length-6)]:0;return {ma:maVal,cvd,cmd,mult,gap,stochK,rate,mfCur,mfPrev,totalIn,totalOut,cmdMom5,prevMom5,isAboveMa:price>maVal,isBull:cmd>0&&mult>0,maArray,cmdChange6};
 }
 
 function calcFusion(td) {
@@ -1327,6 +1327,8 @@ function drawChart() {
     // 简短结论
     const vd=cmd>0?'📈偏多':'📉偏空';
     if(vd)l3+=(l3?' ':'')+vd;
+    const cc6=d.cmdChange6||0;const cc6s=(cc6>=0?'↗':'↘')+fmtVol(Math.abs(cc6)).slice(1);
+    l3+=' | 近6期'+cc6s;
     lines.push({y:10+LH*3,font:'7.5px Inter,sans-serif',t:l3,c:cmd<0?'#f0b90b':(stealthOut>0?'#f6465d':(stealthIn>0?'#0ecb81':'#848e9c'))});
     const tagH=54;
     maTag.push({cfg,my:my0,origMy:my0,tagH,lines});
