@@ -1371,24 +1371,40 @@ function drawChart() {
   // 子图表(4H,1D)
   drawMiniChart('4h','chartCanvas4h','sub4hLabel');
   drawMiniChart('1d','chartCanvas1d','sub1dLabel');
-  // 多周期高低位价格带
+  // 多周期高低位价格带(固定在图表顶部显示)
   const zones=[
-    {label:'⬇止跌+长期持有 大规模入',lo:60000,hi:63000,clr:'rgba(14,203,129,0.08)',line:'#0ecb81'},
-    {label:'⬇止跌+轻仓入',lo:62000,hi:63500,clr:'rgba(14,203,129,0.06)',line:'rgba(14,203,129,0.4)'},
-    {label:'⬆短线滞涨',lo:64050,hi:64250,clr:'rgba(240,185,11,0.08)',line:'#f0b90b'},
-    {label:'⬆中周期滞涨',lo:65500,hi:66500,clr:'rgba(246,70,93,0.06)',line:'rgba(246,70,93,0.4)'},
-    {label:'⬆大周期高位 大规模出',lo:75000,hi:80000,clr:'rgba(246,70,93,0.08)',line:'#f6465d'},
+    {label:'⬇大规模入',lo:60000,hi:63000,clr:'#0ecb81'},
+    {label:'⬇轻仓入',lo:62000,hi:63500,clr:'rgba(14,203,129,0.7)'},
+    {label:'⬆短线滞涨',lo:64050,hi:64250,clr:'#f0b90b'},
+    {label:'⬆中周期滞涨',lo:65500,hi:66500,clr:'rgba(246,70,93,0.7)'},
+    {label:'⬆大规模出',lo:75000,hi:80000,clr:'#f6465d'},
   ];
-  const py=yPos(state.price);
+  // 顶部图例条
+  ctx.fillStyle='rgba(13,19,33,0.85)';
+  ctx.beginPath();ctx.roundRect(pad.left-5,2,cw+10,14,3);ctx.fill();
+  let lx=pad.left;
+  for(const z of zones){
+    const txt=z.label+' $'+z.lo.toLocaleString();
+    ctx.fillStyle=z.clr;ctx.font='bold 7.5px Inter,sans-serif';ctx.textAlign='left';
+    ctx.fillText(txt,lx,13);
+    lx+=ctx.measureText(txt).width+8;
+  }
+  // 当前价在哪个区的指示
+  const nowP=state.price;
+  let curZone='';
+  for(const z of zones){if(nowP>=z.lo&&nowP<=z.hi)curZone=z.label;}
+  if(curZone){ctx.fillStyle='#e0e6f0';ctx.font='bold 7.5px Inter,sans-serif';ctx.textAlign='right';
+    ctx.fillText('当前: '+curZone,W-pad.right-4,13);}
+  // 价格带背景(半透明显示)  
+  const py2=yPos(state.price);
   for(const z of zones){
     const y1=yPos(z.hi),y2=yPos(z.lo),bw=Math.abs(y2-y1);
     if(y1<pad.top+ch+10&&y2>pad.top-10){
-      ctx.fillStyle=z.clr;ctx.fillRect(pad.left,Math.min(y1,y2),cw,bw);
-      ctx.strokeStyle=z.line;ctx.lineWidth=0.5;ctx.setLineDash([3,3]);
+      ctx.fillStyle=(nowP>=z.lo&&nowP<=z.hi)?z.clr.replace(')',',0.12)'):z.clr.replace(')',',0.05)');
+      ctx.fillRect(pad.left,Math.min(y1,y2),cw,bw);
+      ctx.strokeStyle=z.clr;ctx.lineWidth=0.5;ctx.setLineDash([3,4]);
       ctx.beginPath();ctx.moveTo(pad.left,Math.min(y1,y2));ctx.lineTo(W-pad.right,Math.min(y1,y2));
       ctx.moveTo(pad.left,Math.max(y1,y2));ctx.lineTo(W-pad.right,Math.max(y1,y2));ctx.stroke();ctx.setLineDash([]);
-      ctx.fillStyle=z.line;ctx.font='bold 8px Inter,sans-serif';ctx.textAlign='left';
-      ctx.fillText(z.label,pad.left+2,Math.min(y1,y2)-2);
     }
   }
   // 当前价线
