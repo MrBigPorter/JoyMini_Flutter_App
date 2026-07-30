@@ -1515,63 +1515,47 @@ function updateUI(){
   const ma=analyzeMarket();
   const maEl=document.getElementById('marketAnalysis');
   if(ma&&maEl){
-    maEl.style.display='block';
-    let h='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">';
-    h+=ma.regime+' <b>'+ma.bias+'</b>';
-    h+=' <span style="color:#848e9c">| 均战力'+ma.avgM.toFixed(1)+'x</span>';
-    if(ma.sup)h+=' | ⬇ <span style="color:#0ecb81">$'+ma.sup.ma.toFixed(0)+'</span>('+ma.sup.key.toUpperCase()+')';
-    if(ma.res)h+=' | ⬆ <span style="color:#f6465d">$'+ma.res.ma.toFixed(0)+'</span>('+ma.res.key.toUpperCase()+')';
-	    // ── 稳定指数(替代买盘指数) ──
-	// 三个慢变信号: 间距方向(40%)+周期斜率(40%)+OI(20%)
-	var _sm15=tfData['15m']?.ma||0,_sm1h=tfData['1h']?.ma||0;
-	var _sGap = 20;
-	if(_sm15 > _sm1h) {
-	  var _sg = _sm15&&_sm1h?Math.abs(_sm15-_sm1h)/_sm1h*100:0;
-	  _sGap = _sg >= 0.30 ? 40 : _sg >= 0.15 ? 32 : 22;
-	} else {
-	  var _sg = _sm15&&_sm1h?Math.abs(_sm15-_sm1h)/_sm1h*100:0;
-	  _sGap = _sg >= 0.30 ? 15 : _sg >= 0.15 ? 8 : 3;
-	}
-	var _sTrend = 20;
-	if(ma && ma.dirs) {
-	  var _nUp = (ma.dirs.match(/↗/g)||[]).length;
-	  var _nDn = (ma.dirs.match(/↘/g)||[]).length;
-	  _sTrend = Math.round(Math.max(0, Math.min(40, _nUp * 4.5 - _nDn * 2 + 20)));
-	}
-	var _sOi = 10;
-	if(window._oiChg !== undefined) {
-	  _sOi = window._oiChg > 0 ? 20 : window._oiChg < -100 ? 3 : 10;
-	}
-	var _sTotal = Math.min(100, Math.max(0, _sGap + _sTrend + _sOi));
-	var _sColor = _sTotal >= 70 ? '#0ecb81' : _sTotal >= 45 ? '#f0b90b' : '#f6465d';
-	var _sLabel = _sTotal >= 70 ? '稳' : _sTotal >= 45 ? '偏稳' : '不稳';
-	var _sAdvice = _sTotal >= 70 ? '持有' : _sTotal >= 45 ? '观望' : '警惕';
-	var _nNeg = 0;
-	for(var _ni=0;_ni<TF_KEYS.length;_ni++){var _nd=tfData[TF_KEYS[_ni]];if(_nd&&_nd.cmd<0)_nNeg++;}
-	var _risk = _nNeg >= 5 ? '('+_nNeg+'期流出)' : '';
-	var _d15=tfData['15m'];var _h1=tfData['1h'];
-	var _alert='';
-	if(_d15&&_d15.cmd>0&&_d15.mfCur>0&&_d15.cmdChange6>0&&_sTotal<65)_alert=' ⚠️15M走好·大周期偏空';
-	h+='</div>';
-	h+='<div style="display:flex;gap:10px;font-size:9px;margin-top:2px;align-items:center;">';
-	h+='稳定指数 <span style="color:'+_sColor+';font-weight:700;">'+_sTotal+'</span> '+_sLabel;
-	h+=' <span style="color:#848e9c">|</span> '+_sAdvice;
-	h+='<span style="color:#f0b90b;font-size:8px;">'+_alert+'</span>';
-	h+=' <span style="color:#f6465d;font-size:8px;">'+_risk+'</span>';
-	h+='</div>';
-	// MA间距(15M-1H)
-	var _m15ma=tfData['15m']?.ma||0,_m1hma=tfData['1h']?.ma||0;
-	var _maGap=_m15ma&&_m1hma?Math.abs(_m15ma-_m1hma)/_m1hma*100:0;
-	var _maArrow=_m15ma>_m1hma?'↑':'↓';
-	var _maAlert=_maGap<0.15?' ⚡':' ';
-	h+='<div style="display:flex;gap:8px;font-size:8px;margin-top:1px;color:#848e9c;">';
-	h+='15M-1H间距: <span style="color:'+(_maGap<0.3?'#f0b90b':'#848e9c')+';font-weight:600;">'+_maGap.toFixed(2)+'%</span> '+_maArrow;
-	if(_maGap<0.15)h+='<span style="color:#f0b90b;font-weight:700;">⚡即将交叉</span>';
-	h+=' <span style="color:#848e9c">|</span> OI '+(window._oiDir||'-')+(window._oiChg?Math.abs(Math.round(window._oiChg))+' '+(window._oiChg>0?'增加':'减少'):'');
-		var _atr=typeof calcATR!=='undefined'&&allKlines['1h']?calcATR(allKlines['1h']):0;
-		if(_atr>0)h+=' <span style="color:#848e9c">|</span> 目标 $'+(state.price+_atr).toFixed(0)+'~$'+(state.price+_atr*2).toFixed(0)+' ';
-		h+='</div>';
-	h+='</div><div style="color:#5a6270;font-size:9px;margin-top:2px;">'+ma.dirs+'</div>';
+        maEl.style.display='block';
+    // ═══ 融合判断 — 一眼看整体 ═══
+    var _nU=(ma.dirs.match(/↗/g)||[]).length,_nD=(ma.dirs.match(/↘/g)||[]).length;
+    var _dS=(_nU-_nD)/Math.max(1,_nU+_nD)*100;
+    var _s15=tfData['15m']?.ma||0,_s1h=tfData['1h']?.ma||0;
+    var _sG=_s15&&_s1h?Math.abs(_s15-_s1h)/_s1h*100:0,_sD=_s15>_s1h?1:-1;
+    var _sS=_sD>0?Math.min(100,_sG/0.3*100):-Math.min(100,_sG/0.3*100);
+    var _iS=0,_iC=0;
+    for(var _k=0;_k<3;_k++){var _d=tfData[['15m','1h','4h'][_k]];if(_d&&_d.cmdChange6!==undefined){_iS+=Math.max(-100,Math.min(100,_d.cmdChange6/500000*100));_iC++;}}
+    var _iA=_iC>0?_iS/_iC:0;
+    var _oS=window._oiChg!==undefined?(window._oiChg>0?100:-100):0;
+    var _f=Math.round(_dS*0.35+_sS*0.25+_iA*0.25+_oS*0.15);
+    _f=Math.max(-100,Math.min(100,_f));
+    var _fI=_f>20?'🟢':_f<-20?'🔴':'🟡';
+    var _fD=_f>20?'多头':_f<-20?'空头':'震荡';
+    var _fS=Math.min(10,Math.max(1,Math.round(Math.abs(_f)/10)));
+    var _sup=ma.sup?'⬇$'+ma.sup.ma.toFixed(0):'';
+    var _res=ma.res?'⬆$'+ma.res.ma.toFixed(0):'';
+    var _txt=[];
+    if(_nU>=5)_txt.push(_nU+'周期向上');else if(_nD>=5)_txt.push(_nD+'周期向下');else _txt.push('方向分歧');
+    if(_sD>0&&_sG>=0.3)_txt.push('间距健康');else if(_sD<0)_txt.push('间距收窄');
+    if(_iA>20)_txt.push('资金改善');else if(_iA<-20)_txt.push('资金恶化');
+    if(_oS>0)_txt.push('OI进');else if(_oS<0)_txt.push('OI出');
+    var _bW=Math.abs(_f)+100;
+    var _bG=_f>20?'linear-gradient(90deg,#0a5e3a,#0ecb81)':_f<-20?'linear-gradient(90deg,#f6465d,#8a1a2a)':'linear-gradient(90deg,#5a5000,#f0b90b)';
+    var h='<div style="display:flex;flex-direction:column;gap:2px;">';
+    h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
+    h+=_fI+' <b style="font-size:12px;">'+_fD+'</b>';
+    h+=' <span style="font-size:9px;color:#848e9c;">强度'+_fS+'/10</span>';
+    if(_sup)h+=' <span style="font-size:9px;color:#0ecb81;">'+_sup+'</span>';
+    if(_res)h+=' <span style="font-size:9px;color:#f6465d;">'+_res+'</span>';
+    h+='</div>';
+    h+='<div style="height:3px;background:#1a1f35;border-radius:2px;overflow:hidden;margin:1px 0;">';
+    h+='<div style="height:100%;width:'+_bW/2+'%;background:'+_bG+';border-radius:2px;transition:width 0.5s;"></div></div>';
+    h+='<div style="display:flex;justify-content:space-between;font-size:8px;color:#5a6270;flex-wrap:wrap;">';
+    h+='<span>'+_txt.join('·')+'</span>';
+    h+='<span>'+ma.dirs+'</span>';
+    h+=' <span>OI '+(window._oiDir||'-')+(window._oiChg?Math.abs(Math.round(window._oiChg))+' '+(window._oiChg>0?'进':'出'):'');
+    var _atr=typeof calcATR!=='undefined'&&allKlines['1h']?calcATR(allKlines['1h']):0;
+    if(_atr>0)h+=' | 目标 $'+(state.price+_atr).toFixed(0)+'~$'+(state.price+_atr*2).toFixed(0);
+    h+='</span></div></div>';
     maEl.innerHTML=h;
   }else if(maEl)maEl.style.display='none';
   // 15分钟快照
