@@ -1527,7 +1527,7 @@ function updateUI(){
 var _bkW=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];
 var _bw=[0.25,0.20,0.15,0.10,0.08,0.06,0.06,0.05,0.05];
 var _bS=0,_bT=0;
-for(var _bi=0;_bi<_bkW.length;_bi++){var _bd=tfData[_bkW[_bi]];if(_bd&&_bd.mfCur!==undefined){_bS+=_bw[_bi]*(_bd.mfCur>0?1:-1);_bT+=_bw[_bi];}}
+for(var _bi=0;_bi<_bkW.length;_bi++){var _bd=tfData[_bkW[_bi]];if(_bd&&_bd.mfCur!==undefined){_bS+=_bw[_bi]*(_bd.cmd>0?1:-1);_bT+=_bw[_bi];}}
 var _bI=_bT>0?Math.round(((_bS/_bT+1)/2*100)):50;
 var _bC=_bI>=70?'#0ecb81':_bI>=50?'#f0b90b':_bI>=30?'#f0b90b':'#f6465d';
 var _bL=_bI>=70?'强势':_bI>=50?'偏强':_bI>=30?'偏弱':'危险';
