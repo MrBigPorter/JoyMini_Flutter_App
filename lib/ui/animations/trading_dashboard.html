@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 <title>Porter 多周期均线 · 资金流实时审计</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -148,6 +148,26 @@
   @media (max-width:1000px) { .stat-grid { grid-template-columns:repeat(4,1fr); } }
   @media (max-width:700px) { .stat-grid { grid-template-columns:repeat(2,1fr); } .mid-row { grid-template-columns:1fr 1fr; } }
   @media (max-width:600px) { .header { flex-direction:column; gap:6px; text-align:center; } .price-display { text-align:center; } }
+  @media (max-width:600px) {
+    .phase-row { grid-template-columns:1fr !important; gap:4px !important; }
+    .bt-grid { grid-template-columns:repeat(2,1fr) !important; }
+    .chart-wrap, .phase-panel { padding:3px !important; }
+    .stat-card { padding:3px 5px !important; }
+    .stat-card .val { font-size:11px !important; }
+    .fc { padding:6px 8px !important; }
+    .fc .val { font-size:14px !important; }
+    .ma-legend { gap:2px !important; }
+    .ma-legend-item { font-size:8px !important; }
+    .tf-btn { font-size:9px !important; padding:3px 6px !important; }
+    .sym-select { font-size:12px !important; padding:3px 20px 3px 6px !important; }
+    .bt-btn { min-height:36px; font-size:10px !important; }
+    #fsBtn, #dsBtn { display:none !important; }
+    .sig-detail { max-width:260px !important; font-size:10px !important; padding:8px 10px !important; }
+  }
+
+  /* Touch-friendly */
+  .tf-btn, .zoom-btn, .bt-btn, select, button { touch-action:manipulation; }
+  canvas { touch-action:none; }
 </style>
 </head>
 <body>
@@ -213,7 +233,7 @@
     </span>
   </div>
   <div class="chart-inner">
-    <canvas id="chartCanvas4h" style="height:220px;"></canvas>
+    <canvas id="chartCanvas4h"></canvas>
   </div>
 </div>
 
@@ -227,7 +247,7 @@
     </span>
   </div>
   <div class="chart-inner">
-    <canvas id="chartCanvas1d" style="height:220px;"></canvas>
+    <canvas id="chartCanvas1d"></canvas>
   </div>
 </div>
 
@@ -267,7 +287,7 @@
     <span id="cmdTrendLabel" style="font-size:10px;color:#848e9c;"></span>
   </div>
   <div class="chart-inner">
-    <canvas id="cmdTrendCanvas" style="height:200px;"></canvas>
+    <canvas id="cmdTrendCanvas"></canvas>
   </div>
 </div>
 
@@ -950,13 +970,35 @@ function runBacktest(){
   el.innerHTML=html;el.style.display='block';
 }
 
+// ---------- MOBILE MA BAR ----------
+function drawMobileMABar() {
+  const canvas=document.getElementById('chartCanvas');if(!canvas||!isMobile)return;
+  const parent=canvas.parentElement;
+  let bar=document.getElementById('mobileMABar');
+  if(!bar){bar=document.createElement('div');bar.id='mobileMABar';bar.style.cssText='display:flex;flex-wrap:wrap;gap:2px 8px;padding:3px 6px;font-size:9px;font-family:Inter,system-ui,sans-serif;background:#0d1321;border-top:1px solid #1e2d50;border-bottom:1px solid #1e2d50;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;';
+    // Insert below canvas but inside the parent
+    const legend=document.getElementById('maLegend');
+    if(legend)parent.insertBefore(bar,legend);else parent.appendChild(bar);
+  }
+  const TF_ORDER=['15m','1h','4h','6h','8h','12h','1d'];
+  let html='';
+  for(const key of TF_ORDER){
+    const d=tfData[key];if(!d||!d.ma)continue;
+    const cmd=d.cmd||0;const clr=cmd>0?'#0ecb81':cmd<0?'#f6465d':'#848e9c';
+    const arrow=cmd>0?'↗':cmd<0?'↘':'→';
+    const va=fmtVol(cmd);
+    html+='<span style="color:'+clr+';font-weight:600;">'+key.toUpperCase()+'<span style="color:#5a6270;font-weight:400;">$'+d.ma.toFixed(0)+'</span> '+arrow+'<span style="font-weight:400;">'+va+'</span></span>';
+  }
+  bar.innerHTML=html;
+}
+
 // ---------- MINI CHART (4H/1D) ----------
 function drawMiniChart(tf,canvasId,labelId){
   const canvas=document.getElementById(canvasId);if(!canvas)return;
   const kls=allKlines[tf];if(!kls||kls.length<20||!state.price)return;
   const rect=canvas.parentElement.getBoundingClientRect();
   const DPR=window.devicePixelRatio||1;
-  const w=rect.width,h=220;
+  const w=rect.width,h=isMobile?120:220;
   canvas.width=w*DPR;canvas.height=h*DPR;
   canvas.style.width=w+'px';canvas.style.height=h+'px';
   const ctx=canvas.getContext('2d');
@@ -1029,7 +1071,7 @@ function drawCmdTrend() {
   const k1h=allKlines['1h'];if(!k1h||k1h.length<200)return;
   const DPR=window.devicePixelRatio||1;
   const rect=canvas.parentElement.getBoundingClientRect();
-  const w=rect.width,h=200;canvas.width=w*DPR;canvas.height=h*DPR;
+  const w=rect.width,h=isMobile?120:200;canvas.width=w*DPR;canvas.height=h*DPR;
   canvas.style.width=w+'px';canvas.style.height=h+'px';
   const ctx=canvas.getContext('2d');ctx.scale(DPR,DPR);
   const pad={top:20,bottom:20,left:45,right:50};const cw=w-pad.left-pad.right,ch=h-pad.top-pad.bottom;
@@ -1084,13 +1126,13 @@ function drawChart() {
   const canvas=document.getElementById('chartCanvas');
   const rect=canvas.parentElement.getBoundingClientRect();
   const DPR=window.devicePixelRatio||1;
-  const w=rect.width,h=450;
+  const w=rect.width,h=isMobile?280:450;
   canvas.width=w*DPR;canvas.height=h*DPR;
   canvas.style.width=w+'px';canvas.style.height=h+'px';
   const ctx=canvas.getContext('2d');
   ctx.scale(DPR,DPR);
   const W=w,H=h;
-  const pad={top:20,bottom:24,left:55,right:240};
+  const pad={top:isMobile?14:20,bottom:isMobile?18:24,left:isMobile?40:55,right:isMobile?10:240};
   const cw=W-pad.left-pad.right,ch=H-pad.top-pad.bottom;
   ctx.clearRect(0,0,W,H);
   let klines=allKlines[chartTF];
@@ -1164,7 +1206,7 @@ function drawChart() {
     else{ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(x,my+(s.t==='dc_warn'?-4:4),2.5,0,Math.PI*2);ctx.fill();}
     const ly=dir===-1?my+off:my-off;
     let bx=x-s.tw/2;const by=dir===-1?ly:ly-s.th;
-    if(bx+s.tw>W-245){bx=W-245-s.tw;}
+    if(bx+s.tw>W-(isMobile?15:245)){bx=W-(isMobile?15:245)-s.tw;}
     ctx.strokeStyle=s.color;ctx.lineWidth=1;ctx.setLineDash([3,4]);
     if(off>s.baseOff){const ky=dir===-1?my+s.baseOff:my-s.baseOff;
       ctx.beginPath();ctx.moveTo(x,dir===-1?my+4:my-4);ctx.lineTo(x,ky);ctx.lineTo(x+Math.min(15,off-s.baseOff),ky);
@@ -1305,6 +1347,10 @@ function drawChart() {
     if(span>0){const ratio=target/span;maTag.forEach((lb,i)=>{lb.my=tMin+(lb.my-origTop)*ratio;});}
     else{const step=(tMax-tMin)/(maTag.length-1||1);maTag.forEach((lb,i)=>{lb.my=tMin+i*step;});}
   }
+  // Mobile: draw compact MA bar below chart instead of right panel
+  if(isMobile){
+    drawMobileMABar();
+  }else{
   // 绘制
   for(const lb of maTag){
     const by=lb.my;const c=lb.cfg.color;const bx=W-tagW-22;
@@ -1318,9 +1364,10 @@ function drawChart() {
       else if(ln.t){ctx.fillStyle=ln.c;ctx.font=ln.font;ctx.textAlign='left';ctx.fillText(ln.t,bx+4,by+ln.y);}
     }
   }
+  } // end if(!isMobile)
   // 分隔线
   ctx.strokeStyle='rgba(30,45,80,0.35)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(W-235,pad.top);ctx.lineTo(W-235,pad.top+ch);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(W-(isMobile?20:235),pad.top);ctx.lineTo(W-(isMobile?20:235),pad.top+ch);ctx.stroke();
   // 子图表(4H,1D)
   drawMiniChart('4h','chartCanvas4h','sub4hLabel');
   drawMiniChart('1d','chartCanvas1d','sub1dLabel');
@@ -1329,7 +1376,7 @@ function drawChart() {
   ctx.strokeStyle='rgba(224,230,240,0.4)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
   ctx.beginPath();ctx.moveTo(pad.left,py);ctx.lineTo(W-pad.right,py);ctx.stroke();ctx.setLineDash([]);
   ctx.fillStyle='#e0e6f0';ctx.font='bold 9px Inter,monospace';ctx.textAlign='left';
-  ctx.textAlign='right';ctx.fillText('$'+state.price.toFixed(2),W-248,py-4);ctx.textAlign='left';
+  ctx.textAlign='right';ctx.fillText('$'+state.price.toFixed(2),W-(isMobile?20:248),py-4);ctx.textAlign='left';
   // 滚动条
   const scrollH=6,scrollY=pad.top+ch+4;
   ctx.fillStyle='rgba(30,45,80,0.5)';
@@ -1651,6 +1698,8 @@ async function refreshAll(){
   }catch(e){}}
 }
 
+let isMobile=window.innerWidth<600;
+function checkMobile(){const m=window.innerWidth<600;if(m!==isMobile){isMobile=m;drawChart();drawCmdTrend();}}window.addEventListener('resize',checkMobile);window.addEventListener('orientationchange',()=>setTimeout(checkMobile,300));
 async function init(){
   document.getElementById('symSelect').addEventListener('change',e=>switchCoin(e.target.value));
   function zoomChart(delta){const k=allKlines[chartTF];if(!k)return;
@@ -1757,6 +1806,7 @@ async function init(){
       drawCmdTrend();
     },{passive:false});
     cp.addEventListener('mousedown',e=>{cmdDrag=true;cmdDx=e.clientX;cmdDo=cmdOff;cmdCanvas.style.cursor='grabbing';});
+    cp.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];cmdDrag=true;cmdDx=t.clientX;cmdDo=cmdOff;},{passive:false});
     window.addEventListener('mousemove',e=>{
       if(!cmdDrag)return;const k=allKlines['1h'];if(!k)return;
       const mv=Math.min(k.length,cmdBarCnt);
@@ -1764,7 +1814,16 @@ async function init(){
       cmdOff=Math.max(0,Math.min(k.length-mv,cmdOff));
       drawCmdTrend();
     });
+    window.addEventListener('touchmove',e=>{
+      if(!cmdDrag)return;const k=allKlines['1h'];if(!k)return;
+      const mv=Math.min(k.length,cmdBarCnt);
+      const t=e.touches[0];
+      cmdOff=Math.round(cmdDo+(cmdDx-t.clientX)*(mv/cp.getBoundingClientRect().width)*1.2);
+      cmdOff=Math.max(0,Math.min(k.length-mv,cmdOff));
+      drawCmdTrend();
+    },{passive:false});
     window.addEventListener('mouseup',()=>{if(cmdDrag){cmdDrag=false;cmdCanvas.style.cursor='crosshair';}});
+    window.addEventListener('touchend',()=>{if(cmdDrag){cmdDrag=false;cmdCanvas.style.cursor='crosshair';}});
   }
   const cv=document.getElementById('chartCanvas');
   if(cv){const p=cv.parentElement;
@@ -1793,6 +1852,7 @@ async function init(){
       isDragging=true;dragStartX=e.clientX;dragStartOffset=chartOffset;
       cv.style.cursor='grabbing';
     });
+    p.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];isDragging=true;dragStartX=t.clientX;dragStartOffset=chartOffset;cv.style.cursor='grabbing';},{passive:false});
     window.addEventListener('mousemove',e=>{
       if(!isDragging)return;
       const kl=allKlines[chartTF];if(!kl||kl.length<2)return;
@@ -1803,11 +1863,25 @@ async function init(){
       if(chartOffset>mo)chartOffset=mo;if(chartOffset<0)chartOffset=0;
       drawChart();
     });
+    window.addEventListener('touchmove',e=>{
+      if(!isDragging)return;
+      const kl=allKlines[chartTF];if(!kl||kl.length<2)return;
+      const t=e.touches[0];const dx=t.clientX-dragStartX;
+      const mv=Math.min(kl.length,chartBarCount);
+      chartOffset=Math.round(dragStartOffset+dx*(mv/p.getBoundingClientRect().width)*1.2);
+      const mo=Math.max(0,kl.length-mv);
+      if(chartOffset>mo)chartOffset=mo;if(chartOffset<0)chartOffset=0;
+      drawChart();
+    },{passive:false});
     window.addEventListener('mouseup',()=>{
+      if(isDragging){isDragging=false;cv.style.cursor='crosshair';drawChart();}
+    });
+    window.addEventListener('touchend',()=>{
       if(isDragging){isDragging=false;cv.style.cursor='crosshair';drawChart();}
     });
     // 点击信号显示资金详情
     cv.addEventListener('click',e=>{
+      if(isDragging)return;
       const rect=cv.getBoundingClientRect();
       const mx=e.clientX-rect.left,my=e.clientY-rect.top;
       const pos=window._sigPos||[];
@@ -1850,6 +1924,24 @@ async function init(){
       if(px<5)px=5;if(py<5)py=5;
       div.style.left=px+'px';div.style.top=py+'px';
     });
+    // Touch version for mobile
+    cv.addEventListener('touchstart',e=>{
+      if(isDragging)return;
+      const t=e.touches[0];
+      const rect=cv.getBoundingClientRect();
+      const mx=t.clientX-rect.left,my=t.clientY-rect.top;
+      const pos=window._sigPos||[];
+      let best=null,bestDist=35;
+      for(const p of pos){
+        const d=Math.hypot(mx-p.x,my-p.ly);
+        if(d<bestDist){bestDist=d;best=p;}
+      }
+      const el=document.getElementById('sigDetail');
+      if(!best){el.style.display='none';return;}
+      // Reuse same display logic as click
+      const ce=new MouseEvent('click',{clientX:t.clientX,clientY:t.clientY});
+      cv.dispatchEvent(ce);
+    },{passive:true});
   }
 }
 init();
