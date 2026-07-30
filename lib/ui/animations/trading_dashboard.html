@@ -69,7 +69,7 @@
   .zoom-btns:hover { opacity:1; }
   .zoom-btn { width:26px; height:22px; background:rgba(13,19,33,0.85); border:1px solid #1e2d50; color:#e0e6f0; border-radius:4px; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:inherit; line-height:1; }
   .zoom-btn:hover { background:rgba(30,45,80,0.8); border-color:#3b82f6; }
-  .sig-detail { position:absolute; display:none; z-index:20; background:rgba(13,19,33,0.95); border:1px solid #1e2d50; border-radius:6px; padding:10px 14px; font-size:11px; font-variant-numeric:tabular-nums; min-width:200px; pointer-events:none; }
+  .sig-detail { position:absolute; display:none; z-index:20; background:rgba(13,19,33,0.95); border:1px solid #1e2d50; border-radius:6px; padding:10px 14px; font-size:11px; font-variant-numeric:tabular-nums; min-width:280px; max-width:360px; cursor:default; }
   .sig-detail .row { display:flex; justify-content:space-between; padding:2px 0; }
   .sig-detail .l { color:#848e9c; } .sig-detail .v { font-weight:600; }
 
@@ -653,7 +653,7 @@ function scanChartSignals() {
     }
   }
 
-  const cool={gc:-99,dc:-99,chase:-99,rt:-99,fake:-99,flight:-99,proactive:-99,proactive_buy:-99,proactive_sell:-99,proactive_improve:-99},MIN=8;
+  const cool={gc:-99,dc:-99,chase:-99,rt:-99,fake:-99,flight:-99,proactive:-99,proactive_buy:-99,proactive_sell:-99,proactive_improve:-99,impending_gc:-99,impending_dc:-99,divergence:-99,momentum:-99},MIN=4;
   function atrAt(i,p=14){if(i<p+1)return 0;let s=0;
     for(let j=i-p+1;j<=i;j++){const k=k15[j],pk=k15[j-1];s+=Math.max(k.high-k.low,Math.abs(k.high-pk.close),Math.abs(k.low-pk.close));}return s/p;}
 
@@ -719,21 +719,29 @@ function scanChartSignals() {
 	    // ═══════════════════════════════════════════════════════
 	    // 冷却: 同方向每簇只出1个,冷却24根(6h)
 	    // 条件: CMD在12h内从显著水平(>bl1k*3)恶化/改善50%+
-	    const coolPA=24;
+	    const coolPA=12;
 	    if(i>48&&Math.abs(c1h)>bl1k*3){
 	      const c12h=v1h(c1hArr,k15[i].time-43200000);
 	      if(Math.abs(c12h)>bl1k*3){
 	        const declinePct=(c12h-c1h)/Math.abs(c12h);
-	        // 1. CMD从正转负 → 紧急卖出信号(领先死叉26h,几乎在顶部)
 	        const c1h_prev=v1h(c1hArr,k15[i-1].time);
-	        if(c1h_prev>0&&c1h<=0&&!oversold&&i-cool.proactive_sell>=coolPA){
+	        // ── 噪音过滤: 战力弱(<0.5)+大周期逆势=假信号 ──
+	        const __ms=Math.abs(multi)<0.5;
+	        const __ts=c12hV>0&&c1dV>0&&Math.abs(c12hV)>Math.abs(c1h)*3;
+	        const __tb=c12hV<0&&c1dV<0&&Math.abs(c12hV)>Math.abs(c1h)*3;
+	        const __mb=ma15[i]<m60&&ma15[i]>ma15[i-1];
+	        const __mn=ma15[i]>m60&&ma15[i]<ma15[i-1];
+	        const __ws=__ms&&(__ts||__mb);
+	        const __wb=__ms&&(__tb||__mn);
+	        // 1. CMD从正转负 → 资金转空信号(领先死叉26h,几乎在顶部)
+	        if(c1h_prev>0&&c1h<=0&&!oversold&&i-cool.proactive_sell>=coolPA&&!__ws){
 	          cool.proactive_sell=i;
-	          chartSignals.push({...sigCtx,type:'proactive_sell',icon:'🔴',label:'资金转空·卖出',color:'#f6465d'});
+	          chartSignals.push({...sigCtx,type:'proactive_sell',icon:'🔴',label:'资金转空',color:'#f6465d'});
 	        }
-	        // 2. CMD从负转正 → 紧急买入信号(领先金叉)
-	        if(c1h_prev<0&&c1h>=0&&!overbought&&i-cool.proactive_buy>=coolPA){
+	        // 2. CMD从负转正 → 资金转多信号(领先金叉)
+	        if(c1h_prev<0&&c1h>=0&&!overbought&&i-cool.proactive_buy>=coolPA&&!__wb){
 	          cool.proactive_buy=i;
-	          chartSignals.push({...sigCtx,type:'proactive_buy',icon:'🟢',label:'资金转多·买入',color:'#0ecb81'});
+	          chartSignals.push({...sigCtx,type:'proactive_buy',icon:'🟢',label:'资金转多',color:'#0ecb81'});
 	        }
 	        // 3. CMD正但下降50%+ → 资金减弱预警(早期)
 	        if(c1h>0&&declinePct>0.5&&i-cool.proactive>=coolPA){
@@ -748,15 +756,66 @@ function scanChartSignals() {
 	      }
 	    }
 	    // ═══════════════════════════════════════════════════════
+	    // 信号0b: 即将金叉/死叉 — 提前1-3根K线预警
+	    // ═══════════════════════════════════════════════════════
+	    if(i>31&&ma15[i]&&m60&&m60p){
+	      const gapPct=Math.abs(ma15[i]-m60)/m60*100;
+	      const gapPrev=Math.abs(ma15[i-1]-m60p)/m60p*100;
+	      if(gapPct<0.15&&gapPct<gapPrev){
+	        if(ma15[i]<m60&&ma15[i]>ma15[i-1]&&i-cool.impending_gc>=MIN){
+	          cool.impending_gc=i;
+	          chartSignals.push({...sigCtx,type:'impending_gc',icon:'⚡',label:c1h>0?'即将金叉·资金配合':'即将金叉',color:'#0ecb81'});
+	        }
+	        if(ma15[i]>m60&&ma15[i]<ma15[i-1]&&i-cool.impending_dc>=MIN){
+	          cool.impending_dc=i;
+	          chartSignals.push({...sigCtx,type:'impending_dc',icon:'⚡',label:c1h<0?'即将死叉·资金恶化':'即将死叉',color:'#f6465d'});
+	        }
+	      }
+	    }
+	    // ═══════════════════════════════════════════════════════
+	    // 信号0c: 价格-资金背离 — 提前6-12根K线预警
+	    // ═══════════════════════════════════════════════════════
+	    if(i>60&&i-cool.divergence>=MIN*2){
+	      const p5=k15.slice(i-4,i+1).reduce((a,b)=>Math.max(a,b.high),0);
+	      const p20=k15.slice(i-19,i-14).reduce((a,b)=>Math.max(a,b.high),0);
+	      const cm5=cmd15.slice(i-4,i+1).reduce((a,b)=>a+b,0);
+	      const cm20=cmd15.slice(i-19,i-14).reduce((a,b)=>a+b,0);
+	      const l5=k15.slice(i-4,i+1).reduce((a,b)=>Math.min(a,b.low),Infinity);
+	      const l20=k15.slice(i-19,i-14).reduce((a,b)=>Math.min(a,b.low),Infinity);
+	      if(p5>p20*1.002&&cm5<cm20*0.7&&!oversold&&overbought){
+	        cool.divergence=i;
+	        chartSignals.push({...sigCtx,type:'divergence_bear',icon:'🔶',label:'顶背离',color:'#f6465d'});
+	      }
+	      if(l5<l20*0.998&&cm5>cm20*1.3&&!overbought&&oversold){
+	        cool.divergence=i;
+	        chartSignals.push({...sigCtx,type:'divergence_bull',icon:'🟢',label:'底背离',color:'#0ecb81'});
+	      }
+	    }
+	    // ═══════════════════════════════════════════════════════
+	    // 信号0d: 短周期CMD动量(3根vs前3根)提前感知趋势变化
+	    // ═══════════════════════════════════════════════════════
+	    if(i>24&&i-cool.momentum>=MIN){
+	      const m3=mf15[i]+mf15[i-1]+mf15[i-2];
+	      const m3p=mf15[i-3]+mf15[i-4]+mf15[i-5];
+	      if(c1h>0&&m3<m3p*0.2&&m3p>0&&!oversold){
+	        cool.momentum=i;
+	        chartSignals.push({...sigCtx,type:'momentum_slow',icon:'🟡',label:'资金减速·预警',color:'#f0b90b'});
+	      }
+	      if(c1h<0&&m3>m3p*0.5&&m3p<0&&!overbought){
+	        cool.momentum=i;
+	        chartSignals.push({...sigCtx,type:'momentum_fast',icon:'🟢',label:'资金加速·关注',color:'#0ecb81'});
+	      }
+	    }
+	    // ═══════════════════════════════════════════════════════
 	    // 信号1: 金叉 (含弱势/买入/追高)
 	    // ═══════════════════════════════════════════════════════
 	    if(ma15[i-1]<=m60p&&ma15[i]>m60&&Math.abs(ma15[i]-m60)>xGap&&i-cool.gc>=MIN){
 	      cool.gc=i;
 	      const gcBearish=oversold&&c1h<0;  // 超卖区+资金负=弱势
 	      if(panic||fake)chartSignals.push({...sigCtx,type:'fake',icon:'⛔',label:'假金叉',color:'#f0b90b'});
-	      else if(extremelyOverbought&&Math.abs(div)>dt)chartSignals.push({...sigCtx,type:'chase',icon:'🚨',label:'追高←等回踩',color:'#f0b90b'});
+	      else if(extremelyOverbought&&Math.abs(div)>dt)chartSignals.push({...sigCtx,type:'chase',icon:'🚨',label:'追高·偏离过大',color:'#f0b90b'});
 	      else if(overbought&&Math.abs(div)>dt)chartSignals.push({...sigCtx,type:'chase_warn',icon:'⚠️',label:'偏离偏高·注意',color:'#f0b90b'});
-	      else if(overbought&&c1h>0&&cmdImproving)chartSignals.push({...sigCtx,type:'gc',icon:'🟢',label:'金叉买入',color:'#0ecb81'});
+	      else if(overbought&&c1h>0&&cmdImproving)chartSignals.push({...sigCtx,type:'gc',icon:'🟢',label:'金叉·资金共振',color:'#0ecb81'});
 	      else if(gcBearish)chartSignals.push({...sigCtx,type:'gc_weak',icon:'⚪',label:'金叉(弱势)',color:'#848e9c'});
 	      else if(oversold&&c1h<0&&cmdImproving)chartSignals.push({...sigCtx,type:'bottom',icon:'🔍',label:'底部·资金回流',color:'#0ecb81'});
 	      else chartSignals.push({...sigCtx,type:'gc',icon:'🟢',label:'金叉',color:'#0ecb81'});
@@ -774,12 +833,12 @@ function scanChartSignals() {
 	        else if(cmdWorsening)chartSignals.push({...sigCtx,type:'dc_warn',icon:'🔶',label:'死叉(超卖·观望)',color:'#f0b90b'});
 	      }else if(overbought){
 	        // 超买区死叉=真信号(数据:涨1%跌27%)
-	        if(cmdWorsening)chartSignals.push({...sigCtx,type:'dc',icon:'💀',label:'死叉←卖出(超买)',color:'#f6465d'});
-	        else chartSignals.push({...sigCtx,type:'dc',icon:'💀',label:'死叉←卖出',color:'#f6465d'});
+	        if(cmdWorsening)chartSignals.push({...sigCtx,type:'dc',icon:'💀',label:'死叉(超买)',color:'#f6465d'});
+	        else chartSignals.push({...sigCtx,type:'dc',icon:'💀',label:'死叉',color:'#f6465d'});
 	      }else{
 	        // 中性区死叉=看CMD
 	        if(c1h>0&&!cmdWorsening)chartSignals.push({...sigCtx,type:'dc_warn',icon:'🔶',label:'死叉(1H资金正)',color:'#f0b90b'});
-	        else if(c1h<0&&cmdWorsening)chartSignals.push({...sigCtx,type:'dc',icon:'💀',label:'死叉←卖出',color:'#f6465d'});
+	        else if(c1h<0&&cmdWorsening)chartSignals.push({...sigCtx,type:'dc',icon:'💀',label:'死叉',color:'#f6465d'});
 	        else chartSignals.push({...sigCtx,type:'dc_warn',icon:'🔶',label:'死叉(观望)',color:'#f0b90b'});
 	      }
 	    }
@@ -790,7 +849,7 @@ function scanChartSignals() {
 	    // ═══════════════════════════════════════════════════════
 	    // 层级检查: 上层流出时下层能否撑住(753样本验证)
 	    const priceNearMA=Math.abs(p-ma15[i])/ma15[i]<0.008;
-	    const step1OK=mf15[i]>0&&mf15[i-1]>0;
+	    const step1OK=mf15[i]>0&&mf15[i-1]>0&&mf15[i-2]>0;
 	    const cmdSlopeOK=v1h(c1hArr,k15[i].time)>(v1h(c1hArr,k15[i].time-21600000)||0);
 	    const rtOversold=oversold&&priceNearMA&&p>ma15[i]&&step1OK&&multi>0.3&&cmdSlopeOK;
 	    const rtTrend=!oversold&&priceNearMA&&p>ma15[i]&&step1OK&&majorUp&&multi>0.8;
@@ -805,10 +864,10 @@ function scanChartSignals() {
 	    if((rtOversold||rtTrend)&&lySt!=='unsup'&&i-cool.rt>=MIN){
 	      cool.rt=i;
 	      const rd=detectRegime();
-	      let label='回踩←加仓';
-	      if(lySt==='all_pos')label='回踩←加仓(全层共振)';
+	      let label='回踩·资金确认';
+	      if(lySt==='all_pos')label='回踩·全层共振';
 	      else if(rd.confidence>=0.6)label='回踩←加仓('+(oversold?'超卖':'趋势')+')';
-	      else label='回踩←加仓(震荡)';
+	      else label='回踩(震荡)';
 	      chartSignals.push({...sigCtx,type:'rt',icon:'✅',label,color:'#0ecb81'});
 	    }
 	    // ═══════════════════════════════════════════════════════
@@ -816,7 +875,7 @@ function scanChartSignals() {
 	    // ═══════════════════════════════════════════════════════
 	    const s5rt=mf15[i]+mf15[i-1]+mf15[i-2]+mf15[i-3]+mf15[i-4];
 	    if(i>55&&mf15[i]<0&&mf15[i-1]<0&&s5rt<-100000&&overbought&&multi<0){
-	      const rdF=detectRegime();const labelF=rdF.confidence>=0.6?'出逃←卖出':'出逃(震荡)';chartSignals.push({...sigCtx,type:'flight',icon:'🔻',label:labelF,color:'#f6465d'});cool.flight=i;}
+	      const rdF=detectRegime();const labelF=rdF.confidence>=0.6?'出逃':'出逃(震荡)';chartSignals.push({...sigCtx,type:'flight',icon:'🔻',label:labelF,color:'#f6465d'});cool.flight=i;}
 	  }
 	  if(chartSignals.length>2000) chartSignals=chartSignals.slice(-2000);
 	}
@@ -877,7 +936,7 @@ function runBacktest(){
     else{chu.total++;if(ret<-1)chu.ok++;chu.rets.push(ret);}
   }
   let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h3 style="font-size:12px;color:#f0b90b;margin:0">📊 回测结果(24h持有)</h3></div>';
-  for(const{lb,stats}of[{lb:'✅回踩(买入)',stats:hui},{lb:'🔻出逃(卖出)',stats:chu}]){
+  for(const{lb,stats}of[{lb:'✅回踩(做多)',stats:hui},{lb:'🔻出逃',stats:chu}]){
     if(!stats.total)continue;
     const wr=stats.total?(stats.ok/stats.total*100).toFixed(1):'0';
     const avg=stats.rets.length?(stats.rets.reduce((a,b)=>a+b,0)/stats.rets.length).toFixed(2):'0';
@@ -1089,9 +1148,9 @@ function drawChart() {
     const t=sig.type,txt=sig.icon+' '+sig.label;
     ctx.font='bold 10px Inter,sans-serif';
     const tw=ctx.measureText(txt).width+12,th=20;
-    const dir=(t==='gc'||t==='rt'||t==='chase'||t==='fake'||t==='diverg'||t==='panic'||t==='flight'||t==='surge'||t==='fade'||t==='bottom'||t==='gc_weak')?-1:1;
+    const dir=(t==='gc'||t==='rt'||t==='chase'||t==='fake'||t==='diverg'||t==='panic'||t==='flight'||t==='surge'||t==='fade'||t==='bottom'||t==='gc_weak'||t==='impending_gc'||t==='divergence_bull'||t==='momentum_slow'||t==='momentum_fast')?-1:1;
     const my=dir===-1?yPos(Math.min(k.close,k.low)):yPos(Math.max(k.close,k.high));
-    sigs.push({x,my,tw,th,dir,t,txt,color:sig.color||'#f0b90b',baseOff:t==='dc'||t==='panic'?50:35,off:0,_sig:sig});}
+    sigs.push({x,my,tw,th,dir,t,txt,color:sig.color||'#f0b90b',baseOff:(t==='dc'||t==='panic'||t==='impending_dc'||t==='divergence_bear')?50:35,off:0,_sig:sig});}
   function lg(g){if(!g.length)return;g.sort((a,b)=>a.x-b.x);g[0].off=g[0].baseOff;
     for(let i=1;i<g.length;i++){const p=g[i-1],c=g[i];
       const pT=p.dir===-1?p.my+p.off:p.my-p.off-p.th,pB=pT+p.th,pL=p.x-p.tw/2,pR=p.x+p.tw/2;
@@ -1100,8 +1159,8 @@ function drawChart() {
   lg(sigs.filter(s=>s.dir===1));lg(sigs.filter(s=>s.dir===-1));
   for(const s of sigs){
     const x=s.x,my=s.my,dir=s.dir,off=s.off;
-    if(s.t==='gc'||s.t==='rt'||s.t==='bottom'){ctx.fillStyle=s.color;ctx.beginPath();ctx.moveTo(x-5,my-8);ctx.lineTo(x+5,my-8);ctx.lineTo(x,my-2);ctx.closePath();ctx.fill();}
-    else if(s.t==='dc'){ctx.strokeStyle=s.color;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(x-5,my+8);ctx.lineTo(x+5,my+2);ctx.moveTo(x+5,my+8);ctx.lineTo(x-5,my+2);ctx.stroke();}
+    if(s.t==='gc'||s.t==='rt'||s.t==='bottom'||s.t==='impending_gc'||s.t==='divergence_bull'){ctx.fillStyle=s.color;ctx.beginPath();ctx.moveTo(x-5,my-8);ctx.lineTo(x+5,my-8);ctx.lineTo(x,my-2);ctx.closePath();ctx.fill();}
+    else if(s.t==='dc'||s.t==='impending_dc'||s.t==='divergence_bear'){ctx.strokeStyle=s.color;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(x-5,my+8);ctx.lineTo(x+5,my+2);ctx.moveTo(x+5,my+8);ctx.lineTo(x-5,my+2);ctx.stroke();}
     else{ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(x,my+(s.t==='dc_warn'?-4:4),2.5,0,Math.PI*2);ctx.fill();}
     const ly=dir===-1?my+off:my-off;
     let bx=x-s.tw/2;const by=dir===-1?ly:ly-s.th;
@@ -1645,12 +1704,17 @@ async function init(){
   TF_INTERVALS.forEach(tf=>{const btn=document.createElement('button');btn.className='tf-btn'+(tf.id===chartTF?' active':'');btn.dataset.tf=tf.id;btn.textContent=tf.label;btn.addEventListener('click',()=>setChartTF(tf.id));tfBar.appendChild(btn);});
   const leg=document.getElementById('maLegend');
   leg.innerHTML=MA_CONFIG.map(m=>'<div class="ma-legend-item" style="color:'+m.color+'"><div class="ma-legend-color" style="background:'+m.color+'"></div>'+m.label+'</div>').join('')+'<div style="flex:1;min-width:10px"></div>'+
-    '<div class="ma-legend-item" style="color:#0ecb81"><span>🟢</span>金叉买入</div>'+
+    '<div class="ma-legend-item" style="color:#0ecb81"><span>🟢</span>金叉·共振</div>'+
     '<div class="ma-legend-item" style="color:#848e9c"><span>⚪</span>金叉(弱势)</div>'+
-    '<div class="ma-legend-item" style="color:#0ecb81"><span>✅</span>回踩加仓</div>'+
-    '<div class="ma-legend-item" style="color:#f6465d"><span>💀</span>死叉卖出</div>'+
-    '<div class="ma-legend-item" style="color:#f6465d"><span>🔻</span>出逃卖出</div>'+
-    '<div class="ma-legend-item" style="color:#f0b90b"><span>🚨</span>追高等回踩</div>';
+    '<div class="ma-legend-item" style="color:#0ecb81"><span>✅</span>回踩确认</div>'+
+    '<div class="ma-legend-item" style="color:#f6465d"><span>💀</span>死叉</div>'+
+    '<div class="ma-legend-item" style="color:#f6465d"><span>🔻</span>出逃</div>'+
+    '<div class="ma-legend-item" style="color:#f0b90b"><span>🚨</span>追高·偏离大</div>'+
+    '<div class="ma-legend-item" style="color:#0ecb81"><span>⚡</span>即将金叉</div>'+
+    '<div class="ma-legend-item" style="color:#f6465d"><span>⚡</span>即将死叉</div>'+
+    '<div class="ma-legend-item" style="color:#f6465d"><span>🔶</span>顶背离</div>'+
+    '<div class="ma-legend-item" style="color:#0ecb81"><span>🟢</span>底背离</div>'+
+    '<div class="ma-legend-item" style="color:#f0b90b"><span>🟡</span>资金减速</div>';
   try{const t=await fetchTicker();if(t)Object.assign(state,t);}catch(e){}
   await refreshAll();startWS();
   refreshTimer=setInterval(refreshAll,15000);uiTimer=setInterval(updateUI,1000);tickerTimer=setInterval(async()=>{try{const t=await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr?symbol="+SYMBOL).then(r=>r.json());state.price=parseFloat(t.lastPrice);state.change24h=parseFloat(t.priceChange);state.changePct24h=parseFloat(t.priceChangePercent);updateUI();}catch(_){}},3000);
@@ -1673,7 +1737,7 @@ async function init(){
     }
     txt+='---\n价格: $'+state.price.toFixed(2)+' | '+new Date().toLocaleTimeString();
     navigator.clipboard.writeText(txt).then(()=>{const btn=document.getElementById('copyTagsBtn');btn.textContent='✅';setTimeout(()=>btn.textContent='📋',2000);});
-  };document.getElementById('copyHistBtn').onclick=async()=>{const btn=document.getElementById('copyHistBtn');btn.textContent='⏳';const history=await getHistory(MAX_DAYS);const ks=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D','1w':'1W','1M':'1M'};var _ep=parseFloat(localStorage.getItem('entryPrice'));var _ei='';if(_ep&&_ep>0){var _pp=((state.price-_ep)/_ep*100).toFixed(2);_ei='【持仓信息】入场:'+String.fromCharCode(36)+_ep.toFixed(2)+' | 现价:'+String.fromCharCode(36)+state.price.toFixed(2)+' | '+(state.price>=_ep?'盈利':'亏损')+Math.abs(_pp)+'%\n\n';}var txt=_ei+'📊 Porter 多周期分析报告 ('+MAX_DAYS+'天数据)\n时间: '+new Date().toLocaleString()+' | '+SYMBOL+' $'+state.price.toFixed(2)+'\n\n【字段说明】\nMA=该周期SMA30均线价 | 净(CMD)=24K累计净资金流(正=净流入,负=净流出) | 入/出=24K内总买入/卖出量 | 速(speedRatio)=|净|÷均线缺口(>1够突破,<1不够) | 倍(mult)=当前资金流强度vs近期平均(>3强,≈1正常,<1弱) | 当=当前单KCMD(参考指标,净决定方向,当判断力度:当大=动量强,当小=动量弱)\n\n=== 当前数据 ===\n';for(const k of ks){const d=tfData[k];if(!d)continue;const cmd=d.cmd||0,mfCur=d.mfCur||0;const need=Math.abs(d.ma-(tfData[ks[ks.indexOf(k)+1]]?.ma||state.price))*1000;const sr=need>0?Math.abs(cmd)/need:0;txt+=lb[k]+': $'+d.ma.toFixed(0)+' | 净'+(cmd>=0?'+':'')+fmtVol(cmd)+' | 入'+fmtVol(d.totalIn||0).slice(1)+' 出'+fmtVol(d.totalOut||0).slice(1)+' | 速'+(cmd<0?'-':'')+sr.toFixed(1)+'x | 倍'+(d.mult||0).toFixed(1)+'x | 当'+(mfCur>0?'+':'')+fmtVol(mfCur)+'\n';}if(history.length>0){txt+='\n=== '+history.length+'条历史趋势(净额变化) ===\n时间\t';for(const k of ks)txt+=lb[k]+'\t';txt+='价格\n';for(const h of history.slice(-200)){txt+=new Date(h.ts).toLocaleString()+' ';for(const k of ks){const t=h.tf[k];txt+=(t?((t.cmd||0)>=0?'+':'')+fmtVol(t.cmd||0):'—')+'\t';}txt+='$'+(h.price||0).toFixed(2)+'\n';}}txt+='\n---\n【分析规则(必遵守)】\n1.净决定多空方向,当决定动量强弱:净↑=偏多,净↓=偏空。当大=加速,当小=减弱\n2.速>1=够突破,<1=不够。|倍|>3=强\n3.不准预测暴涨暴跌,只说当前结构\n4.入场必须给具体点位,不止损不推荐\n5.宏观只说确认知道的\n6.关键发现用⚠️或✅标注,结论用一句话写清楚多空\n7.不准只看单一周期得出结论,必须综合9个周期净和当的分布来下判断\n8.必须对照下方的历史趋势表,逐个周期看净额变化方向(恶化/改善/见顶/触底)。例如:1H净从+8M升到+16M又回落到+12M=见顶回落,不能说还在买入\n9.结论和交易计划方向必须一致。偏空就不能建议做多,偏多就不能建议做空。震荡就建议观望\n\n【示例-正确分析】\n步骤1:15M净正当负(动能弱)1H净正当负(动能弱)4H净负当正(接盘)8H净负当正(接盘)1D净正当正(强势)→整体偏多但短弱中强\n结论:🟡震荡偏多\n\n【示例-错误分析】\n❌1H净+就喊多(只看一个周期)\n❌当归零就喊空(忽略中长线)\n❌马上就要暴涨/暴跌(预测)\n❌只看当前快照不看历史趋势\n\n【输出格式】每步单独写,结论放最后。结论必须明确写偏多/偏空/震荡\n\n【分析步骤(按顺序)】\n步骤1:每个周期对照净和当→判断方向\n步骤2:对照历史趋势表看变化趋势(恶化/改善/平稳)\n步骤3:找现价与各MA位置→标支撑阻力\n步骤4:找最大矛盾点\n步骤5:给出结论+具体交易计划\n步骤6:直接回答:①当前位置偏多还是偏空?②要不要跑(持多者)?③能不能拿住?底线在哪?';navigator.clipboard.writeText(txt).then(()=>{btn.textContent='✅';setTimeout(()=>btn.textContent='📋📊',2000);});};
+  };document.getElementById('copyHistBtn').onclick=async()=>{const btn=document.getElementById('copyHistBtn');btn.textContent='⏳';const history=await getHistory(MAX_DAYS);const ks=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D','1w':'1W','1M':'1M'};var _ep=parseFloat(localStorage.getItem('entryPrice'));var _ei='';if(_ep&&_ep>0){var _pp=((state.price-_ep)/_ep*100).toFixed(2);_ei='【持仓信息】入场:'+String.fromCharCode(36)+_ep.toFixed(2)+' | 现价:'+String.fromCharCode(36)+state.price.toFixed(2)+' | '+(state.price>=_ep?'盈利':'亏损')+Math.abs(_pp)+'%\n\n';}var txt=_ei+'📊 Porter 多周期分析报告 ('+MAX_DAYS+'天数据)\n时间: '+new Date().toLocaleString()+' | '+SYMBOL+' $'+state.price.toFixed(2)+'\n\n【字段说明】\nMA=该周期SMA30均线价 | 净(CMD)=24K累计净资金流(正=净流入,负=净流出) | 入/出=24K内总买入/卖出量 | 速(speedRatio)=|净|÷均线缺口(>1够突破,<1不够) | 倍(mult)=当前资金流强度vs近期平均(>3强,≈1正常,<1弱) | 当=当前单KCMD(参考指标,净决定方向,当判断力度:当大=动量强,当小=动量弱)\n\n=== 当前数据 ===\n';for(const k of ks){const d=tfData[k];if(!d)continue;const cmd=d.cmd||0,mfCur=d.mfCur||0;const need=Math.abs(d.ma-(tfData[ks[ks.indexOf(k)+1]]?.ma||state.price))*1000;const sr=need>0?Math.abs(cmd)/need:0;txt+=lb[k]+': $'+d.ma.toFixed(0)+' | 净'+(cmd>=0?'+':'')+fmtVol(cmd)+' | 入'+fmtVol(d.totalIn||0).slice(1)+' 出'+fmtVol(d.totalOut||0).slice(1)+' | 速'+(cmd<0?'-':'')+sr.toFixed(1)+'x | 倍'+(d.mult||0).toFixed(1)+'x | 当'+(mfCur>0?'+':'')+fmtVol(mfCur)+'\n';}if(history.length>0){txt+='\n=== '+history.length+'条历史趋势(净额变化) ===\n时间\t';for(const k of ks)txt+=lb[k]+'\t';txt+='价格\n';for(const h of history.slice(-200)){txt+=new Date(h.ts).toLocaleString()+' ';for(const k of ks){const t=h.tf[k];txt+=(t?((t.cmd||0)>=0?'+':'')+fmtVol(t.cmd||0):'—')+'\t';}txt+='$'+(h.price||0).toFixed(2)+'\n';}}txt+='\n---\n【指令】\n直接给我结论，不写分析过程。\n\n必须回答：\n1. 现在偏多还是偏空？一句话\n2. 我的持仓（盈亏在上面）该怎么办？持有、减仓还是清仓？给具体条件\n3. 如果持有，底线在哪？\n\n要求：直接说，不说步骤，不说字段解释';navigator.clipboard.writeText(txt).then(()=>{btn.textContent='✅';setTimeout(()=>btn.textContent='📋📊',2000);});};
   window.addEventListener('keydown',e=>{
     if(e.key==='='||e.key==='+'){e.preventDefault();zoomChart(-10);}
     if(e.key==='-'){e.preventDefault();zoomChart(10);}
@@ -1741,6 +1805,50 @@ async function init(){
     });
     window.addEventListener('mouseup',()=>{
       if(isDragging){isDragging=false;cv.style.cursor='crosshair';drawChart();}
+    });
+    // 点击信号显示资金详情
+    cv.addEventListener('click',e=>{
+      const rect=cv.getBoundingClientRect();
+      const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+      const pos=window._sigPos||[];
+      let best=null,bestDist=35;
+      for(const p of pos){
+        const d=Math.hypot(mx-p.x,my-p.ly);
+        if(d<bestDist){bestDist=d;best=p;}
+      }
+      const el=document.getElementById('sigDetail');
+      if(!best){el.style.display='none';return;}
+      const s=best.sig;if(!s)return;
+      const d=s;
+      const cmdClr=v=>v>0?'#0ecb81':v<0?'#f6465d':'#848e9c';
+      const fmtCmd=v=>v===undefined||v===null||isNaN(v)?'—':(v>=0?'+':'')+fmtVol(v);
+      const tm=new Date(d.time).toLocaleString();
+      const icon=d.icon||'❓',label=d.label||d.type||'信号';
+      const div=document.getElementById('sigDetail');
+      let h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+      h+='<span style="font-weight:700;font-size:13px;">'+icon+' '+label+'</span>';
+      h+='<span style="color:#848e9c;font-size:9px;cursor:pointer;" onclick="this.parentElement.parentElement.parentElement.style.display=&#39;none&#39;">✕</span></div>';
+      h+='<div style="color:#848e9c;font-size:10px;margin-bottom:6px;border-bottom:1px solid #1e2d50;padding-bottom:4px;">'+tm+'</div>';
+      h+='<div class="row"><span class="l">价格</span><span class="v">$'+(d.price||0).toFixed(2)+'</span></div>';
+      h+='<div class="row"><span class="l">MA15</span><span class="v">$'+(d.ma15||0).toFixed(2)+'</span></div>';
+      h+='<div class="row"><span class="l">MA60</span><span class="v">$'+(d.ma60||0).toFixed(2)+'</span></div>';
+      h+='<div class="row"><span class="l">偏离度</span><span class="v" style="color:'+cmdClr(d.div)+'">'+((d.div||0)>=0?'+':'')+(d.div||0).toFixed(2)+'%</span></div>';
+      h+='<div class="row"><span class="l">战力(倍)</span><span class="v" style="color:'+((d.mult||0)>0?'#0ecb81':'#f6465d')+'">'+fmtMult(d.mult||0)+'</span></div>';
+      h+='<div class="row"><span class="l">StochK</span><span class="v">'+((d.stochK||0).toFixed(0))+'</span></div>';
+      h+='<div style="font-size:9px;color:#848e9c;margin:6px 0 3px;border-bottom:1px solid #1e2d50;padding-bottom:2px;">📊 多周期CMD</div>';
+      const tfLabels=[{k:'cmd',l:'15M'},{k:'cmd1h',l:'1H'},{k:'cmd4h',l:'4H'},{k:'cmd6h',l:'6H'},{k:'cmd8h',l:'8H'},{k:'cmd12h',l:'12H'},{k:'cmd1d',l:'1D'}];
+      for(const t of tfLabels){
+        const v=d[t.k];
+        if(v===0||v===undefined||v===null){h+='<div class="row"><span class="l">'+t.l+'</span><span class="v" style="color:#5a6270">—</span></div>';continue;}
+        h+='<div class="row"><span class="l">'+t.l+'</span><span class="v" style="color:'+cmdClr(v)+'">'+fmtCmd(v)+'</span></div>';
+      }
+      if(d.atr)h+='<div class="row" style="margin-top:3px;border-top:1px solid #1e2d50;padding-top:3px;"><span class="l">ATR</span><span class="v">$'+(d.atr||0).toFixed(2)+'</span></div>';
+      div.innerHTML=h;
+      div.style.display='block';
+      let px=Math.min(e.clientX-rect.left,rect.width-div.offsetWidth-10);
+      let py=Math.min(e.clientY-rect.top+15,rect.height-div.offsetHeight-10);
+      if(px<5)px=5;if(py<5)py=5;
+      div.style.left=px+'px';div.style.top=py+'px';
     });
   }
 }
