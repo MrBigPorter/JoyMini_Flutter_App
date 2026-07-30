@@ -1518,33 +1518,47 @@ function updateUI(){
     maEl.style.display='block';
     let h='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">';
     h+=ma.regime+' <b>'+ma.bias+'</b>';
-    h+=' <span style="color:#848e9c">| 多'+ma.b+' 空'+ma.be+' 均战力'+ma.avgM.toFixed(1)+'x</span>';
+    h+=' <span style="color:#848e9c">| 均战力'+ma.avgM.toFixed(1)+'x</span>';
     if(ma.sup)h+=' | ⬇ <span style="color:#0ecb81">$'+ma.sup.ma.toFixed(0)+'</span>('+ma.sup.key.toUpperCase()+')';
     if(ma.res)h+=' | ⬆ <span style="color:#f6465d">$'+ma.res.ma.toFixed(0)+'</span>('+ma.res.key.toUpperCase()+')';
-	    // 买盘指数(当前60%+过去40%)
-var _bkW=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];
-var _bw=[0.25,0.20,0.15,0.10,0.08,0.06,0.06,0.05,0.05];
-var _bS1=0,_bS2=0,_bT=0,_nNeg=0;
-for(var _bi=0;_bi<_bkW.length;_bi++){var _bd=tfData[_bkW[_bi]];if(_bd){_bT+=_bw[_bi];
-if(_bd.mfCur!==undefined)_bS1+=_bw[_bi]*(_bd.mfCur>0?1:-1);
-if(_bd.cmd!==undefined){_bS2+=_bw[_bi]*(_bd.cmd>0?1:-1);if(_bd.cmd<0)_nNeg++;}}}
-var _bI=_bT>0?Math.round((((_bS1/_bT*0.6+_bS2/_bT*0.4)+1)/2*100)):50;
-var _bC=_bI>=70?'#0ecb81':_bI>=50?'#f0b90b':_bI>=30?'#f0b90b':'#f6465d';
-var _bL=_bI>=70?'偏多':_bI>=50?'中性':_bI>=30?'偏弱':'危险';
-var _cA=_bI>=70?'持有':_bI>=50?'观望':_bI>=30?'谨慎':'减仓';
-var _risk=_nNeg>=5?'('+_nNeg+'期流出)':'';
-// ⚠️预警:15M走好但大周期没跟
-var _d15=tfData['15m'];var _h1=tfData['1h'];
-var _alert='';
-if(_d15&&_d15.cmd>0&&_d15.mfCur>0&&_d15.cmdChange6>0&&_bI<70)_alert=' ⚠️15M走好';
-else if(_d15&&_d15.cmd>0&&_d15.mfCur>0&&_h1&&_h1.cmdChange6>0&&_bI<70)_alert=' ⚠️关注';
-h+='</div>';
-h+='<div style="display:flex;gap:10px;font-size:9px;margin-top:2px;align-items:center;">';
-h+='买盘指数 <span style="color:'+_bC+';font-weight:700;">'+_bI+'</span> '+_bL;
-h+=' <span style="color:#848e9c">|</span> '+_cA;
-h+='<span style="color:#f0b90b;font-size:8px;">'+_alert+'</span>';
-h+=' <span style="color:#f6465d;font-size:8px;">'+_risk+'</span>';
-h+='</div>';
+	    // ── 稳定指数(替代买盘指数) ──
+	// 三个慢变信号: 间距方向(40%)+周期斜率(40%)+OI(20%)
+	var _sm15=tfData['15m']?.ma||0,_sm1h=tfData['1h']?.ma||0;
+	var _sGap = 20;
+	if(_sm15 > _sm1h) {
+	  var _sg = _sm15&&_sm1h?Math.abs(_sm15-_sm1h)/_sm1h*100:0;
+	  _sGap = _sg >= 0.30 ? 40 : _sg >= 0.15 ? 32 : 22;
+	} else {
+	  var _sg = _sm15&&_sm1h?Math.abs(_sm15-_sm1h)/_sm1h*100:0;
+	  _sGap = _sg >= 0.30 ? 15 : _sg >= 0.15 ? 8 : 3;
+	}
+	var _sTrend = 20;
+	if(ma && ma.dirs) {
+	  var _nUp = (ma.dirs.match(/↗/g)||[]).length;
+	  var _nDn = (ma.dirs.match(/↘/g)||[]).length;
+	  _sTrend = Math.round(Math.max(0, Math.min(40, _nUp * 4.5 - _nDn * 2 + 20)));
+	}
+	var _sOi = 10;
+	if(window._oiChg !== undefined) {
+	  _sOi = window._oiChg > 0 ? 20 : window._oiChg < -100 ? 3 : 10;
+	}
+	var _sTotal = Math.min(100, Math.max(0, _sGap + _sTrend + _sOi));
+	var _sColor = _sTotal >= 70 ? '#0ecb81' : _sTotal >= 45 ? '#f0b90b' : '#f6465d';
+	var _sLabel = _sTotal >= 70 ? '稳' : _sTotal >= 45 ? '偏稳' : '不稳';
+	var _sAdvice = _sTotal >= 70 ? '持有' : _sTotal >= 45 ? '观望' : '警惕';
+	var _nNeg = 0;
+	for(var _ni=0;_ni<TF_KEYS.length;_ni++){var _nd=tfData[TF_KEYS[_ni]];if(_nd&&_nd.cmd<0)_nNeg++;}
+	var _risk = _nNeg >= 5 ? '('+_nNeg+'期流出)' : '';
+	var _d15=tfData['15m'];var _h1=tfData['1h'];
+	var _alert='';
+	if(_d15&&_d15.cmd>0&&_d15.mfCur>0&&_d15.cmdChange6>0&&_sTotal<65)_alert=' ⚠️15M走好·大周期偏空';
+	h+='</div>';
+	h+='<div style="display:flex;gap:10px;font-size:9px;margin-top:2px;align-items:center;">';
+	h+='稳定指数 <span style="color:'+_sColor+';font-weight:700;">'+_sTotal+'</span> '+_sLabel;
+	h+=' <span style="color:#848e9c">|</span> '+_sAdvice;
+	h+='<span style="color:#f0b90b;font-size:8px;">'+_alert+'</span>';
+	h+=' <span style="color:#f6465d;font-size:8px;">'+_risk+'</span>';
+	h+='</div>';
 	// MA间距(15M-1H)
 	var _m15ma=tfData['15m']?.ma||0,_m1hma=tfData['1h']?.ma||0;
 	var _maGap=_m15ma&&_m1hma?Math.abs(_m15ma-_m1hma)/_m1hma*100:0;
