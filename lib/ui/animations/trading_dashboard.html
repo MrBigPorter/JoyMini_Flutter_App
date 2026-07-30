@@ -1371,8 +1371,27 @@ function drawChart() {
   // 子图表(4H,1D)
   drawMiniChart('4h','chartCanvas4h','sub4hLabel');
   drawMiniChart('1d','chartCanvas1d','sub1dLabel');
-  // 当前价线
+  // 多周期高低位价格带
+  const zones=[
+    {label:'大周期底',lo:60000,hi:63000,clr:'rgba(14,203,129,0.08)',line:'#0ecb81'},
+    {label:'大周期顶',lo:75000,hi:80000,clr:'rgba(246,70,93,0.08)',line:'#f6465d'},
+    {label:'中周期底',lo:62000,hi:63500,clr:'rgba(14,203,129,0.06)',line:'rgba(14,203,129,0.4)'},
+    {label:'中周期顶',lo:65500,hi:66500,clr:'rgba(246,70,93,0.06)',line:'rgba(246,70,93,0.4)'},
+    {label:'短线压',lo:64050,hi:64250,clr:'rgba(240,185,11,0.08)',line:'#f0b90b'},
+  ];
   const py=yPos(state.price);
+  for(const z of zones){
+    const y1=yPos(z.hi),y2=yPos(z.lo),bw=Math.abs(y2-y1);
+    if(y1<pad.top+ch+10&&y2>pad.top-10){
+      ctx.fillStyle=z.clr;ctx.fillRect(pad.left,Math.min(y1,y2),cw,bw);
+      ctx.strokeStyle=z.line;ctx.lineWidth=0.5;ctx.setLineDash([3,3]);
+      ctx.beginPath();ctx.moveTo(pad.left,Math.min(y1,y2));ctx.lineTo(W-pad.right,Math.min(y1,y2));
+      ctx.moveTo(pad.left,Math.max(y1,y2));ctx.lineTo(W-pad.right,Math.max(y1,y2));ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle=z.line;ctx.font='7px Inter,sans-serif';ctx.textAlign='left';
+      ctx.fillText(z.label,pad.left+2,Math.min(y1,y2)-2);
+    }
+  }
+  // 当前价线
   ctx.strokeStyle='rgba(224,230,240,0.4)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
   ctx.beginPath();ctx.moveTo(pad.left,py);ctx.lineTo(W-pad.right,py);ctx.stroke();ctx.setLineDash([]);
   ctx.fillStyle='#e0e6f0';ctx.font='bold 9px Inter,monospace';ctx.textAlign='left';
