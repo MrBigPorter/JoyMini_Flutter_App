@@ -163,6 +163,7 @@
     .bt-btn { min-height:36px; font-size:10px !important; }
     #fsBtn, #dsBtn { display:none !important; }
     .sig-detail { max-width:260px !important; font-size:10px !important; padding:8px 10px !important; }
+    .zoom-btn { width:32px !important; height:32px !important; font-size:16px !important; }
   }
 
   /* Touch-friendly */
@@ -1851,7 +1852,8 @@ async function init(){
       isDragging=true;dragStartX=e.clientX;dragStartOffset=chartOffset;
       cv.style.cursor='grabbing';
     });
-    p.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];isDragging=true;dragStartX=t.clientX;dragStartOffset=chartOffset;cv.style.cursor='grabbing';},{passive:false});
+    let pinchDist=0;
+p.addEventListener('touchstart',e=>{e.preventDefault();if(e.touches.length>=2){pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);isDragging=false;return;}const t=e.touches[0];isDragging=true;dragStartX=t.clientX;dragStartOffset=chartOffset;cv.style.cursor='grabbing';},{passive:false});
     window.addEventListener('mousemove',e=>{
       if(!isDragging)return;
       const kl=allKlines[chartTF];if(!kl||kl.length<2)return;
@@ -1863,6 +1865,12 @@ async function init(){
       drawChart();
     });
     window.addEventListener('touchmove',e=>{
+      if(e.touches.length>=2&&pinchDist>0){
+        const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+        const delta=Math.round((d-pinchDist)/5);
+        if(Math.abs(delta)>=2){const kl=allKlines[chartTF];if(kl){const mv=Math.min(kl.length,chartBarCount);chartBarCount=Math.max(20,Math.min(200,chartBarCount-delta));chartOffset=Math.max(0,Math.min(kl.length-Math.min(kl.length,chartBarCount),chartOffset));drawChart();}pinchDist=d;}
+        return;
+      }
       if(!isDragging)return;
       const kl=allKlines[chartTF];if(!kl||kl.length<2)return;
       const t=e.touches[0];const dx=t.clientX-dragStartX;
@@ -1876,6 +1884,7 @@ async function init(){
       if(isDragging){isDragging=false;cv.style.cursor='crosshair';drawChart();}
     });
     window.addEventListener('touchend',()=>{
+      pinchDist=0;
       if(isDragging){isDragging=false;cv.style.cursor='crosshair';drawChart();}
     });
     // 点击信号显示资金详情
