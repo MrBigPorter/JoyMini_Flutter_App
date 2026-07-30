@@ -1545,7 +1545,16 @@ h+=' <span style="color:#848e9c">|</span> '+_cA;
 h+='<span style="color:#f0b90b;font-size:8px;">'+_alert+'</span>';
 h+=' <span style="color:#f6465d;font-size:8px;">'+_risk+'</span>';
 h+='</div>';
-    h+='</div><div style="color:#5a6270;font-size:9px;margin-top:2px;">'+ma.dirs+'</div>';
+	// MA间距(15M-1H)
+	var _m15ma=tfData['15m']?.ma||0,_m1hma=tfData['1h']?.ma||0;
+	var _maGap=_m15ma&&_m1hma?Math.abs(_m15ma-_m1hma)/_m1hma*100:0;
+	var _maArrow=_m15ma>_m1hma?'↑':'↓';
+	var _maAlert=_maGap<0.15?' ⚡':' ';
+	h+='<div style="display:flex;gap:8px;font-size:8px;margin-top:1px;color:#848e9c;">';
+	h+='15M-1H间距: <span style="color:'+(_maGap<0.3?'#f0b90b':'#848e9c')+';font-weight:600;">'+_maGap.toFixed(2)+'%</span> '+_maArrow;
+	if(_maGap<0.15)h+='<span style="color:#f0b90b;font-weight:700;">⚡即将交叉</span>';
+	h+='</div>';
+	h+='</div><div style="color:#5a6270;font-size:9px;margin-top:2px;">'+ma.dirs+'</div>';
     maEl.innerHTML=h;
   }else if(maEl)maEl.style.display='none';
   // 15分钟快照
