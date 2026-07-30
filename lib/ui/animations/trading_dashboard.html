@@ -1523,7 +1523,18 @@ function updateUI(){
     h+=' <span style="color:#848e9c">| 多'+ma.b+' 空'+ma.be+' 均战力'+ma.avgM.toFixed(1)+'x</span>';
     if(ma.sup)h+=' | ⬇ <span style="color:#0ecb81">$'+ma.sup.ma.toFixed(0)+'</span>('+ma.sup.key.toUpperCase()+')';
     if(ma.res)h+=' | ⬆ <span style="color:#f6465d">$'+ma.res.ma.toFixed(0)+'</span>('+ma.res.key.toUpperCase()+')';
-	    h+='</div><div style="font-size:9px;margin-top:2px;"><span>'+ma.fusionIcon+' '+ma.fusion+'</span></div>';
+	    // 买盘指数
+var _bkW=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];
+var _bw=[0.25,0.20,0.15,0.10,0.08,0.06,0.06,0.05,0.05];
+var _bS=0,_bT=0;
+for(var _bi=0;_bi<_bkW.length;_bi++){var _bd=tfData[_bkW[_bi]];if(_bd&&_bd.mfCur!==undefined){_bS+=_bw[_bi]*(_bd.mfCur>0?1:-1);_bT+=_bw[_bi];}}
+var _bI=_bT>0?Math.round(((_bS/_bT+1)/2*100)):50;
+var _bC=_bI>=70?'#0ecb81':_bI>=50?'#f0b90b':_bI>=30?'#f0b90b':'#f6465d';
+var _bL=_bI>=70?'强势':_bI>=50?'偏强':_bI>=30?'偏弱':'危险';
+h+='</div><div style="display:flex;gap:10px;font-size:9px;margin-top:2px;align-items:center;">';
+h+='<span>'+ma.fusionIcon+' '+ma.fusion+'</span>';
+h+='<span style="color:#848e9c">|</span> 买盘指数 <span style="color:'+_bC+';font-weight:700;">'+_bI+'</span> '+_bL;
+h+='</div>';
     h+='</div><div style="color:#5a6270;font-size:9px;margin-top:2px;">'+ma.dirs+'</div>';
     maEl.innerHTML=h;
   }else if(maEl)maEl.style.display='none';
