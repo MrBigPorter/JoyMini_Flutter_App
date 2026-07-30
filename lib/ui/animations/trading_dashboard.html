@@ -1371,42 +1371,6 @@ function drawChart() {
   // 子图表(4H,1D)
   drawMiniChart('4h','chartCanvas4h','sub4hLabel');
   drawMiniChart('1d','chartCanvas1d','sub1dLabel');
-  // 多周期高低位价格带(固定在图表顶部显示)
-  const zones=[
-    {label:'⬇大规模入',lo:60000,hi:63000,clr:'#0ecb81'},
-    {label:'⬇轻仓入',lo:62000,hi:63500,clr:'rgba(14,203,129,0.7)'},
-    {label:'⬆短线滞涨',lo:64050,hi:64250,clr:'#f0b90b'},
-    {label:'⬆中周期滞涨',lo:65500,hi:66500,clr:'rgba(246,70,93,0.7)'},
-    {label:'⬆大规模出',lo:75000,hi:80000,clr:'#f6465d'},
-  ];
-  // 顶部图例条
-  ctx.fillStyle='rgba(13,19,33,0.85)';
-  ctx.beginPath();ctx.roundRect(pad.left-5,2,cw+10,14,3);ctx.fill();
-  let lx=pad.left;
-  for(const z of zones){
-    const txt=z.label+' $'+z.lo.toLocaleString();
-    ctx.fillStyle=z.clr;ctx.font='bold 7.5px Inter,sans-serif';ctx.textAlign='left';
-    ctx.fillText(txt,lx,13);
-    lx+=ctx.measureText(txt).width+8;
-  }
-  // 当前价在哪个区的指示
-  const nowP=state.price;
-  let curZone='';
-  for(const z of zones){if(nowP>=z.lo&&nowP<=z.hi)curZone=z.label;}
-  if(curZone){ctx.fillStyle='#e0e6f0';ctx.font='bold 7.5px Inter,sans-serif';ctx.textAlign='right';
-    ctx.fillText('当前: '+curZone,W-pad.right-4,13);}
-  // 价格带背景(半透明显示)  
-  const py2=yPos(state.price);
-  for(const z of zones){
-    const y1=yPos(z.hi),y2=yPos(z.lo),bw=Math.abs(y2-y1);
-    if(y1<pad.top+ch+10&&y2>pad.top-10){
-      ctx.fillStyle=(nowP>=z.lo&&nowP<=z.hi)?z.clr.replace(')',',0.12)'):z.clr.replace(')',',0.05)');
-      ctx.fillRect(pad.left,Math.min(y1,y2),cw,bw);
-      ctx.strokeStyle=z.clr;ctx.lineWidth=0.5;ctx.setLineDash([3,4]);
-      ctx.beginPath();ctx.moveTo(pad.left,Math.min(y1,y2));ctx.lineTo(W-pad.right,Math.min(y1,y2));
-      ctx.moveTo(pad.left,Math.max(y1,y2));ctx.lineTo(W-pad.right,Math.max(y1,y2));ctx.stroke();ctx.setLineDash([]);
-    }
-  }
   // 当前价线
   ctx.strokeStyle='rgba(224,230,240,0.4)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
   ctx.beginPath();ctx.moveTo(pad.left,py);ctx.lineTo(W-pad.right,py);ctx.stroke();ctx.setLineDash([]);
@@ -1821,7 +1785,7 @@ async function init(){
     }
     txt+='---\n价格: $'+state.price.toFixed(2)+' | '+new Date().toLocaleTimeString();
     navigator.clipboard.writeText(txt).then(()=>{const btn=document.getElementById('copyTagsBtn');btn.textContent='✅';setTimeout(()=>btn.textContent='📋',2000);});
-  };document.getElementById('copyHistBtn').onclick=async()=>{const btn=document.getElementById('copyHistBtn');btn.textContent='⏳';const history=await getHistory(MAX_DAYS);const ks=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D','1w':'1W','1M':'1M'};var _ep=parseFloat(localStorage.getItem('entryPrice'));var _ei='';if(_ep&&_ep>0){var _pp=((state.price-_ep)/_ep*100).toFixed(2);_ei='【持仓信息】入场:'+String.fromCharCode(36)+_ep.toFixed(2)+' | 现价:'+String.fromCharCode(36)+state.price.toFixed(2)+' | '+(state.price>=_ep?'盈利':'亏损')+Math.abs(_pp)+'%\n\n';}var txt=_ei+'📊 Porter 多周期分析报告 ('+MAX_DAYS+'天数据)\n时间: '+new Date().toLocaleString()+' | '+SYMBOL+' $'+state.price.toFixed(2)+'\n\n【字段说明】\nMA=该周期SMA30均线价 | 净(CMD)=24K累计净资金流(正=净流入,负=净流出) | 入/出=24K内总买入/卖出量 | 速(speedRatio)=|净|÷均线缺口(>1够突破,<1不够) | 倍(mult)=当前资金流强度vs近期平均(>3强,≈1正常,<1弱) | 当=当前单KCMD(参考指标,净决定方向,当判断力度:当大=动量强,当小=动量弱)\n\n=== 当前数据 ===\n';for(const k of ks){const d=tfData[k];if(!d)continue;const cmd=d.cmd||0,mfCur=d.mfCur||0;const need=Math.abs(d.ma-(tfData[ks[ks.indexOf(k)+1]]?.ma||state.price))*1000;const sr=need>0?Math.abs(cmd)/need:0;txt+=lb[k]+': $'+d.ma.toFixed(0)+' | 净'+(cmd>=0?'+':'')+fmtVol(cmd)+' | 入'+fmtVol(d.totalIn||0).slice(1)+' 出'+fmtVol(d.totalOut||0).slice(1)+' | 速'+(cmd<0?'-':'')+sr.toFixed(1)+'x | 倍'+(d.mult||0).toFixed(1)+'x | 当'+(mfCur>0?'+':'')+fmtVol(mfCur)+'\n';}if(history.length>0){txt+='\n=== '+history.length+'条历史趋势(净额变化) ===\n时间\t';for(const k of ks)txt+=lb[k]+'\t';txt+='价格\n';for(const h of history.slice(-200)){txt+=new Date(h.ts).toLocaleString()+' ';for(const k of ks){const t=h.tf[k];txt+=(t?((t.cmd||0)>=0?'+':'')+fmtVol(t.cmd||0):'—')+'\t';}txt+='$'+(h.price||0).toFixed(2)+'\n';}}txt+='\n---\n【指令】\n直接给我结论，不写分析过程。\n\n必须回答：\n1. 现在偏多还是偏空？一句话\n2. 我的持仓（盈亏在上面）该怎么办？持有、减仓还是清仓？给具体条件\n3. 如果持有，底线在哪？\n\n要求：直接说，不说步骤，不说字段解释';navigator.clipboard.writeText(txt).then(()=>{btn.textContent='✅';setTimeout(()=>btn.textContent='📋📊',2000);});};
+  };document.getElementById('copyHistBtn').onclick=async()=>{const btn=document.getElementById('copyHistBtn');btn.textContent='⏳';const history=await getHistory(MAX_DAYS);const ks=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];const lb={'15m':'15M','1h':'1H','4h':'4H','6h':'6H','8h':'8H','12h':'12H','1d':'1D','1w':'1W','1M':'1M'};var _ep=parseFloat(localStorage.getItem('entryPrice'));var _ei='';if(_ep&&_ep>0){var _pp=((state.price-_ep)/_ep*100).toFixed(2);_ei='【持仓信息】入场:'+String.fromCharCode(36)+_ep.toFixed(2)+' | 现价:'+String.fromCharCode(36)+state.price.toFixed(2)+' | '+(state.price>=_ep?'盈利':'亏损')+Math.abs(_pp)+'%\n\n';}var txt=_ei+'📊 Porter 多周期分析报告 ('+MAX_DAYS+'天数据)\n时间: '+new Date().toLocaleString()+' | '+SYMBOL+' $'+state.price.toFixed(2)+'\n\n【字段说明】\nMA=该周期SMA30均线价 | 净(CMD)=24K累计净资金流(正=净流入,负=净流出) | 入/出=24K内总买入/卖出量 | 速(speedRatio)=|净|÷均线缺口(>1够突破,<1不够) | 倍(mult)=当前资金流强度vs近期平均(>3强,≈1正常,<1弱) | 当=当前单KCMD(参考指标,净决定方向,当判断力度:当大=动量强,当小=动量弱)\n\n=== 当前数据 ===\n';for(const k of ks){const d=tfData[k];if(!d)continue;const cmd=d.cmd||0,mfCur=d.mfCur||0;const need=Math.abs(d.ma-(tfData[ks[ks.indexOf(k)+1]]?.ma||state.price))*1000;const sr=need>0?Math.abs(cmd)/need:0;txt+=lb[k]+': $'+d.ma.toFixed(0)+' | 净'+(cmd>=0?'+':'')+fmtVol(cmd)+' | 入'+fmtVol(d.totalIn||0).slice(1)+' 出'+fmtVol(d.totalOut||0).slice(1)+' | 速'+(cmd<0?'-':'')+sr.toFixed(1)+'x | 倍'+(d.mult||0).toFixed(1)+'x | 当'+(mfCur>0?'+':'')+fmtVol(mfCur)+'\n';}if(history.length>0){txt+='\n=== '+history.length+'条历史趋势(净额变化) ===\n时间\t';for(const k of ks)txt+=lb[k]+'\t';txt+='价格\n';for(const h of history.slice(-200)){txt+=new Date(h.ts).toLocaleString()+' ';for(const k of ks){const t=h.tf[k];txt+=(t?((t.cmd||0)>=0?'+':'')+fmtVol(t.cmd||0):'—')+'\t';}txt+='$'+(h.price||0).toFixed(2)+'\n';}}txt+='\n\n=== 价格带参考 ===\n大周期买入区: $60K-$63K | 轻仓入: $62K-$63.5K\n短线滞涨: $64K-$64.25K | 中周期滞涨: $65.5K-$66.5K | 大规模出: $75K-$80K\n\n---\n【指令】\n直接给我结论，不写分析过程。\n\n必须回答：\n1. 现在偏多还是偏空？一句话\n2. 我的持仓（盈亏在上面）该怎么办？持有、减仓还是清仓？给具体条件\n3. 如果持有，底线在哪？\n\n要求：直接说，不说步骤，不说字段解释';navigator.clipboard.writeText(txt).then(()=>{btn.textContent='✅';setTimeout(()=>btn.textContent='📋📊',2000);});};
   window.addEventListener('keydown',e=>{
     if(e.key==='='||e.key==='+'){e.preventDefault();zoomChart(-10);}
     if(e.key==='-'){e.preventDefault();zoomChart(10);}
