@@ -1307,11 +1307,12 @@ function drawChart() {
     const _mfcur=d.mfCur||0;const mfclr=_mfcur>0?'#0ecb81':'#f6465d';
     l2+='  |  '+(d.mfCur>0?'买':'卖')+fmtVol(Math.abs(d.mfCur||0));
     lines.push({y:10+LH*2,font:'7.5px Inter,sans-serif',t:l2,c:'#e0e6f0'});
-    // L3: 动作(持有/减仓/观望/清仓)
-    var _cmdOk=d.cmd>0,_mfOk=(d.mfCur||0)>0;
-    var _st=_cmdOk&&_mfOk?'✅持有':_cmdOk&&!_mfOk?'⚠️减仓':!_cmdOk&&_mfOk?'👀观望':'❌清仓';
-    l3=_st;
-    lines.push({y:10+LH*3,font:'8px Inter,sans-serif',t:l3,c:_cmdOk&&_mfOk?'#0ecb81':_cmdOk||_mfOk?'#f0b90b':'#f6465d'});
+    // L3: 变化(改善/恶化+百分比)
+    var _cc=d.cmdChange6||0;
+    var _cp=d.cmd&&d.cmd!==0?(_cc/d.cmd*100).toFixed(1):0;
+    var _cS=(_cc>0?'+':'')+fmtVol(_cc).slice(1)+' ('+(_cp>0?'+':'')+_cp+'%)';
+    l3=_cS;
+    lines.push({y:10+LH*3,font:'8px Inter,sans-serif',t:l3,c:_cc>0?'#0ecb81':'#f6465d'});
     const tagH=54;
     maTag.push({cfg,my:my0,origMy:my0,tagH,lines});
   }
