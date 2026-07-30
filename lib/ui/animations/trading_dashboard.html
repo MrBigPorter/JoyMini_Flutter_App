@@ -1311,11 +1311,13 @@ function drawChart() {
     const cc6=d.cmdChange6||0;const cc6t=cc6>0?'改善':cc6<0?'恶化':'持平';
     const cc6s=fmtVol(Math.abs(cc6)).slice(1);
     // 速率判断(比上一期好还是差)
-    const cc6v=d.cmdMom5||0;
+    const cc6av=Math.abs(d.cmdMom5||0);
     const _vel=cc6t+' '+cc6s;
-    const velTxt=cc6v>0.1?'↗加速':cc6v<-0.1?'↘减速':'→平稳';
-    const velClr=cc6v>0&&cc6<0?'#f0b90b':cc6v>0?'#0ecb81':cc6<0?'#f6465d':'#848e9c';
-    l3=_vel+' '+velTxt;
+    var _vn=cc6av>5?10:cc6av>3?9:cc6av>2?8:cc6av>1.2?7:cc6av>0.8?6:cc6av>0.5?5:cc6av>0.3?4:cc6av>0.15?3:cc6av>0.05?2:1;
+    // 同向=增强,反向=减弱
+    var _same=(d.cmdMom5||0)>0&&cc6>0||(d.cmdMom5||0)<0&&cc6<0;
+    var _dTxt=_same?'加强'+_vn:'减弱'+_vn;
+    l3=_vel+' ⏱'+_dTxt;
     lines.push({y:10+LH*3,font:'8px Inter,sans-serif',t:'📊 '+l3,c:cc6>0?'#0ecb81':'#f6465d'});
     const tagH=54;
     maTag.push({cfg,my:my0,origMy:my0,tagH,lines});
