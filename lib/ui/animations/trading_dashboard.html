@@ -1310,7 +1310,7 @@ function drawChart() {
     // L3: 变化(改善/恶化+百分比)
     var _cc=d.cmdChange6||0;
     var _cm=d.cmdMom5||0;
-    var _ar=_cm>0.03?'好转':_cm<-0.03?'加速':'平稳';
+    var _ar=_cm>0.03?'加速':_cm<-0.03?'好转':'平稳';
     l3=(_cc>0?'+':'')+fmtVol(Math.abs(_cc)).slice(1)+' '+_ar;
     lines.push({y:10+LH*3,font:'8px Inter,sans-serif',t:l3,c:_cc>0?'#0ecb81':'#f6465d'});
     const tagH=54;
