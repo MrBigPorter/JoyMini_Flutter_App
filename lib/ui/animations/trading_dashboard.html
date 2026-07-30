@@ -1523,7 +1523,7 @@ function updateUI(){
     var _sG=_s15&&_s1h?Math.abs(_s15-_s1h)/_s1h*100:0,_sD=_s15>_s1h?1:-1;
     var _sS=_sD>0?Math.min(100,_sG/0.3*100):-Math.min(100,_sG/0.3*100);
     var _iS=0,_iC=0;
-    for(var _k=0;_k<3;_k++){var _d=tfData[['15m','1h','4h'][_k]];if(_d&&_d.cmdChange6!==undefined){_iS+=Math.max(-100,Math.min(100,_d.cmdChange6/500000*100));_iC++;}}
+    for(var _k=0;_k<3;_k++){var _d=tfData[['15m','1h','4h'][_k]];if(_d&&_d.cmdChange6!==undefined){_iS+=Math.max(-100,Math.min(100,_d.cmdChange6/Math.max(1,Math.abs(_d.cmd||1)*0.3)*100));_iC++;}}
     var _iA=_iC>0?_iS/_iC:0;
     var _oS=window._oiChg!==undefined?(window._oiChg>0?100:-100):0;
     // ═══ VPVR成交量分布 ═══
@@ -1749,7 +1749,7 @@ async function refreshAll(){
     if(klines.length>=20){allKlines[key]=klines;const m=calcTF(key,klines,state.price);if(m)tfData[key]=m;}
   }catch(e){}}
   // OI自动刷新+今日区间
-  if(SYMBOL==='BTCUSDT'){try{var _o=await fetch('https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=15m&limit=2');var _j=await _o.json();if(_j&&_j.length>=2)var _oiN=parseFloat(_j[_j.length-1].sumOpenInterest), _oiP=parseFloat(_j[0].sumOpenInterest);window._oiDir=_oiN>_oiP?'↑':'↓';window._oiChg=(_oiN-_oiP).toFixed(0);window._oiVal=_oiN.toFixed(0);}catch(_){}}
+  try{var _o=await fetch('https://fapi.binance.com/futures/data/openInterestHist?symbol='+SYMBOL+'&period=15m&limit=2');var _j=await _o.json();if(_j&&_j.length>=2)var _oiN=parseFloat(_j[_j.length-1].sumOpenInterest), _oiP=parseFloat(_j[0].sumOpenInterest);window._oiDir=_oiN>_oiP?'↑':'↓';window._oiChg=(_oiN-_oiP).toFixed(0);window._oiVal=_oiN.toFixed(0);}catch(_){}}
   // 今日高低点
   if(state.price){if(!window._dayLow||state.price<window._dayLow)window._dayLow=state.price;if(!window._dayHigh||state.price>window._dayHigh)window._dayHigh=state.price;}
 }
@@ -1849,9 +1849,9 @@ txt+='\n=== '+history.length+'条历史趋势(净额变化) ===\n时间\t';for(c
 // BTC对比参考(非BTC币种时)
 if(SYMBOL!=='BTCUSDT'){try{var _bt=await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT');var _bd=await _bt.json();if(_bd&&_bd.lastPrice){txt+='\n\n=== BTC对比参考 ===\nBTC现价: $'+parseFloat(_bd.lastPrice).toFixed(2)+' | 24h涨跌: '+parseFloat(_bd.priceChangePercent).toFixed(2)+'%\n';}}catch(_ex2){}}
 // OI期货数据
-if(SYMBOL==='BTCUSDT'){try{var _oiR=await fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol='+SYMBOL);var _oiD=await _oiR.json();if(_oiD&&_oiD.openInterest){var _oiV=parseFloat(_oiD.openInterest);txt+='\n\n=== 期货OI(Binance) ===\n当前OI: '+(_oiV/1000).toFixed(1)+'K BTC ($'+(state.price*_oiV/1e9).toFixed(1)+'B)';}}catch(_ex3){}}
+try{var _oiR=await fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol='+SYMBOL);var _oiD=await _oiR.json();if(_oiD&&_oiD.openInterest){var _oiV=parseFloat(_oiD.openInterest);txt+='\n\n=== 期货OI(Binance) ===\n当前OI: '+(_oiV/1000).toFixed(1)+'K BTC ($'+(state.price*_oiV/1e9).toFixed(1)+'B)';}}catch(_ex3){}}
 // OI趋势
-if(SYMBOL==='BTCUSDT'){try{var _oiR2=await fetch('https://fapi.binance.com/futures/data/openInterestHist?symbol='+SYMBOL+'&period=15m&limit=2');var _oiD2=await _oiR2.json();if(_oiD2&&_oiD2.length>=2){var _oiN=parseFloat(_oiD2[_oiD2.length-1].sumOpenInterest);var _oiP=parseFloat(_oiD2[0].sumOpenInterest);var _oiD=_oiN-_oiP;var _oiDir=_oiD>0?'↑':'↓';txt+=' | OI'+_oiDir+Math.abs(Math.round(_oiD))+' '+( _oiD>0?'增加':'减少');
+try{var _oiR2=await fetch('https://fapi.binance.com/futures/data/openInterestHist?symbol='+SYMBOL+'&period=15m&limit=2');var _oiD2=await _oiR2.json();if(_oiD2&&_oiD2.length>=2){var _oiN=parseFloat(_oiD2[_oiD2.length-1].sumOpenInterest);var _oiP=parseFloat(_oiD2[0].sumOpenInterest);var _oiD=_oiN-_oiP;var _oiDir=_oiD>0?'↑':'↓';txt+=' | OI'+_oiDir+Math.abs(Math.round(_oiD))+' '+( _oiD>0?'增加':'减少');
 window._oiDir=_oiDir;window._oiChg=_oiD.toFixed(0);window._oiVal=_oiN.toFixed(0);
 }}catch(_ex4){}}
 txt+='\n\n=== 关键均线位置(距现价由近到远) ===\n';var _ms=['15m','1h','4h','6h','8h','12h','1d','1w','1M'];var _ml=[];for(var _i=0;_i<_ms.length;_i++){var _d=tfData[_ms[_i]];if(_d&&_d.ma)_ml.push({k:_ms[_i],v:_d.ma});}_ml.sort(function(a,b){return Math.abs(a.v-state.price)-Math.abs(b.v-state.price);});for(var _i=0;_i<_ml.length;_i++){var _m=_ml[_i];var _dir=_m.v>state.price?'🔼压制':'🔽支撑';var _dist=((_m.v-state.price)/state.price*100).toFixed(2);txt+=_m.k.toUpperCase()+' MA $'+_m.v.toFixed(0)+' '+_dir+' ('+_dist+'%)\n';}txt+='\n---\n【指令】\n你是Porter交易分析系统的主分析师。直接给出交易建议。\n\n执行规则：\n1. 读完整份数据再开口（当前数据+全部趋势行+均线位置）。\n2. 利用当前数据中的改善/恶化值、买/卖、累加/累减快速判断趋势。\n3. 同时对比趋势表首尾行验证，改善/恶化值与手动对比不一致时以手动对比为准。\n4. 优先找出最大矛盾点（如15M持有但1D清仓）。\n5. 涉及关键价位时交叉验证===市场参考===数据并搜索验证。\n\n必须回答：\n1. 操作建议：持有/观望/减仓/清仓？理由一句话。\n2. 持仓怎么办？给具体条件。\n3. 如果持有，底线在哪？\n\n同时分析：\n- 做多盈亏比（7天最高-现价）÷（现价-7天最低）\n- 做空盈亏比（现价-7天最低）÷（7天最高-现价）\n- 低于2:1不建议操作\n\n要求：\n- 结论直接，不模糊。\n- 所有数字标注来源。\n- 非BTC币种必须包含BTC对比。\n- 与上次对比，指出关键变化。';navigator.clipboard.writeText(txt).then(()=>{btn.textContent='✅';setTimeout(()=>btn.textContent='📋📊',2000);});};
