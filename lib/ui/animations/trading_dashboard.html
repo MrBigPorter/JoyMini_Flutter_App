@@ -1900,7 +1900,7 @@ async function init(){
       const div=document.getElementById('sigDetail');
       let h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
       h+='<span style="font-weight:700;font-size:13px;">'+icon+' '+label+'</span>';
-      h+='<span style="color:#848e9c;font-size:9px;cursor:pointer;" onclick="this.parentElement.parentElement.parentElement.style.display=&#39;none&#39;">✕</span></div>';
+      h+='<span style="color:#848e9c;font-size:9px;cursor:pointer;" id="sigClose">✕</span></div>';
       h+='<div style="color:#848e9c;font-size:10px;margin-bottom:6px;border-bottom:1px solid #1e2d50;padding-bottom:4px;">'+tm+'</div>';
       h+='<div class="row"><span class="l">价格</span><span class="v">$'+(d.price||0).toFixed(2)+'</span></div>';
       h+='<div class="row"><span class="l">MA15</span><span class="v">$'+(d.ma15||0).toFixed(2)+'</span></div>';
@@ -1917,6 +1917,7 @@ async function init(){
       }
       if(d.atr)h+='<div class="row" style="margin-top:3px;border-top:1px solid #1e2d50;padding-top:3px;"><span class="l">ATR</span><span class="v">$'+(d.atr||0).toFixed(2)+'</span></div>';
       div.innerHTML=h;
+      var sc=document.getElementById('sigClose');if(sc){sc.onclick=function(){div.style.display='none';};sc.ontouchend=function(e){e.preventDefault();div.style.display='none';};}
       div.style.display='block';
       let px=Math.min(e.clientX-rect.left,rect.width-div.offsetWidth-10);
       let py=Math.min(e.clientY-rect.top+15,rect.height-div.offsetHeight-10);
