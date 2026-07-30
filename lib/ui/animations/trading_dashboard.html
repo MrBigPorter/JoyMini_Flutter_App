@@ -1371,6 +1371,7 @@ function drawChart() {
   // 子图表(4H,1D)
   drawMiniChart('4h','chartCanvas4h','sub4hLabel');
   drawMiniChart('1d','chartCanvas1d','sub1dLabel');
+  const py=yPos(state.price);
   // 当前价线
   ctx.strokeStyle='rgba(224,230,240,0.4)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
   ctx.beginPath();ctx.moveTo(pad.left,py);ctx.lineTo(W-pad.right,py);ctx.stroke();ctx.setLineDash([]);
