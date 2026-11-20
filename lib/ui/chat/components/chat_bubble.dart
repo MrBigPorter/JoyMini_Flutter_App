@@ -42,7 +42,9 @@ class ChatBubble extends ConsumerWidget {
     return Container(
       margin: EdgeInsets.symmetric(vertical: 8.h, horizontal: 12.w),
       child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Remote participant's avatar
@@ -53,15 +55,38 @@ class ChatBubble extends ConsumerWidget {
 
           Flexible(
             child: Column(
-              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isMe
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
-                // Display sender nickname in group chats
-                if (!isMe && isGroup && message.senderName != null)
+                // Display AI marker or sender nickname in group chats
+                if (!isMe &&
+                    (message.isAi || (isGroup && message.senderName != null)))
                   Padding(
                     padding: EdgeInsets.only(bottom: 4.h, left: 4.w),
-                    child: Text(
-                      message.senderName!,
-                      style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 6.w,
+                        vertical: 2.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: message.isAi
+                            ? Colors.blue.withValues(alpha: 0.1)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(4.r),
+                      ),
+                      child: Text(
+                        message.isAi ? 'AI Assistant' : message.senderName!,
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          color: message.isAi
+                              ? Colors.blue[700]
+                              : Colors.grey[600],
+                          fontWeight: message.isAi
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
                     ),
                   ),
 
@@ -90,9 +115,9 @@ class ChatBubble extends ConsumerWidget {
                     child: Text(
                       "Read",
                       style: TextStyle(
-                          fontSize: 10.sp,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[400]
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[400],
                       ),
                     ),
                   ),
@@ -114,12 +139,13 @@ class ChatBubble extends ConsumerWidget {
   Widget _buildCenteredSystemTip() {
     String tipText;
     if (message.isRecalled) {
-      final String displayName = message.isMe ? "You" : (message.senderName ?? 'Someone');
+      final String displayName = message.isMe
+          ? "You"
+          : (message.senderName ?? 'Someone');
       tipText = "$displayName recalled a message";
     } else {
       tipText = message.content;
     }
-    
 
     return Center(
       child: Container(
@@ -140,11 +166,16 @@ class ChatBubble extends ConsumerWidget {
   /// Factory method: Render specific bubble UI based on message type
   Widget _buildContentFactory(BuildContext context) {
     switch (message.type) {
-      case MessageType.image: return ImageMsgBubble(message: message);
-      case MessageType.audio: return VoiceBubble(message: message, isMe: message.isMe);
-      case MessageType.video: return VideoMsgBubble(message: message, isMe: message.isMe);
-      case MessageType.file: return FileMsgBubble(message: message);
-      case MessageType.location: return LocationMsgBubble(message: message);
+      case MessageType.image:
+        return ImageMsgBubble(message: message);
+      case MessageType.audio:
+        return VoiceBubble(message: message, isMe: message.isMe);
+      case MessageType.video:
+        return VideoMsgBubble(message: message, isMe: message.isMe);
+      case MessageType.file:
+        return FileMsgBubble(message: message);
+      case MessageType.location:
+        return LocationMsgBubble(message: message);
       case MessageType.text:
       default:
         return TextMsgBubble(message: message);
@@ -153,15 +184,18 @@ class ChatBubble extends ConsumerWidget {
 
   /// Avatar rendering with fallback icon
   Widget _buildAvatar(String? url) {
-    if (url == null || url.isEmpty) {
+    // Flutter 不渲染 SVG，跳过 Dicebear 等矢量头像
+    final bool isSvg =
+        url != null && (url.endsWith('.svg') || url.contains('dicebear'));
+    if (url == null || url.isEmpty || isSvg) {
       return Container(
         width: 40.w,
         height: 40.w,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6.r),
-          color: Colors.grey[200],
+          color: const Color(0xFFF5F5F5),
         ),
-        child: Icon(Icons.person, color: Colors.grey[400], size: 24.sp),
+        child: Icon(Icons.person, color: const Color(0xFF9E9E9E), size: 24.sp),
       );
     }
     return ClipRRect(
@@ -181,17 +215,27 @@ class ChatBubble extends ConsumerWidget {
     if (message.status == MessageStatus.pending) {
       return Padding(
         padding: EdgeInsets.only(right: 8.w, bottom: 4.h),
-        child: Icon(Icons.access_time_rounded, size: 16.sp, color: Colors.grey[400]),
+        child: Icon(
+          Icons.access_time_rounded,
+          size: 16.sp,
+          color: Colors.grey[400],
+        ),
       );
     }
     if (message.status == MessageStatus.sending) {
       // Media messages handle their own internal loading states
-      if (message.type == MessageType.image || message.type == MessageType.video) return const SizedBox.shrink();
+      if (message.type == MessageType.image ||
+          message.type == MessageType.video)
+        return const SizedBox.shrink();
       return Padding(
         padding: EdgeInsets.only(right: 8.w, bottom: 4.h),
         child: SizedBox(
-          width: 14.w, height: 14.w,
-          child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.grey),
+          width: 14.w,
+          height: 14.w,
+          child: const CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Colors.grey,
+          ),
         ),
       );
     }

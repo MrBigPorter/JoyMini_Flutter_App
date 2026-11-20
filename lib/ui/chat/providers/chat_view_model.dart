@@ -8,6 +8,7 @@ import '../models/conversation.dart';
 import '../providers/conversation_provider.dart';
 import '../repository/message_repository.dart';
 import '../services/database/local_database_service.dart';
+import '../models/ai_action_model.dart';
 
 class ChatListState {
   final List<ChatUiModel> messages;
@@ -19,6 +20,9 @@ class ChatListState {
   final bool isAiStreaming;
   final String currentAiToken;
   final String aiStatusText;
+  final AiConfirmData? confirmData;
+  final ConfirmCardStatus confirmCardStatus;
+  final String? confirmErrorMessage;
 
   ChatListState({
     this.messages = const [],
@@ -28,6 +32,9 @@ class ChatListState {
     this.isAiStreaming = false,
     this.currentAiToken = '',
     this.aiStatusText = '',
+    this.confirmData = null,
+    this.confirmCardStatus = ConfirmCardStatus.pending,
+    this.confirmErrorMessage = null,
   });
 
   ChatListState copyWith({
@@ -38,6 +45,9 @@ class ChatListState {
     bool? isAiStreaming,
     String? currentAiToken,
     String? aiStatusText,
+    AiConfirmData? confirmData,
+    ConfirmCardStatus? confirmCardStatus,
+    String? confirmErrorMessage,
     bool clearAiError = false,
   }) {
     return ChatListState(
@@ -48,6 +58,11 @@ class ChatListState {
       isAiStreaming: isAiStreaming ?? this.isAiStreaming,
       currentAiToken: currentAiToken ?? this.currentAiToken,
       aiStatusText: aiStatusText ?? this.aiStatusText,
+      confirmData: confirmData ?? this.confirmData,
+      confirmCardStatus: confirmCardStatus ?? this.confirmCardStatus,
+      confirmErrorMessage: clearAiError
+          ? null
+          : (confirmErrorMessage ?? this.confirmErrorMessage),
     );
   }
 }
@@ -63,6 +78,7 @@ class ChatViewModel extends StateNotifier<ChatListState> {
 
   StreamSubscription? _subscription;
   int _currentLimit = 50;
+  Timer? _confirmTimer; // 确认卡片 60s 过期倒计时
 
   ChatViewModel(this.conversationId, this.ref) : super(ChatListState()) {
     _repo = ref.read(messageRepositoryProvider);
@@ -280,11 +296,10 @@ class ChatViewModel extends StateNotifier<ChatListState> {
   Future<void> _saveApiMessages(List<dynamic> apiMsgs) async {
     final currentUserId = ref.read(userProvider)?.id;
     final uiMsgs = apiMsgs
-        .map((m) => ChatUiModelMapper.fromApiModel(
-              m,
-              conversationId,
-              currentUserId,
-            ))
+        .map(
+          (m) =>
+              ChatUiModelMapper.fromApiModel(m, conversationId, currentUserId),
+        )
         .toList();
 
     // Architectural Defense: Uses saveBatch to prevent overwriting local HD images
@@ -387,9 +402,70 @@ class ChatViewModel extends StateNotifier<ChatListState> {
     );
   }
 
+  void setConfirm(AiConfirmData data) {
+    state = state.copyWith(
+      confirmData: data,
+      confirmCardStatus: ConfirmCardStatus.pending,
+    );
+    // 60 秒后自动过期，防"卡片挂一辈子"（后端 token 同样 60s TTL）
+    _confirmTimer?.cancel();
+    _confirmTimer = Timer(const Duration(seconds: 60), () {
+      if (!mounted) return;
+      state = state.copyWith(confirmCardStatus: ConfirmCardStatus.expired);
+    });
+  }
+
+  Future<void> confirmAction() async {
+    final confirm = state.confirmData;
+    if (confirm == null) return;
+    _confirmTimer?.cancel(); // 取消过期计时器
+    state = state.copyWith(confirmCardStatus: ConfirmCardStatus.loading);
+    try {
+      final res = await Api.confirmAction(confirm.confirmToken);
+      final needOtp = res['needOtp'] as bool? ?? false;
+      if (needOtp) {
+        // 提现：token 已消费，等用户输验证码——保留卡片，让它"变形"
+        state = state.copyWith(confirmCardStatus: ConfirmCardStatus.needOtp);
+      } else {
+        // 非提现：token 已消费，直接成功——卡片消失
+        state = state.copyWith(confirmCardStatus: ConfirmCardStatus.success);
+      }
+    } catch (e) {
+      state = state.copyWith(
+        confirmCardStatus: ConfirmCardStatus.failed,
+        confirmErrorMessage: e.toString(),
+      );
+    }
+  }
+
+  /// 提现 OTP 验码 → 验过则收起卡片
+  Future<void> confirmWithdrawOtp(String code) async {
+    state = state.copyWith(confirmCardStatus: ConfirmCardStatus.loading);
+    try {
+      await Api.confirmWithdrawOtp(code);
+      state = state.copyWith(
+        confirmData: null,
+        confirmCardStatus: ConfirmCardStatus.success,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        confirmCardStatus: ConfirmCardStatus.failed,
+        confirmErrorMessage: e.toString(),
+      );
+    }
+  }
+
+  void clearConfirm() {
+    state = state.copyWith(
+      confirmData: null,
+      confirmCardStatus: ConfirmCardStatus.pending,
+    );
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();
+    _confirmTimer?.cancel();
     super.dispose();
   }
 }

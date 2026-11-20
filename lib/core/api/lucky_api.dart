@@ -59,7 +59,7 @@ class Api {
 
       final data = parseList<IndexTreasureItem>(
         res,
-            (e) => IndexTreasureItem.fromJson(e),
+        (e) => IndexTreasureItem.fromJson(e),
       );
 
       return data;
@@ -80,7 +80,6 @@ class Api {
     return parseList<AdRes>(res, (e) => AdRes.fromJson(e));
   }
 
-
   /// User profile info
   static Future<UserInfo> getUserInfo() async {
     final res = await Http.get("/api/v1/auth/profile");
@@ -99,7 +98,7 @@ class Api {
     final res = await Http.get('/api/v1/client/payment/channels/recharge');
     return parseList<PaymentChannelConfigItem>(
       res,
-          (e) => PaymentChannelConfigItem.fromJson(e),
+      (e) => PaymentChannelConfigItem.fromJson(e),
     );
   }
 
@@ -109,14 +108,14 @@ class Api {
     final res = await Http.get('/api/v1/client/payment/channels/withdraw');
     return parseList<PaymentChannelConfigItem>(
       res,
-          (e) => PaymentChannelConfigItem.fromJson(e),
+      (e) => PaymentChannelConfigItem.fromJson(e),
     );
   }
 
   /// Create recharge order
   static Future<RechargeResponse> walletRechargeCreateApi(
-      CreateRechargeDto data,
-      ) async {
+    CreateRechargeDto data,
+  ) async {
     final res = await Http.post(
       '/api/v1/wallet/recharge/create',
       data: data.toJson(),
@@ -124,20 +123,18 @@ class Api {
     return RechargeResponse.fromJson(res);
   }
 
-    /// Get recharge order status
+  /// Get recharge order status
   static Future<RechargeStatusResponse> walletRechargeStatusApi(
-      String rechargeNo,
-      ) async {
-    final res = await Http.get(
-      '/api/v1/wallet/recharge/status/$rechargeNo',
-    );
+    String rechargeNo,
+  ) async {
+    final res = await Http.get('/api/v1/wallet/recharge/status/$rechargeNo');
     return RechargeStatusResponse.fromJson(res);
   }
 
   /// Wallet transaction history
   static Future<PageResult<WalletRechargeHistoryItem>> walletRechargeHistoryApi(
-      WalletRechargeHistoryDto data,
-      ) async {
+    WalletRechargeHistoryDto data,
+  ) async {
     final res = await Http.get(
       '/api/v1/wallet/recharge/history',
       query: data.toJson(),
@@ -148,8 +145,8 @@ class Api {
 
   /// Withdrawal history
   static Future<PageResult<WalletWithdrawHistoryItem>> walletWithdrawHistory(
-      WalletWithdrawHistoryDto data,
-      ) async {
+    WalletWithdrawHistoryDto data,
+  ) async {
     final res = await Http.get(
       '/api/v1/wallet/withdraw/history',
       query: data.toJson(),
@@ -160,8 +157,8 @@ class Api {
 
   /// Apply for withdrawal
   static Future<WalletWithdrawResponse> walletWithdrawApply(
-      WalletWithdrawApplyDto data,
-      ) async {
+    WalletWithdrawApplyDto data,
+  ) async {
     final res = await Http.post(
       '/api/v1/wallet/withdraw/apply',
       data: data.toJson(),
@@ -171,15 +168,14 @@ class Api {
 
   /// Order checkout
   static Future<OrderCheckoutResponse> ordersCheckOutApi(
-      OrdersCheckoutParams params,
-      ) async {
+    OrdersCheckoutParams params,
+  ) async {
     final res = await Http.post(
       '/api/v1/orders/checkout',
       data: params.toJson(),
     );
     return OrderCheckoutResponse.fromJson(res);
   }
-
 
   /// Dynamic system configuration - supports any key-value pairs from backend
   static Future<DynamicSystemConfig> getDynamicSystemConfig() async {
@@ -197,15 +193,15 @@ class Api {
     final res = await Http.get('/api/v1/categories');
     return parseList<ProductCategoryItem>(
       res,
-          (e) => ProductCategoryItem.fromJson(e),
+      (e) => ProductCategoryItem.fromJson(e),
     );
   }
 
   /// Product list
   /// categoryId 0: all, 1: hot, 2: tech
   static Future<PageResult<ProductListItem>> getProductList(
-      ProductListParams params,
-      ) async {
+    ProductListParams params,
+  ) async {
     final res = await Http.get(
       '/api/v1/treasure',
       queryParameters: {
@@ -225,8 +221,8 @@ class Api {
 
   /// Get real-time price
   static Future<TreasureStatusModel> getRealTimePriceApi(
-      String treasureId,
-      ) async {
+    String treasureId,
+  ) async {
     final res = await Http.get('/api/v1/treasure/status/$treasureId');
     return TreasureStatusModel.fromJson(res);
   }
@@ -242,7 +238,7 @@ class Api {
     final res = await Http.get('/actWinnersLasts.json');
     return parseList<WinnersLastsItem>(
       res,
-          (e) => WinnersLastsItem.fromJson(e),
+      (e) => WinnersLastsItem.fromJson(e),
     );
   }
 
@@ -254,8 +250,8 @@ class Api {
 
   /// Monthly winners list (paginated)
   static Future<PageResult<ActWinnersMonth>> winnersMonthApi(
-      ActWinnersMonthParams params,
-      ) async {
+    ActWinnersMonthParams params,
+  ) async {
     final res = await Http.get(
       '/actWinnersMonth.json',
       queryParameters: {
@@ -301,8 +297,8 @@ class Api {
 
   /// Order list
   static Future<PageResult<OrderItem>> orderListApi(
-      OrderListParams params,
-      ) async {
+    OrderListParams params,
+  ) async {
     final res = await Http.post(
       '/api/v1/orders/list',
       data: {
@@ -380,11 +376,13 @@ class Api {
       '/api/v1/auth/email/login',
       data: {'email': email, 'code': code},
       // skipTokenGuard: 防止后端 40100（验证码无效）被误判为 token 过期而触发登出
-      options: Options(extra: {
-        'noAuth': true,
-        'skipTokenGuard': true,
-        'noErrorToast': true, // UI 层自行控制错误提示
-      }),
+      options: Options(
+        extra: {
+          'noAuth': true,
+          'skipTokenGuard': true,
+          'noErrorToast': true, // UI 层自行控制错误提示
+        },
+      ),
     );
     return AuthLoginEmail.fromJson(res);
   }
@@ -428,20 +426,21 @@ class Api {
     required String idToken,
     String? inviteCode,
   }) async {
-    debugPrint('[Api.loginWithFirebaseApi] Starting Firebase login with idToken (length=${idToken.length})');
-    final data = <String, dynamic>{
-      'idToken': idToken,
-    };
+    debugPrint(
+      '[Api.loginWithFirebaseApi] Starting Firebase login with idToken (length=${idToken.length})',
+    );
+    final data = <String, dynamic>{'idToken': idToken};
     if (inviteCode != null && inviteCode.isNotEmpty) {
       data['inviteCode'] = inviteCode;
-      debugPrint('[Api.loginWithFirebaseApi] Including inviteCode: $inviteCode');
+      debugPrint(
+        '[Api.loginWithFirebaseApi] Including inviteCode: $inviteCode',
+      );
     }
     debugPrint('[Api.loginWithFirebaseApi] Calling POST /api/v1/auth/firebase');
-    final res = await Http.post(
-      '/api/v1/auth/firebase',
-      data: data,
+    final res = await Http.post('/api/v1/auth/firebase', data: data);
+    debugPrint(
+      '[Api.loginWithFirebaseApi] Backend response received, parsing AuthLoginOauth',
     );
-    debugPrint('[Api.loginWithFirebaseApi] Backend response received, parsing AuthLoginOauth');
     return AuthLoginOauth.fromJson(res);
   }
 
@@ -453,8 +452,8 @@ class Api {
 
   /// Group list for treasure
   static Future<PageResult<GroupForTreasureItem>> groupsListApi(
-      GroupsListRequestParams params,
-      ) async {
+    GroupsListRequestParams params,
+  ) async {
     final res = await Http.get(
       '/api/v1/client/groups/list',
       query: {
@@ -474,8 +473,8 @@ class Api {
 
   /// Group member list
   static Future<PageResult<GroupMemberItem>> groupMemberListApi(
-      GroupMemberListRequestParams params,
-      ) async {
+    GroupMemberListRequestParams params,
+  ) async {
     final res = await Http.get(
       '/api/v1/groups/${params.groupId}/members',
       query: {'page': params.page, 'pageSize': params.pageSize},
@@ -563,9 +562,9 @@ class Api {
 
   /// Update existing address
   static Future<AddressRes> addressUpdateApi(
-      String addressId,
-      AddressCreateDto data,
-      ) async {
+    String addressId,
+    AddressCreateDto data,
+  ) async {
     final res = await Http.post(
       '/api/v1/client/address/update/$addressId',
       data: data,
@@ -586,8 +585,8 @@ class Api {
 
   /// Register device for FCM notifications
   static Future<void> fcmNotificationDeviceRegisterApi(
-      FcmNotificationDeviceRegisterDto data,
-      ) async {
+    FcmNotificationDeviceRegisterDto data,
+  ) async {
     return await Http.post(
       '/api/v1/client/notifications/device/register',
       data: data.toJson(),
@@ -603,10 +602,7 @@ class Api {
     int? status,
     double? orderAmount,
   }) async {
-    final Map<String, dynamic> query = {
-      'page': page,
-      'pageSize': pageSize,
-    };
+    final Map<String, dynamic> query = {'page': page, 'pageSize': pageSize};
 
     if (status != null) {
       query['status'] = status;
@@ -615,10 +611,7 @@ class Api {
       query['orderAmount'] = orderAmount;
     }
 
-    final res = await Http.get(
-      '/api/v1/client/coupons/me',
-      query: query,
-    );
+    final res = await Http.get('/api/v1/client/coupons/me', query: query);
 
     return parsePageResponse(res, (e) => UserCoupon.fromJson(e));
   }
@@ -640,15 +633,14 @@ class Api {
 
   /// claim a coupon manually by its template ID
   static Future<String> claimCouponApi(String couponId) async {
-    final res = await Http.post(
-      '/api/v1/client/coupons/claim/$couponId',
-    );
+    final res = await Http.post('/api/v1/client/coupons/claim/$couponId');
 
     if (res != null && res['message'] != null) {
       return res['message'].toString();
     }
     return 'Coupon claimed successfully';
   }
+
   /// Get list of claimable coupons (those that the user can claim but hasn't claimed yet). This is typically used to show a list of available coupons that the user can choose to claim.
   static Future<List<ClaimableCoupon>> claimableCouponsApi() async {
     final res = await Http.get('/api/v1/client/coupons/claimable');
@@ -671,11 +663,15 @@ class Api {
     String orderId,
   ) async {
     final res = await Http.get('/api/v1/lucky-draw/order/$orderId/ticket');
-    return LuckyDrawOrderTicketResponse.fromJson(Map<String, dynamic>.from(res));
+    return LuckyDrawOrderTicketResponse.fromJson(
+      Map<String, dynamic>.from(res),
+    );
   }
 
   /// Execute draw with a ticket
-  static Future<LuckyDrawActionResult> luckyDrawExecuteApi(String ticketId) async {
+  static Future<LuckyDrawActionResult> luckyDrawExecuteApi(
+    String ticketId,
+  ) async {
     final res = await Http.post('/api/v1/lucky-draw/tickets/$ticketId/draw');
     return LuckyDrawActionResult.fromJson(Map<String, dynamic>.from(res));
   }
@@ -695,14 +691,19 @@ class Api {
   static Future<List<FlashSaleSession>> flashSaleActiveSessionsApi() async {
     final res = await Http.get('/api/v1/flash-sale/sessions/active');
     final list = (res as Map<String, dynamic>)['list'];
-    return parseList<FlashSaleSession>(list, (e) => FlashSaleSession.fromJson(e));
+    return parseList<FlashSaleSession>(
+      list,
+      (e) => FlashSaleSession.fromJson(e),
+    );
   }
 
   /// Get flash sale products under one active session
   static Future<FlashSaleSessionProducts> flashSaleSessionProductsApi(
     String sessionId,
   ) async {
-    final res = await Http.get('/api/v1/flash-sale/sessions/$sessionId/products');
+    final res = await Http.get(
+      '/api/v1/flash-sale/sessions/$sessionId/products',
+    );
     return FlashSaleSessionProducts.fromJson(Map<String, dynamic>.from(res));
   }
 
@@ -722,8 +723,8 @@ class Api {
 
   /// Create business chat
   static Future<ConversationIdResponse> chatBusinessApi(
-      String businessId,
-      ) async {
+    String businessId,
+  ) async {
     final res = await Http.get(
       '/api/v1/chat/business',
       query: {'businessId': businessId},
@@ -733,8 +734,8 @@ class Api {
 
   /// Create direct chat
   static Future<ConversationIdResponse> chatDirectApi(
-      String targetUserId,
-      ) async {
+    String targetUserId,
+  ) async {
     final res = await Http.post(
       '/api/v1/chat/direct',
       data: {'targetUserId': targetUserId},
@@ -744,8 +745,8 @@ class Api {
 
   /// Invite members to group (Strongly typed version)
   static Future<InviteToGroupResponse> groupInviteApi(
-      InviteToGroupRequest req,
-      ) async {
+    InviteToGroupRequest req,
+  ) async {
     final res = await Http.post(
       '/api/v1/chat/group/invite',
       data: req.toJson(),
@@ -769,8 +770,8 @@ class Api {
 
   /// Get message history (called when entering ChatPage)
   static Future<MessageListResponse> chatMessagesApi(
-      MessageHistoryRequest data,
-      ) async {
+    MessageHistoryRequest data,
+  ) async {
     final res = await Http.get('/api/v1/chat/messages', query: data.toJson());
     return MessageListResponse.fromJson(res);
   }
@@ -792,9 +793,9 @@ class Api {
 
   /// Create a group chat
   static Future<CreateGroupResponse> createGroupApi(
-      String name,
-      List<String> memberIds,
-      ) async {
+    String name,
+    List<String> memberIds,
+  ) async {
     final request = CreateGroupRequest(name: name, memberIds: memberIds);
     final res = await Http.post(
       '/api/v1/chat/create-group',
@@ -826,8 +827,8 @@ class Api {
 
   /// Mark messages as read
   static Future<MessageMarkReadResponse> messageMarkAsReadApi(
-      MessageMarkReadRequest data,
-      ) async {
+    MessageMarkReadRequest data,
+  ) async {
     final res = await Http.post(
       '/api/v1/chat/message/mark-as-read',
       data: data.toJson(),
@@ -837,8 +838,8 @@ class Api {
 
   /// Recall a message
   static Future<MessageRecallResponse> messageRecallApi(
-      MessageRecallRequest data,
-      ) async {
+    MessageRecallRequest data,
+  ) async {
     final res = await Http.post(
       '/api/v1/chat/message/recall',
       data: data.toJson(),
@@ -848,8 +849,8 @@ class Api {
 
   /// Delete a message
   static Future<MessageDeleteResponse> messageDeleteApi(
-      MessageDeleteRequest data,
-      ) async {
+    MessageDeleteRequest data,
+  ) async {
     final res = await Http.delete(
       '/api/v1/chat/message/delete',
       data: data.toJson(),
@@ -894,7 +895,10 @@ class Api {
   }
 
   /// Handle a friend request (Accept/Reject)
-  static Future<bool> handleFriendRequestApi(String targetId, FriendRequestAction action) async {
+  static Future<bool> handleFriendRequestApi(
+    String targetId,
+    FriendRequestAction action,
+  ) async {
     final req = HandleFriendRequest(targetId: targetId, action: action);
     await Http.post('/api/v1/chat/contacts/handle', data: req.toJson());
     return true;
@@ -907,16 +911,34 @@ class Api {
   }
 
   /// Set "Mute Notifications" for a conversation
-  static Future<ChatSettingsResponse> setConversationMute(String conversationId, bool isMuted) async {
-    final req = SetMuteRequest(conversationId: conversationId, isMuted: isMuted);
-    final res = await Http.post('/api/v1/chat/settings/mute', data: req.toJson());
+  static Future<ChatSettingsResponse> setConversationMute(
+    String conversationId,
+    bool isMuted,
+  ) async {
+    final req = SetMuteRequest(
+      conversationId: conversationId,
+      isMuted: isMuted,
+    );
+    final res = await Http.post(
+      '/api/v1/chat/settings/mute',
+      data: req.toJson(),
+    );
     return ChatSettingsResponse.fromJson(res);
   }
 
   /// Set "Pin to Top" for a conversation
-  static Future<ChatSettingsResponse> setConversationPin(String conversationId, bool isPinned) async {
-    final req = SetPinRequest(conversationId: conversationId, isPinned: isPinned);
-    final res = await Http.post('/api/v1/chat/settings/pin', data: req.toJson());
+  static Future<ChatSettingsResponse> setConversationPin(
+    String conversationId,
+    bool isPinned,
+  ) async {
+    final req = SetPinRequest(
+      conversationId: conversationId,
+      isPinned: isPinned,
+    );
+    final res = await Http.post(
+      '/api/v1/chat/settings/pin',
+      data: req.toJson(),
+    );
     return ChatSettingsResponse.fromJson(res);
   }
 
@@ -925,5 +947,20 @@ class Api {
     final req = ClearHistoryRequest(conversationId: conversationId);
     await Http.post('/api/v1/chat/settings/clear-history', data: req.toJson());
     return true;
+  }
+
+  /// AI 确认卡片 → 上报服务端执行（消费一次性 token）
+  /// 关键不变式：写操作只在服务端执行一次，客户端绝不直接调业务 API
+  static Future<Map<String, dynamic>> confirmAction(String token) async {
+    final res = await Http.post<Map<String, dynamic>>(
+      '/api/v1/ai/customer/confirm',
+      data: {'token': token},
+    );
+    return res;
+  }
+
+  /// 提现 OTP 验码 → 服务端执行提现（第二道闸门）
+  static Future<void> confirmWithdrawOtp(String code) async {
+    await Http.post('/api/v1/ai/customer/confirm/otp', data: {'code': code});
   }
 }

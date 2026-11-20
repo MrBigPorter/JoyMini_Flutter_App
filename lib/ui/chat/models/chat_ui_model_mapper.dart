@@ -4,11 +4,10 @@ import 'package:flutter_app/ui/chat/models/conversation.dart';
 class ChatUiModelMapper {
   /// Maps a raw API ChatMessage entity into a standardized ChatUiModel for the view layer.
   static ChatUiModel fromApiModel(
-      ChatMessage apiMsg,
-      String conversationId, [
-        String? currentUserId,
-      ]) {
-
+    ChatMessage apiMsg,
+    String conversationId, [
+    String? currentUserId,
+  ]) {
     // Determine the strongly-typed MessageType from the raw integer value
     MessageType uiType = MessageType.fromValue(apiMsg.type);
 
@@ -36,9 +35,12 @@ class ChatUiModelMapper {
       senderName: apiMsg.sender?.nickname,
       senderAvatar: apiMsg.sender?.avatar,
       isRecalled: isRecalled ?? false,
+      isAi: apiMsg.isAi,
       conversationId: conversationId,
       // Safely parse duration from metadata if present (common for audio/video)
-      duration: meta['duration'] is num ? (meta['duration'] as num).toInt() : null,
+      duration: meta['duration'] is num
+          ? (meta['duration'] as num).toInt()
+          : null,
       meta: meta,
     );
   }

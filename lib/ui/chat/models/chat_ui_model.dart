@@ -1,21 +1,22 @@
 import 'dart:typed_data';
 import 'package:equatable/equatable.dart';
+import 'package:flutter_app/utils/date_helper.dart';
 export 'chat_ui_model_ext.dart';
 export 'chat_ui_model_mapper.dart';
 
 enum MessageStatus { sending, success, failed, read, pending }
 
 enum MessageType {
-  text(0, label:'[Text]'),
-  image(1, label:'[Image]'),
-  audio(2, label:'[Audio]'),
-  video(3, label:'[Video]'),
-  recalled(4, label:'[Recalled]'),
-  file(5, label:'[File]'),
-  location(6, label:'[Location]'),
-  ai(8, label:'[AI]'),
-  card(9, label:'[ActionCard]'),
-  system(99, label:'[System]');
+  text(0, label: '[Text]'),
+  image(1, label: '[Image]'),
+  audio(2, label: '[Audio]'),
+  video(3, label: '[Video]'),
+  recalled(4, label: '[Recalled]'),
+  file(5, label: '[File]'),
+  location(6, label: '[Location]'),
+  ai(8, label: '[AI]'),
+  card(9, label: '[ActionCard]'),
+  system(99, label: '[System]');
 
   final int value;
   final String label;
@@ -23,7 +24,7 @@ enum MessageType {
   const MessageType(this.value, {required this.label});
 
   static MessageType fromValue(int value) => MessageType.values.firstWhere(
-        (e) => e.value == value,
+    (e) => e.value == value,
     orElse: () => MessageType.text,
   );
 
@@ -37,7 +38,9 @@ enum MessageType {
     }
 
     // Priority 2: For text, ai, or system messages, return the raw content.
-    if (this == MessageType.text || this == MessageType.ai || this == MessageType.system) {
+    if (this == MessageType.text ||
+        this == MessageType.ai ||
+        this == MessageType.system) {
       return content;
     }
 
@@ -65,6 +68,7 @@ class ChatUiModel extends Equatable {
   final String? localPath;
   final int? duration;
   final bool isRecalled;
+  final bool isAi;
   final Map<String, dynamic>? meta;
 
   ChatUiModel({
@@ -76,6 +80,7 @@ class ChatUiModel extends Equatable {
     required this.createdAt,
     required this.conversationId,
     this.isRecalled = false,
+    this.isAi = false,
     this.senderAvatar,
     this.senderName,
     this.seqId,
@@ -98,6 +103,7 @@ class ChatUiModel extends Equatable {
     meta,
     seqId,
     isRecalled,
+    isAi,
   ];
 
   // --- Persistence Logic ---
@@ -117,6 +123,7 @@ class ChatUiModel extends Equatable {
     'localPath': localPath,
     'duration': duration,
     'isRecalled': isRecalled,
+    'isAi': isAi,
     'meta': meta, // Ensure meta content is JSON-compatible
   };
 
@@ -125,7 +132,9 @@ class ChatUiModel extends Equatable {
       id: json['id'] as String,
       seqId: json['seqId'] as int?,
       content: json['content'] as String,
-      type: json['type'] is int // Safely parse type as int or String
+      type:
+          json['type']
+              is int // Safely parse type as int or String
           ? MessageType.fromValue(json['type'] as int)
           : MessageType.values.firstWhere(
               (e) => e.name == (json['type'] as String?),
@@ -133,10 +142,10 @@ class ChatUiModel extends Equatable {
             ),
       isMe: json['isMe'] as bool,
       status: MessageStatus.values.firstWhere(
-            (e) => e.name == json['status'],
+        (e) => e.name == json['status'],
         orElse: () => MessageStatus.pending,
       ),
-      createdAt: json['createdAt'] as int,
+      createdAt: DateFormatHelper.toTimestamp(json['createdAt']),
       senderAvatar: json['senderAvatar'] as String?,
       senderName: json['senderName'] as String?,
       conversationId: json['conversationId'] as String,
@@ -146,6 +155,7 @@ class ChatUiModel extends Equatable {
       localPath: json['localPath'] as String?,
       duration: json['duration'] as int?,
       isRecalled: json['isRecalled'] as bool? ?? false,
+      isAi: json['isAi'] as bool? ?? false,
       meta: json['meta'] as Map<String, dynamic>? ?? {},
     );
   }
@@ -155,15 +165,19 @@ class ChatUiModel extends Equatable {
   ChatUiModel merge(ChatUiModel serverMsg) {
     return copyWith(
       // 1. Status: Trust the server (e.g., transition from 'sending' to 'success')
-      status: serverMsg.status == MessageStatus.success ? MessageStatus.success : status,
+      status: serverMsg.status == MessageStatus.success
+          ? MessageStatus.success
+          : status,
 
       // 2. Resource Protection: Servers do not provide localPaths; preserve local ones.
-      localPath: (serverMsg.localPath != null && serverMsg.localPath!.isNotEmpty)
+      localPath:
+          (serverMsg.localPath != null && serverMsg.localPath!.isNotEmpty)
           ? serverMsg.localPath
           : localPath,
 
       // 3. In-memory data: Servers rarely provide byte arrays; retain local placeholders.
-      previewBytes: (serverMsg.previewBytes != null && serverMsg.previewBytes!.isNotEmpty)
+      previewBytes:
+          (serverMsg.previewBytes != null && serverMsg.previewBytes!.isNotEmpty)
           ? serverMsg.previewBytes
           : previewBytes,
 
@@ -174,7 +188,9 @@ class ChatUiModel extends Equatable {
       content: serverMsg.content.isNotEmpty ? serverMsg.content : content,
 
       // Prevent overwriting existing metadata (dimensions, etc.) if server provides an empty map
-      meta: (serverMsg.meta == null || serverMsg.meta!.isEmpty) ? meta : serverMsg.meta,
+      meta: (serverMsg.meta == null || serverMsg.meta!.isEmpty)
+          ? meta
+          : serverMsg.meta,
 
       createdAt: serverMsg.createdAt > 0 ? serverMsg.createdAt : createdAt,
     );
@@ -226,7 +242,8 @@ class ChatUiModel extends Equatable {
   /// 1. Only messages with 'read' or 'success' status can be recalled.
   /// 2. Must be within a 2-minute time window from creation.
   bool get canRecall {
-    if (status != MessageStatus.read && status != MessageStatus.success) return false;
+    if (status != MessageStatus.read && status != MessageStatus.success)
+      return false;
 
     final sendTime = DateTime.fromMillisecondsSinceEpoch(createdAt);
     final now = DateTime.now();

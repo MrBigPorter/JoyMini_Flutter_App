@@ -1,4 +1,5 @@
 import 'package:json_annotation/json_annotation.dart';
+import 'package:flutter_app/utils/date_helper.dart';
 import 'chat_ui_model.dart';
 import 'group_manage_req.dart';
 import 'group_role.dart';
@@ -10,18 +11,26 @@ part 'conversation.g.dart';
 // =================================================================
 
 enum ConversationType {
-  @JsonValue('DIRECT') direct,
-  @JsonValue('GROUP') group,
-  @JsonValue('BUSINESS') business,
-  @JsonValue('SUPPORT') support,
-  @JsonValue('AI') ai,
+  @JsonValue('DIRECT')
+  direct,
+  @JsonValue('GROUP')
+  group,
+  @JsonValue('BUSINESS')
+  business,
+  @JsonValue('SUPPORT')
+  support,
+  @JsonValue('AI')
+  ai,
 }
 
 /// Relationship status codes: 0=Stranger, 1=Friend, 2=RequestSent
 enum RelationshipStatus {
-  @JsonValue(0) stranger,
-  @JsonValue(1) friend,
-  @JsonValue(2) sent;
+  @JsonValue(0)
+  stranger,
+  @JsonValue(1)
+  friend,
+  @JsonValue(2)
+  sent;
 
   bool get isFriend => this == RelationshipStatus.friend;
   bool get isStranger => this == RelationshipStatus.stranger;
@@ -175,7 +184,7 @@ class ChatSocketPayload {
     this.member,
     this.members,
     this.kickedUserId,
-    this.syncType
+    this.syncType,
   });
 
   /// Hand-written factory to handle complex legacy field mappings and type safety
@@ -185,12 +194,13 @@ class ChatSocketPayload {
       operatorId: json['operatorId']?.toString(),
 
       // Unified targetId mapping: Handles various ID keys from different backend event types
-      targetId: json['targetId']?.toString()
-          ?? json['memberId']?.toString()
-          ?? json['userId']?.toString()
-          ?? json['kickedUserId']?.toString()
-          ?? json['newOwnerId']?.toString()
-          ?? json['applicantId']?.toString(),
+      targetId:
+          json['targetId']?.toString() ??
+          json['memberId']?.toString() ??
+          json['userId']?.toString() ??
+          json['kickedUserId']?.toString() ??
+          json['newOwnerId']?.toString() ??
+          json['applicantId']?.toString(),
 
       updates: (json['updates'] is Map)
           ? Map<String, dynamic>.from(json['updates'])
@@ -228,24 +238,18 @@ class ChatSocketPayload {
 }
 
 class SocketGroupEvent {
-  final String type;                 // Event type string (e.g., 'member_kicked')
+  final String type; // Event type string (e.g., 'member_kicked')
   final Map<String, dynamic> rawData; // Original raw JSON data
   late final ChatSocketPayload payload; // Strongly typed payload
 
   String get groupId => payload.conversationId;
 
-  SocketGroupEvent({
-    required this.type,
-    required this.rawData,
-  }) {
+  SocketGroupEvent({required this.type, required this.rawData}) {
     payload = ChatSocketPayload.fromJson(rawData);
   }
 
   factory SocketGroupEvent.fromJson(String type, Map<String, dynamic> json) {
-    return SocketGroupEvent(
-      type: type,
-      rawData: json,
-    );
+    return SocketGroupEvent(type: type, rawData: json);
   }
 }
 
@@ -332,7 +336,7 @@ class ConversationDetail {
       announcement: announcement ?? this.announcement,
       isMuteAll: isMuteAll ?? this.isMuteAll,
       joinNeedApproval: joinNeedApproval ?? this.joinNeedApproval,
-      applicationStatus:  applicationStatus?? this.applicationStatus,
+      applicationStatus: applicationStatus ?? this.applicationStatus,
       pendingRequestCount: pendingRequestCount ?? this.pendingRequestCount,
       memberCount: memberCount ?? this.memberCount,
     );
@@ -340,8 +344,8 @@ class ConversationDetail {
 
   /// Retrieves the peer member object (applicable to Direct messages only)
   ChatMember? getOtherMember(String? myUserId) {
-    if(type != ConversationType.direct) return null;
-    if(myUserId == null || members.isEmpty) return null;
+    if (type != ConversationType.direct) return null;
+    if (myUserId == null || members.isEmpty) return null;
     try {
       return members.firstWhere((m) => m.userId != myUserId);
     } catch (e) {
@@ -373,7 +377,7 @@ class ConversationDetail {
   factory ConversationDetail.fromJson(Map<String, dynamic> json) {
     final typeStr = json['type']?.toString().toUpperCase() ?? 'GROUP';
     final typeEnum = ConversationType.values.firstWhere(
-          (e) => e.name.toUpperCase() == typeStr,
+      (e) => e.name.toUpperCase() == typeStr,
       orElse: () => ConversationType.group,
     );
 
@@ -384,9 +388,11 @@ class ConversationDetail {
       avatar: json['avatar'],
       unreadCount: json['unreadCount'] ?? 0,
       type: typeEnum,
-      members: (json['members'] as List<dynamic>?)
-          ?.map((e) => ChatMember.fromJson(e))
-          .toList() ?? [],
+      members:
+          (json['members'] as List<dynamic>?)
+              ?.map((e) => ChatMember.fromJson(e))
+              .toList() ??
+          [],
       lastMsgSeqId: json['lastMsgSeqId'] ?? 0,
       myLastReadSeqId: json['myLastReadSeqId'] ?? 0,
       isPinned: json['isPinned'] ?? false,
@@ -436,9 +442,15 @@ class ChatSender {
   final String? avatar;
   final String? phone;
 
-  ChatSender({required this.id, required this.nickname, this.avatar, this.phone});
+  ChatSender({
+    required this.id,
+    required this.nickname,
+    this.avatar,
+    this.phone,
+  });
 
-  factory ChatSender.fromJson(Map<String, dynamic> json) => _$ChatSenderFromJson(json);
+  factory ChatSender.fromJson(Map<String, dynamic> json) =>
+      _$ChatSenderFromJson(json);
   Map<String, dynamic> toJson() => _$ChatSenderToJson(this);
 
   @override
@@ -511,6 +523,8 @@ class ChatMessage {
   final String id;
   final int type; // 0:Text, 1:Image, etc.
   final String content;
+  // Server may send epoch millis (num) or an ISO-8601 string (e.g. "2026-08-02T14:33:21.448Z")
+  @JsonKey(fromJson: DateFormatHelper.toTimestamp)
   final int createdAt;
   final ChatSender? sender;
   final int? seqId;
@@ -523,6 +537,10 @@ class ChatMessage {
   @JsonKey(defaultValue: false)
   final bool isSelf;
 
+  /// 服务端标记的 AI 生成消息；默认 false，兼容旧服务端
+  @JsonKey(defaultValue: false)
+  final bool isAi;
+
   ChatMessage({
     required this.id,
     required this.type,
@@ -533,9 +551,11 @@ class ChatMessage {
     this.isSelf = false,
     this.seqId,
     this.meta,
+    this.isAi = false,
   });
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) => _$ChatMessageFromJson(json);
+  factory ChatMessage.fromJson(Map<String, dynamic> json) =>
+      _$ChatMessageFromJson(json);
   Map<String, dynamic> toJson() => _$ChatMessageToJson(this);
 
   @override
@@ -550,7 +570,8 @@ class ChatMessage {
 class ConversationIdResponse {
   final String conversationId;
   ConversationIdResponse({required this.conversationId});
-  factory ConversationIdResponse.fromJson(Map<String, dynamic> json) => _$ConversationIdResponseFromJson(json);
+  factory ConversationIdResponse.fromJson(Map<String, dynamic> json) =>
+      _$ConversationIdResponseFromJson(json);
   Map<String, dynamic> toJson() => _$ConversationIdResponseToJson(this);
 }
 
@@ -559,7 +580,11 @@ class MessageHistoryRequest {
   final String conversationId;
   final int? cursor;
   final int pageSize;
-  MessageHistoryRequest({required this.conversationId, this.pageSize = 20, this.cursor});
+  MessageHistoryRequest({
+    required this.conversationId,
+    this.pageSize = 20,
+    this.cursor,
+  });
   Map<String, dynamic> toJson() => _$MessageHistoryRequestToJson(this);
 }
 
@@ -569,8 +594,13 @@ class MessageListResponse {
   final List<ChatMessage> list;
   final int? nextCursor;
   final int partnerLastReadSeqId;
-  MessageListResponse({required this.list, required this.partnerLastReadSeqId, this.nextCursor});
-  factory MessageListResponse.fromJson(Map<String, dynamic> json) => _$MessageListResponseFromJson(json);
+  MessageListResponse({
+    required this.list,
+    required this.partnerLastReadSeqId,
+    this.nextCursor,
+  });
+  factory MessageListResponse.fromJson(Map<String, dynamic> json) =>
+      _$MessageListResponseFromJson(json);
   Map<String, dynamic> toJson() => _$MessageListResponseToJson(this);
 }
 
@@ -581,6 +611,8 @@ class SocketMessage {
   final String senderId;
   final String content;
   final int type;
+  // Server may send epoch millis (num) or an ISO-8601 string (e.g. "2026-08-02T14:33:21.448Z")
+  @JsonKey(fromJson: DateFormatHelper.toTimestamp)
   final int createdAt;
   final SocketSender? sender;
   final String? tempId;
@@ -590,11 +622,27 @@ class SocketMessage {
   final int? seqId;
   final Map<String, dynamic>? meta;
 
+  /// 服务端标记的 AI 生成消息；默认 false
+  @JsonKey(defaultValue: false)
+  final bool isAi;
+
   SocketMessage({
-    required this.id, required this.conversationId, required this.senderId, required this.content,
-    required this.type, required this.createdAt, this.sender, this.tempId, this.isSelf, this.seqId, this.meta, this.isRecalled
+    required this.id,
+    required this.conversationId,
+    required this.senderId,
+    required this.content,
+    required this.type,
+    required this.createdAt,
+    this.sender,
+    this.tempId,
+    this.isSelf,
+    this.seqId,
+    this.meta,
+    this.isRecalled,
+    this.isAi = false,
   });
-  factory SocketMessage.fromJson(Map<String, dynamic> json) => _$SocketMessageFromJson(json);
+  factory SocketMessage.fromJson(Map<String, dynamic> json) =>
+      _$SocketMessageFromJson(json);
   Map<String, dynamic> toJson() => _$SocketMessageToJson(this);
 }
 
@@ -604,7 +652,8 @@ class SocketSender {
   final String nickname;
   final String? avatar;
   SocketSender({required this.id, this.nickname = 'Unknown', this.avatar});
-  factory SocketSender.fromJson(Map<String, dynamic> json) => _$SocketSenderFromJson(json);
+  factory SocketSender.fromJson(Map<String, dynamic> json) =>
+      _$SocketSenderFromJson(json);
   Map<String, dynamic> toJson() => _$SocketSenderToJson(this);
 }
 
@@ -622,7 +671,8 @@ class MessageMarkReadResponse {
   final int unreadCount;
   final int lastReadSeqId;
   MessageMarkReadResponse({this.unreadCount = 0, required this.lastReadSeqId});
-  factory MessageMarkReadResponse.fromJson(Map<String, dynamic> json) => _$MessageMarkReadResponseFromJson(json);
+  factory MessageMarkReadResponse.fromJson(Map<String, dynamic> json) =>
+      _$MessageMarkReadResponseFromJson(json);
   Map<String, dynamic> toJson() => _$MessageMarkReadResponseToJson(this);
 }
 
@@ -633,8 +683,14 @@ class SocketReadEvent {
   final bool? isSelf;
   @JsonKey(defaultValue: 0)
   final int lastReadSeqId;
-  SocketReadEvent({required this.conversationId, required this.readerId, required this.lastReadSeqId, this.isSelf});
-  factory SocketReadEvent.fromJson(Map<String, dynamic> json) => _$SocketReadEventFromJson(json);
+  SocketReadEvent({
+    required this.conversationId,
+    required this.readerId,
+    required this.lastReadSeqId,
+    this.isSelf,
+  });
+  factory SocketReadEvent.fromJson(Map<String, dynamic> json) =>
+      _$SocketReadEventFromJson(json);
 }
 
 @JsonSerializable(checked: true)
@@ -650,7 +706,8 @@ class MessageRecallResponse {
   final String messageId;
   final String tip;
   MessageRecallResponse({required this.messageId, required this.tip});
-  factory MessageRecallResponse.fromJson(Map<String, dynamic> json) => _$MessageRecallResponseFromJson(json);
+  factory MessageRecallResponse.fromJson(Map<String, dynamic> json) =>
+      _$MessageRecallResponseFromJson(json);
   Map<String, dynamic> toJson() => _$MessageRecallResponseToJson(this);
 }
 
@@ -662,8 +719,16 @@ class SocketRecallEvent {
   final String operatorId;
   final int? seqId;
   final bool isSelf;
-  SocketRecallEvent({required this.conversationId, required this.messageId, required this.tip, required this.isSelf, required this.operatorId, this.seqId});
-  factory SocketRecallEvent.fromJson(Map<String, dynamic> json) => _$SocketRecallEventFromJson(json);
+  SocketRecallEvent({
+    required this.conversationId,
+    required this.messageId,
+    required this.tip,
+    required this.isSelf,
+    required this.operatorId,
+    this.seqId,
+  });
+  factory SocketRecallEvent.fromJson(Map<String, dynamic> json) =>
+      _$SocketRecallEventFromJson(json);
 }
 
 @JsonSerializable(checked: true)
@@ -678,7 +743,8 @@ class MessageDeleteRequest {
 class MessageDeleteResponse {
   final String messageId;
   MessageDeleteResponse({required this.messageId});
-  factory MessageDeleteResponse.fromJson(Map<String, dynamic> json) => _$MessageDeleteResponseFromJson(json);
+  factory MessageDeleteResponse.fromJson(Map<String, dynamic> json) =>
+      _$MessageDeleteResponseFromJson(json);
   Map<String, dynamic> toJson() => _$MessageDeleteResponseToJson(this);
 }
 
@@ -690,8 +756,15 @@ class ChatUser {
   final String? phone;
   @JsonKey(unknownEnumValue: RelationshipStatus.stranger)
   final RelationshipStatus status;
-  ChatUser({required this.id, required this.nickname, this.avatar, this.phone, this.status = RelationshipStatus.stranger});
-  factory ChatUser.fromJson(Map<String, dynamic> json) => _$ChatUserFromJson(json);
+  ChatUser({
+    required this.id,
+    required this.nickname,
+    this.avatar,
+    this.phone,
+    this.status = RelationshipStatus.stranger,
+  });
+  factory ChatUser.fromJson(Map<String, dynamic> json) =>
+      _$ChatUserFromJson(json);
   Map<String, dynamic> toJson() => _$ChatUserToJson(this);
 }
 
@@ -710,8 +783,15 @@ class CreateGroupResponse {
   final String type;
   final String ownerId;
   final int? createdAt;
-  CreateGroupResponse({required this.id, required this.name, required this.type, required this.ownerId, this.createdAt});
-  factory CreateGroupResponse.fromJson(Map<String, dynamic> json) => _$CreateGroupResponseFromJson(json);
+  CreateGroupResponse({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.ownerId,
+    this.createdAt,
+  });
+  factory CreateGroupResponse.fromJson(Map<String, dynamic> json) =>
+      _$CreateGroupResponseFromJson(json);
   Map<String, dynamic> toJson() => _$CreateGroupResponseToJson(this);
 }
 
@@ -727,7 +807,8 @@ class InviteToGroupRequest {
 class InviteToGroupResponse {
   final int count;
   InviteToGroupResponse({required this.count});
-  factory InviteToGroupResponse.fromJson(Map<String, dynamic> json) => _$InviteToGroupResponseFromJson(json);
+  factory InviteToGroupResponse.fromJson(Map<String, dynamic> json) =>
+      _$InviteToGroupResponseFromJson(json);
   Map<String, dynamic> toJson() => _$InviteToGroupResponseToJson(this);
 }
 
@@ -742,7 +823,8 @@ class LeaveGroupRequest {
 class LeaveGroupResponse {
   final bool success;
   LeaveGroupResponse({required this.success});
-  factory LeaveGroupResponse.fromJson(Map<String, dynamic> json) => _$LeaveGroupResponseFromJson(json);
+  factory LeaveGroupResponse.fromJson(Map<String, dynamic> json) =>
+      _$LeaveGroupResponseFromJson(json);
   Map<String, dynamic> toJson() => _$LeaveGroupResponseToJson(this);
 }
 
@@ -754,7 +836,15 @@ class GroupSearchResult {
   final int memberCount;
   final bool joinNeedApproval;
   final bool isMember;
-  GroupSearchResult({required this.id, required this.name, this.avatar, required this.memberCount, required this.joinNeedApproval, required this.isMember});
-  factory GroupSearchResult.fromJson(Map<String, dynamic> json) => _$GroupSearchResultFromJson(json);
+  GroupSearchResult({
+    required this.id,
+    required this.name,
+    this.avatar,
+    required this.memberCount,
+    required this.joinNeedApproval,
+    required this.isMember,
+  });
+  factory GroupSearchResult.fromJson(Map<String, dynamic> json) =>
+      _$GroupSearchResultFromJson(json);
   Map<String, dynamic> toJson() => _$GroupSearchResultToJson(this);
 }
