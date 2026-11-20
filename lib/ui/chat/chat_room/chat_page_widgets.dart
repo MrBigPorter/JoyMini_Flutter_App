@@ -246,7 +246,11 @@ Widget _buildStreamingBubble(BuildContext context, ChatListState chatState) {
             borderRadius: BorderRadius.circular(6.r),
             color: const Color(0xFFF5F5F5),
           ),
-          child: Icon(Icons.support_agent, color: const Color(0xFF9E9E9E), size: 24.sp),
+          child: Icon(
+            Icons.support_agent,
+            color: const Color(0xFF9E9E9E),
+            size: 24.sp,
+          ),
         ),
         // Bubble content
         Flexible(
@@ -361,6 +365,7 @@ Widget _buildConfirmCard(
   required String conversationId,
   required VoidCallback onClearConfirm,
   required VoidCallback onConfirmAction,
+  required ValueChanged<String> onOtpSubmit,
 }) {
   final confirm = chatState.confirmData;
   if (confirm == null) return const SizedBox.shrink();
@@ -371,6 +376,7 @@ Widget _buildConfirmCard(
     errorMessage: chatState.confirmErrorMessage,
     onConfirm: onConfirmAction,
     onCancel: onClearConfirm,
+    onOtpSubmit: onOtpSubmit,
   );
 }
 

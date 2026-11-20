@@ -9,6 +9,7 @@ class AiConfirmCard extends StatelessWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
   final String? errorMessage;
+  final ValueChanged<String>? onOtpSubmit; // 提现 OTP 验证码提交回调
 
   const AiConfirmCard({
     super.key,
@@ -17,6 +18,7 @@ class AiConfirmCard extends StatelessWidget {
     required this.onConfirm,
     required this.onCancel,
     this.errorMessage,
+    this.onOtpSubmit,
   });
 
   @override
@@ -28,12 +30,17 @@ class AiConfirmCard extends StatelessWidget {
         children: [
           // 头像
           Container(
-            width: 40.w, height: 40.w,
+            width: 40.w,
+            height: 40.w,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(6.r),
               color: const Color(0xFFF5F5F5),
             ),
-            child: Icon(Icons.support_agent, color: const Color(0xFF9E9E9E), size: 24.sp),
+            child: Icon(
+              Icons.support_agent,
+              color: const Color(0xFF9E9E9E),
+              size: 24.sp,
+            ),
           ),
           SizedBox(width: 8.w),
           // 卡片内容
@@ -88,47 +95,86 @@ class AiConfirmCard extends StatelessWidget {
     final entries = _paramEntries;
     if (entries.isEmpty) return const SizedBox.shrink();
     return Column(
-      children: entries.map((e) => Padding(
-        padding: EdgeInsets.symmetric(vertical: 2.h),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 64.w,
-              child: Text(e.label, style: TextStyle(fontSize: 12.sp, color: Colors.grey[500])),
+      children: entries
+          .map(
+            (e) => Padding(
+              padding: EdgeInsets.symmetric(vertical: 2.h),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 64.w,
+                    child: Text(
+                      e.label,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      e.value,
+                      style: TextStyle(fontSize: 13.sp, color: Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Expanded(
-              child: Text(e.value, style: TextStyle(fontSize: 13.sp, color: Colors.black87)),
-            ),
-          ],
-        ),
-      )).toList(),
+          )
+          .toList(),
     );
   }
 
   Widget _buildStatusBar() {
     switch (status) {
       case ConfirmCardStatus.expired:
-        return Text('已过期，请让 AI 重新发起', style: TextStyle(fontSize: 11.sp, color: Colors.orange));
+        return Text(
+          '已过期，请让 AI 重新发起',
+          style: TextStyle(fontSize: 11.sp, color: Colors.orange),
+        );
       case ConfirmCardStatus.loading:
         return Row(
           children: [
-            SizedBox(width: 12.w, height: 12.w, child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(
+              width: 12.w,
+              height: 12.w,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
             SizedBox(width: 6.w),
-            Text('处理中...', style: TextStyle(fontSize: 11.sp, color: Colors.grey[500])),
+            Text(
+              '处理中...',
+              style: TextStyle(fontSize: 11.sp, color: Colors.grey[500]),
+            ),
           ],
         );
       case ConfirmCardStatus.failed:
-        return Text(errorMessage ?? '操作失败', style: TextStyle(fontSize: 11.sp, color: Colors.red));
+        return Text(
+          errorMessage ?? '操作失败',
+          style: TextStyle(fontSize: 11.sp, color: Colors.red),
+        );
       case ConfirmCardStatus.success:
       case ConfirmCardStatus.cancelled:
         return const SizedBox.shrink();
       case ConfirmCardStatus.pending:
-        return Text('请在 60 秒内确认', style: TextStyle(fontSize: 11.sp, color: Colors.grey[400]));
+        return Text(
+          '请在 60 秒内确认',
+          style: TextStyle(fontSize: 11.sp, color: Colors.grey[400]),
+        );
+      case ConfirmCardStatus.needOtp:
+        return Text(
+          'Please enter the OTP code sent to your registered mobile number to complete the withdrawal.Valid for 60 seconds.',
+          style: TextStyle(fontSize: 11.sp, color: Colors.grey[500]),
+        );
     }
   }
 
   Widget _buildButtons() {
-    final disabled = status == ConfirmCardStatus.expired || status == ConfirmCardStatus.loading;
+    if (status == ConfirmCardStatus.needOtp) {
+      return _OtpInput(onSubmit: (code) => onOtpSubmit?.call(code));
+    }
+    final disabled =
+        status == ConfirmCardStatus.expired ||
+        status == ConfirmCardStatus.loading;
     return Row(
       children: [
         Expanded(
@@ -160,23 +206,35 @@ class AiConfirmCard extends StatelessWidget {
 
   IconData get _actionIcon {
     switch (data.action) {
-      case 'withdraw': return Icons.account_balance;
-      case 'claim_coupon': return Icons.card_giftcard;
-      case 'redeem_code': return Icons.vpn_key;
-      case 'draw': return Icons.casino;
-      case 'delete_address': return Icons.delete;
-      default: return Icons.description;
+      case 'withdraw':
+        return Icons.account_balance;
+      case 'claim_coupon':
+        return Icons.card_giftcard;
+      case 'redeem_code':
+        return Icons.vpn_key;
+      case 'draw':
+        return Icons.casino;
+      case 'delete_address':
+        return Icons.delete;
+      default:
+        return Icons.description;
     }
   }
 
   String get _actionTitle {
     switch (data.action) {
-      case 'withdraw': return '提现确认';
-      case 'claim_coupon': return '领券确认';
-      case 'redeem_code': return '兑换码确认';
-      case 'draw': return '抽奖确认';
-      case 'delete_address': return '删除地址确认';
-      default: return '操作确认';
+      case 'withdraw':
+        return '提现确认';
+      case 'claim_coupon':
+        return '领券确认';
+      case 'redeem_code':
+        return '兑换码确认';
+      case 'draw':
+        return '抽奖确认';
+      case 'delete_address':
+        return '删除地址确认';
+      default:
+        return '操作确认';
     }
   }
 
@@ -185,24 +243,20 @@ class AiConfirmCard extends StatelessWidget {
       case 'withdraw':
         return [
           _ParamEntry('金额', data.summary['amount']?.toString() ?? ''),
-          _ParamEntry('渠道', data.summary['channel']?.toString() ?? ''),
+          _ParamEntry('渠道', data.summary['channelId']?.toString() ?? ''),
+          _ParamEntry('账号', data.summary['account']?.toString() ?? ''),
+          _ParamEntry('户主', data.summary['accountName']?.toString() ?? ''),
+          _ParamEntry('手续费', data.summary['fee']?.toString() ?? ''),
+          _ParamEntry('到账', data.summary['netAmount']?.toString() ?? ''),
         ];
       case 'claim_coupon':
-        return [
-          _ParamEntry('优惠券', data.summary['couponId']?.toString() ?? ''),
-        ];
+        return [_ParamEntry('优惠券', data.summary['couponId']?.toString() ?? '')];
       case 'redeem_code':
-        return [
-          _ParamEntry('兑换码', data.summary['code']?.toString() ?? ''),
-        ];
+        return [_ParamEntry('兑换码', data.summary['code']?.toString() ?? '')];
       case 'draw':
-        return [
-          _ParamEntry('抽奖券', data.summary['ticketId']?.toString() ?? ''),
-        ];
+        return [_ParamEntry('抽奖券', data.summary['ticketId']?.toString() ?? '')];
       case 'delete_address':
-        return [
-          _ParamEntry('地址', data.summary['addressId']?.toString() ?? ''),
-        ];
+        return [_ParamEntry('地址', data.summary['addressId']?.toString() ?? '')];
       default:
         return [];
     }
@@ -213,4 +267,59 @@ class _ParamEntry {
   final String label;
   final String value;
   _ParamEntry(this.label, this.value);
+}
+
+/// 验证码输入框 — 自己管 controller，提交时把码回调出去
+class _OtpInput extends StatefulWidget {
+  final ValueChanged<String> onSubmit;
+  const _OtpInput({required this.onSubmit});
+
+  @override
+  State<_OtpInput> createState() => _OtpInputState();
+}
+
+class _OtpInputState extends State<_OtpInput> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _controller,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            decoration: InputDecoration(
+              hintText: 'Please enter the OTP code',
+              counterText: '',
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6.r),
+              ),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 8.w,
+                vertical: 4.h,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: 8.w),
+        ElevatedButton(
+          onPressed: () => widget.onSubmit(_controller.text.trim()),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF95EC69),
+            foregroundColor: Colors.black87,
+          ),
+          child: Text('Submit', style: TextStyle(fontSize: 13.sp)),
+        ),
+      ],
+    );
+  }
 }

@@ -182,8 +182,8 @@ class _ChatPageState extends ConsumerState<ChatPage> with ChatPageLogic {
 
                   final bool hasStreamingBubble = chatState.isAiStreaming;
                   // 流式气泡在 index 0（reverse: true 最底部），其后是消息列表 + loading
-                  final int itemCount = messages.length + 1 +
-                      (hasStreamingBubble ? 1 : 0);
+                  final int itemCount =
+                      messages.length + 1 + (hasStreamingBubble ? 1 : 0);
 
                   return Stack(
                     children: [
@@ -211,10 +211,30 @@ class _ChatPageState extends ConsumerState<ChatPage> with ChatPageLogic {
                               // 确认卡片优先级高于流式气泡
                               if (chatState.confirmData != null && index == 0) {
                                 return _buildConfirmCard(
-                                  context, chatState,
+                                  context,
+                                  chatState,
                                   conversationId: widget.conversationId,
-                                  onClearConfirm: () => ref.read(chatViewModelProvider(widget.conversationId).notifier).clearConfirm(),
-                                  onConfirmAction: () => ref.read(chatViewModelProvider(widget.conversationId).notifier).confirmAction(),
+                                  onClearConfirm: () => ref
+                                      .read(
+                                        chatViewModelProvider(
+                                          widget.conversationId,
+                                        ).notifier,
+                                      )
+                                      .clearConfirm(),
+                                  onConfirmAction: () => ref
+                                      .read(
+                                        chatViewModelProvider(
+                                          widget.conversationId,
+                                        ).notifier,
+                                      )
+                                      .confirmAction(),
+                                  onOtpSubmit: (code) => ref
+                                      .read(
+                                        chatViewModelProvider(
+                                          widget.conversationId,
+                                        ).notifier,
+                                      )
+                                      .confirmWithdrawOtp(code),
                                 );
                               }
                               if (hasStreamingBubble) {

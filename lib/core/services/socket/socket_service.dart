@@ -141,12 +141,13 @@ mixin SocketDispatcherMixin on _SocketBase {
       case SocketEvents.aiDone:
       case SocketEvents.aiError:
       case SocketEvents.aiTransfer:
+      case SocketEvents.aiConfirm:
+      case SocketEvents.aiActionResult:
         _onAiEvent(type, data);
         break;
 
       default:
         debugPrint(" [SocketService] Unhandled event type: $type, data: $data");
-
     }
   }
 
@@ -196,14 +197,18 @@ class SocketService extends _SocketBase
     required String token,
     TokenRefreshCallback? onTokenRefresh,
   }) async {
-    debugPrint('🔌 [SocketService] init() called with token: ${token.substring(0, 10)}...');
-    
+    debugPrint(
+      '🔌 [SocketService] init() called with token: ${token.substring(0, 10)}...',
+    );
+
     // 检查是否已经在初始化中
     if (_isInitializing) {
-      debugPrint('🔌 [SocketService] Already initializing, skipping duplicate call');
+      debugPrint(
+        '🔌 [SocketService] Already initializing, skipping duplicate call',
+      );
       return;
     }
-    
+
     _tokenRefresher =
         onTokenRefresh ?? onTokenRefreshRequest ?? _defaultTokenRefresher;
     _isInitializing = true;
@@ -216,11 +221,17 @@ class SocketService extends _SocketBase
         _isInitializing = false;
         return;
       }
-      debugPrint('🔌 [SocketService] Token validated: ${validToken.substring(0, 10)}...');
+      debugPrint(
+        '🔌 [SocketService] Token validated: ${validToken.substring(0, 10)}...',
+      );
 
       // 检查是否已经使用相同的Token连接
-      if (_socket != null && _socket!.connected && _currentToken == validToken) {
-        debugPrint("🔌 [SocketService] Already connected with same token, skipping");
+      if (_socket != null &&
+          _socket!.connected &&
+          _currentToken == validToken) {
+        debugPrint(
+          "🔌 [SocketService] Already connected with same token, skipping",
+        );
         _isInitializing = false;
         return;
       }
@@ -242,7 +253,7 @@ class SocketService extends _SocketBase
 
       final socketUrl = '${AppConfig.apiBaseUrl}/events';
       debugPrint('🔌 [SocketService] Connecting to: $socketUrl');
-      
+
       // 创建新的Socket连接
       _socket = IO.io(
         socketUrl,
@@ -269,47 +280,47 @@ class SocketService extends _SocketBase
         if (!_connectController.isClosed) _connectController.add(null);
         triggerSync();
       });
-      
+
       _socket!.onDisconnect((reason) {
         debugPrint('❌ [SocketService] Disconnected from server: $reason');
         _currentToken = null; // 断开时清除Token
       });
-      
+
       _socket!.onConnectError((data) {
         // Fix 1: Also release the lock on connection failure so the next
         // init() call (e.g. after a token refresh) is not silently skipped.
         _isInitializing = false;
         debugPrint('⚠️ [SocketService] Connection error: $data');
       });
-      
+
       _socket!.onError((data) {
         debugPrint('⚠️ [SocketService] Socket error: $data');
       });
-      
+
       _socket!.onReconnect((attempt) {
         debugPrint('🔄 [SocketService] Reconnecting (attempt $attempt)...');
       });
-      
+
       _socket!.onReconnectAttempt((attempt) {
         debugPrint('🔄 [SocketService] Reconnection attempt $attempt');
       });
-      
+
       _socket!.onReconnectError((error) {
         debugPrint('❌ [SocketService] Reconnection error: $error');
       });
-      
+
       _socket!.onReconnectFailed((_) {
         debugPrint('❌ [SocketService] Reconnection failed after all attempts');
       });
-      
+
       _socket!.on(SocketEvents.dispatch, (data) {
         debugPrint('📨 [SocketService] Received dispatch event');
         _handleDispatch(data);
       });
-      
+
       debugPrint('🔌 [SocketService] Starting connection...');
       _socket!.connect();
-      
+
       // 添加连接超时检查
       Future.delayed(const Duration(seconds: 10), () {
         if (_socket != null && !_socket!.connected && !_socket!.disconnected) {
@@ -317,7 +328,6 @@ class SocketService extends _SocketBase
           // 可以在这里触发重连或显示错误
         }
       });
-      
     } catch (e, stackTrace) {
       debugPrint('❌ [SocketService] init() failed: $e');
       debugPrint('❌ [SocketService] Stack trace: $stackTrace');
@@ -332,7 +342,9 @@ class SocketService extends _SocketBase
   }
 
   Future<String?> _ensureValidToken(String token) async {
-    debugPrint('🔑 [SocketService] Validating token: ${token.substring(0, 10)}...');
+    debugPrint(
+      '🔑 [SocketService] Validating token: ${token.substring(0, 10)}...',
+    );
     if (token.isEmpty) {
       debugPrint('🔑 [SocketService] Token is empty');
       return null;
@@ -341,7 +353,7 @@ class SocketService extends _SocketBase
     // 检查Token格式和过期状态
     bool isInvalid = false;
     String? validationError;
-    
+
     try {
       // 首先检查Token格式（基本的JWT格式检查）
       final parts = token.split('.');
@@ -359,14 +371,20 @@ class SocketService extends _SocketBase
     }
 
     if (isInvalid) {
-      debugPrint("🔑 [SocketService] Token invalid ($validationError), attempting refresh...");
+      debugPrint(
+        "🔑 [SocketService] Token invalid ($validationError), attempting refresh...",
+      );
       try {
         final refreshedToken = await _tokenRefresher?.call();
         if (refreshedToken != null && refreshedToken.isNotEmpty) {
-          debugPrint("🔑 [SocketService] Token refresh successful: ${refreshedToken.substring(0, 10)}...");
+          debugPrint(
+            "🔑 [SocketService] Token refresh successful: ${refreshedToken.substring(0, 10)}...",
+          );
           return refreshedToken;
         } else {
-          debugPrint("🔑 [SocketService] Token refresh failed or returned empty token");
+          debugPrint(
+            "🔑 [SocketService] Token refresh failed or returned empty token",
+          );
           return null;
         }
       } catch (e, stackTrace) {
@@ -386,7 +404,9 @@ class SocketService extends _SocketBase
       final success = await Http.tryRefreshToken(Http.rawDio);
       if (success) {
         final newToken = await Http.getToken();
-        debugPrint('🔄 [SocketService] Token refresh successful: ${newToken?.substring(0, 10)}...');
+        debugPrint(
+          '🔄 [SocketService] Token refresh successful: ${newToken?.substring(0, 10)}...',
+        );
         return newToken;
       } else {
         debugPrint('🔄 [SocketService] Token refresh failed');

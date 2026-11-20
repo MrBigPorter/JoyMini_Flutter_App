@@ -45,10 +45,11 @@ class AiActionResult {
 
 /// 卡片生命周期状态
 enum ConfirmCardStatus {
-  pending,    // 等待用户操作
-  expired,    // 已过期
-  loading,    // 确认中（调 API 中）
-  success,    // 操作成功
-  failed,     // 操作失败
-  cancelled,  // 用户取消
+  pending, // 等待用户操作
+  needOtp, // 提现已确认，等待输入验证码
+  expired, // 已过期
+  loading, // 确认中（调 API 中）
+  success, // 操作成功
+  failed, // 操作失败
+  cancelled, // 用户取消
 }
