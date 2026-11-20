@@ -8,7 +8,6 @@ import '../../models/chat_ui_model_mapper.dart';
 
 // Note: Declaring this class as a worker for <ChatPipelineContext>
 class ParseStep extends PipelineStep<ChatPipelineContext> {
-
   @override
   Future<void> execute(ChatPipelineContext ctx) async {
     // 1. If the pipeline has been aborted, stop execution
@@ -26,12 +25,15 @@ class ParseStep extends PipelineStep<ChatPipelineContext> {
         seqId: socketMsg.seqId,
         createdAt: socketMsg.createdAt,
         isSelf: false, // Message belongs to others
+        isAi: socketMsg.isAi,
         meta: socketMsg.meta,
-        sender: socketMsg.sender != null ? ChatSender(
-            id: socketMsg.sender!.id,
-            nickname: socketMsg.sender!.nickname,
-            avatar: socketMsg.sender!.avatar
-        ) : null,
+        sender: socketMsg.sender != null
+            ? ChatSender(
+                id: socketMsg.sender!.id,
+                nickname: socketMsg.sender!.nickname,
+                avatar: socketMsg.sender!.avatar,
+              )
+            : null,
       ),
       socketMsg.conversationId,
       ctx.currentUserId,
